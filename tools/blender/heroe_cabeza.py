@@ -87,3 +87,93 @@ def pelo():
     sol.vertex_group = 'Grosor'
     sol.thickness_vertex_group = 0.0
     return pc, top
+
+
+def bufanda():
+    tela = SF.material('M_Bufanda', (0.05, 0.14, 0.11, 1), rough=0.95)
+    N, R = 64, 22
+    secs = []
+    for j in range(R + 1):
+        t = j / R
+        pts = []
+        for k in range(N):
+            th = 2 * math.pi * k / N  # 0 = frente (-Y)
+            fr = max(0.0, math.cos(th)) ** 1.5
+            z_bot = 1.498 - 0.03 * fr
+            z_top = 1.648 - 0.062 * fr
+            z = z_bot + (z_top - z_bot) * t
+            r = 0.112 - 0.024 * t
+            r += 0.011 * math.sin(math.pi * t * 2.5) ** 2          # vueltas de la bufanda
+            r += 0.0045 * math.sin(7 * th + 5 * t) + 0.0028 * math.sin(13 * th - 3 * t + 1.3)  # pliegues
+            r += 0.006 * fr * (1 - t)                                # cae un poco adelante
+            ry = r * (0.96 + 0.06 * fr)
+            pts.append(Vector((math.sin(th) * r, -0.014 - math.cos(th) * ry, z)))
+        secs.append(pts)
+    ob = SF.loft_mesh('Bufanda', secs, closed_ends=False)
+    SF._with_mat(ob, tela)
+    SF.add_mods(ob, thick=0.012, levels=2, offset=1.0)
+    # cola anudada que cae por adelante, del lado derecho
+    objs = [o for o in (bpy.data.objects.get('Camiseta'), bpy.data.objects.get('Chaleco'), ob) if o]
+    bvh = SF.surface_bvh(objs)
+    path = [Vector((-0.035, -0.125, 1.535)), Vector((-0.05, -0.15, 1.47)), Vector((-0.058, -0.175, 1.41)),
+            Vector((-0.062, -0.19, 1.36))]
+    path = [bvh.ray_cast(p + Vector((0, -0.2, 0.02)), Vector((0, 1, -0.1)).normalized(), 0.4)[0] or p for p in path]
+    path = [p + Vector((0, -0.006, 0)) for p in path]
+    cola = SF.strap('BufandaCola', None, path, width=0.062, thick=0.014, mat=tela, bvh=bvh, gap=0.004, exp=2.4, sec=16,
+                    step=0.008)
+    nudo = SF.patch('BufandaNudo', None, Vector((-0.032, -0.2, 1.54)), Vector((0, 0.2, 1)), (0.06, 0.05), thick=0.026,
+                    puff=0.9, exp=2.2, mat=tela, bvh=SF.surface_bvh([ob]), seam=0.0, gap=0.0)
+    for o in (cola,):
+        d = o.modifiers.new('Sub', 'SUBSURF')
+        d.levels = 1
+    return ob
+
+
+def antiparras():
+    goma = SF.material('M_AntiparrasGoma', (0.05, 0.05, 0.055, 1), rough=0.6)
+    lente = SF.material('M_Lente', (0.9, 0.42, 0.08, 1), rough=0.08, metal=0.2)
+    aro = SF.material('M_AntiparrasAro', (0.35, 0.33, 0.30, 1), rough=0.3, metal=0.9)
+    hair = [o for o in (bpy.data.objects.get('PeloArriba'), bpy.data.objects.get('PeloCorto'), bpy.data.objects['Cuerpo']) if o]
+    bvh = SF.surface_bvh(hair)
+    hc = Vector((0, -0.055, 1.765))
+    F = Vector((0, -math.cos(math.radians(38)), math.sin(math.radians(38))))
+    hit = bvh.ray_cast(hc + F * 0.4, -F, 0.4)
+    P = hit[0]
+    X = Vector((1, 0, 0))
+    U = F.cross(X).normalized() * -1  # hacia la coronilla
+    if U.z < 0:
+        U = -U
+    parts = []
+    for i, sx in enumerate((1, -1)):
+        c = P + X * (sx * 0.034) + F * 0.004
+        hh = bvh.ray_cast(c + F * 0.2, -F, 0.3)
+        base = (hh[0] if hh[0] else c) + F * 0.002
+        secs = []
+        for d, rx, ry in ((0.0, 0.027, 0.019), (0.006, 0.0305, 0.0225), (0.016, 0.0305, 0.0225), (0.019, 0.027, 0.019)):
+            secs.append(SF.superellipse(base + F * d, rx, ry, 3.2, X, U, N=32))
+        cup = SF.loft_mesh('AntiparraCopa%d' % i, secs, closed_ends=True)
+        SF._with_mat(cup, goma)
+        d_ = cup.modifiers.new('Sub', 'SUBSURF')
+        d_.levels = 2
+        lens_secs = []
+        for d, s_ in ((0.0185, 1.0), (0.0205, 0.8), (0.0218, 0.5), (0.0223, 0.15)):
+            lens_secs.append(SF.superellipse(base + F * d, 0.0245 * s_, 0.0168 * s_, 3.2, X, U, N=32))
+        ln = SF.loft_mesh('AntiparraLente%d' % i, lens_secs, closed_ends=True)
+        SF._with_mat(ln, lente)
+        d_ = ln.modifiers.new('Sub', 'SUBSURF')
+        d_.levels = 2
+        rim = SF.tube('AntiparraAro%d' % i, SF.superellipse(base + F * 0.0185, 0.0262, 0.0182, 3.2, X, U, N=40), 0.0022,
+                      mat=aro, smooth_iters=0)
+        parts += [cup, ln, rim]
+    SF.rbox('AntiparraPuente', P + F * 0.012, (X, U, F), (0.016, 0.01, 0.008), bevel=0.003, mat=goma)
+    # correa elástica alrededor de la cabeza
+    path = []
+    for a in range(55, 306, 10):
+        th = math.radians(a)
+        d = Vector((math.sin(th), -math.cos(th), 0))
+        z = 1.792 + 0.03 * max(0.0, math.cos(th)) + 0.008 * (1 - abs(math.cos(th)))
+        o = Vector((0, -0.055, z))
+        hh = bvh.ray_cast(o + d * 0.25, -d, 0.25)
+        path.append((hh[0] if hh[0] else o + d * 0.1) + d * 0.004)
+    SF.strap('AntiparraCorrea', None, path, width=0.022, thick=0.004, mat=goma, bvh=bvh, gap=0.003, step=0.008)
+    return parts
