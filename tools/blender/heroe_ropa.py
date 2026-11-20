@@ -318,7 +318,7 @@ def botas():
         # --- caña: elipses que envuelven la pierna con holgura
         rings = []
         for z in [0.07 + 0.25 * k / 12 for k in range(13)]:
-            sl = body[(abs(body[:, 2] - z) < 0.008) & (body[:, 0] * sx > 0.06)]
+            sl = body[(abs(body[:, 2] - z) < 0.016) & (body[:, 0] * sx > 0.06) & (body[:, 1] > -0.09 + 0.3 * (0.12 - z))]
             cx = (sl[:, 0].min() + sl[:, 0].max()) / 2
             cy = (sl[:, 1].min() + sl[:, 1].max()) / 2
             rx = (sl[:, 0].max() - sl[:, 0].min()) / 2 + 0.014 + 0.004 * ss(0.25, 0.32, z)
