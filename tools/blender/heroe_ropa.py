@@ -337,7 +337,7 @@ def botas():
                 e = Vector((d.x / Rr.x, d.y / Rr.y, d.z / Rr.z)).length
                 if e > 1e-6:
                     v.co = v.co.lerp(C + d / e, w)
-            SF._lap(bm, 3, 0.45, wfn=lambda c: ss(0.03, -0.05, c.y) * ss(0.14, 0.08, c.z))
+            SF._lap(bm, 4, 0.5, wfn=lambda c: ss(0.03, -0.05, c.y) * ss(0.14, 0.08, c.z), taubin=True)
         # aplana la planta: todo lo que quedó por debajo de z=0.008 se apoya en la suela
         for v in bm.verts:
             if v.co.z < 0.008:
@@ -380,10 +380,10 @@ def botas():
         n_e = 7
         for i in range(n_e):
             t = i / (n_e - 1)
-            z = 0.275 - 0.19 * t
+            z = 0.278 - 0.175 * t
             slab = [c for c in bv if abs(c.z - z) < 0.012 and c.y > -0.06]
             O = sum(slab, Vector()) / len(slab)
-            phi = math.radians(6 + 64 * t ** 1.5)
+            phi = math.radians(6 + 50 * t ** 1.3)
             nd = (front * math.cos(phi) + up * math.sin(phi)).normalized()
             for lst, sgn in ((eyes_l, 1), (eyes_r, -1)):
                 Q = O + side_v * (sgn * 0.016)
