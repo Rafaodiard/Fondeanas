@@ -100,10 +100,10 @@ def bufanda():
             th = 2 * math.pi * k / N  # 0 = frente (-Y)
             fr = max(0.0, math.cos(th)) ** 1.5
             z_bot = 1.498 - 0.03 * fr
-            z_top = 1.648 - 0.062 * fr
+            z_top = 1.636 - 0.055 * fr
             z = z_bot + (z_top - z_bot) * t
             r = 0.112 - 0.024 * t
-            r += 0.011 * math.sin(math.pi * t * 2.5) ** 2          # vueltas de la bufanda
+            r += 0.009 * math.sin(math.pi * t * 2.0) ** 2          # vueltas de la bufanda
             r += 0.0045 * math.sin(7 * th + 5 * t) + 0.0028 * math.sin(13 * th - 3 * t + 1.3)  # pliegues
             r += 0.006 * fr * (1 - t)                                # cae un poco adelante
             ry = r * (0.96 + 0.06 * fr)
@@ -121,8 +121,29 @@ def bufanda():
     path = [p + Vector((0, -0.006, 0)) for p in path]
     cola = SF.strap('BufandaCola', None, path, width=0.062, thick=0.014, mat=tela, bvh=bvh, gap=0.004, exp=2.4, sec=16,
                     step=0.008)
-    nudo = SF.patch('BufandaNudo', None, Vector((-0.032, -0.2, 1.54)), Vector((0, 0.2, 1)), (0.06, 0.05), thick=0.026,
-                    puff=0.9, exp=2.2, mat=tela, bvh=SF.surface_bvh([ob]), seam=0.0, gap=0.0)
+    # vuelta superior cruzada en diagonal (se ve que la tela está enrollada)
+    secs = []
+    M = 72
+    for i in range(M):
+        th = 2 * math.pi * i / M
+        fr = max(0.0, math.cos(th)) ** 1.5
+        zc = 1.566 + 0.022 * math.sin(th + 0.9) - 0.03 * fr
+        r = 0.106 + 0.004 * math.sin(5 * th) + 0.006 * fr
+        C = Vector((math.sin(th) * r, -0.014 - math.cos(th) * r * (0.96 + 0.06 * fr), zc))
+        radial = Vector((math.sin(th), -math.cos(th), 0))
+        tang = Vector((math.cos(th), math.sin(th), 0))
+        up = radial.cross(tang).normalized()
+        if up.z < 0:
+            up = -up
+        h = 0.03 + 0.008 * math.sin(3 * th + 1)
+        secs.append(SF.superellipse(C + radial * 0.006, 0.011, h, 2.2, radial, up, N=14))
+    vuelta = SF.loft_ring('BufandaVuelta', secs)
+    SF._with_mat(vuelta, tela)
+    d = vuelta.modifiers.new('Sub', 'SUBSURF')
+    d.levels = 2
+    nudo = SF.patch('BufandaNudo', None, Vector((-0.032, -0.2, 1.528)), Vector((0.25, 0.15, 1)), (0.05, 0.036), thick=0.018,
+                    puff=0.8, exp=2.6, mat=tela, bvh=SF.surface_bvh([ob, vuelta]), seam=0.0, gap=0.0,
+                    shape=lambda x, y: (x * (1 + 0.25 * y / 0.018), y))
     for o in (cola,):
         d = o.modifiers.new('Sub', 'SUBSURF')
         d.levels = 1
@@ -171,7 +192,7 @@ def antiparras():
     for a in range(55, 306, 10):
         th = math.radians(a)
         d = Vector((math.sin(th), -math.cos(th), 0))
-        z = 1.792 + 0.03 * max(0.0, math.cos(th)) + 0.008 * (1 - abs(math.cos(th)))
+        z = 1.806 + 0.022 * max(0.0, math.cos(th))
         o = Vector((0, -0.055, z))
         hh = bvh.ray_cast(o + d * 0.25, -d, 0.25)
         path.append((hh[0] if hh[0] else o + d * 0.1) + d * 0.004)

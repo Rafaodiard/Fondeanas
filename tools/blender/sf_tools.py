@@ -171,6 +171,30 @@ def superellipse(center, rx, ry, n, axis_u, axis_v, N=32):
     return pts
 
 
+def loft_ring(name, sections):
+    # Loft cerrado en las dos direcciones (anillo de secciones), p. ej. una vuelta de bufanda.
+    M = len(sections)
+    N = len(sections[0])
+    verts = [tuple(p) for sec in sections for p in sec]
+    faces = []
+    for i in range(M):
+        i2 = (i + 1) % M
+        for k in range(N):
+            k2 = (k + 1) % N
+            faces.append((i * N + k, i * N + k2, i2 * N + k2, i2 * N + k))
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], faces)
+    me.validate()
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bm.to_mesh(me)
+    bm.free()
+    for p in me.polygons:
+        p.use_smooth = True
+    return new_obj(name, me)
+
+
 def apply_mods(ob, keep=()):
     """Aplica los modificadores sin bpy.ops (más estable desde el servidor MCP)."""
     dg = bpy.context.evaluated_depsgraph_get()
