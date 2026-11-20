@@ -324,20 +324,20 @@ def botas():
                         mat=cuero, edge_smooth=5)
         # puntera: proyecta la zona de los dedos sobre un elipsoide (bota de puntera redonda, sin dedos marcados)
         import bmesh
-        C = Vector((sx * 0.214, -0.085, 0.045))
-        Rr = Vector((0.052, 0.105, 0.05))
+        C = Vector((sx * 0.216, -0.072, 0.036))
+        Rr = Vector((0.05, 0.094, 0.041))
         bm = bmesh.new()
         bm.from_mesh(b.data)
         for _ in range(2):
             for v in bm.verts:
-                w = ss(-0.02, -0.075, v.co.y) * ss(0.13, 0.07, v.co.z)
+                w = ss(0.0, -0.085, v.co.y) * ss(0.12, 0.05, v.co.z)
                 if w <= 0:
                     continue
                 d = v.co - C
                 e = Vector((d.x / Rr.x, d.y / Rr.y, d.z / Rr.z)).length
                 if e > 1e-6:
                     v.co = v.co.lerp(C + d / e, w)
-            SF._lap(bm, 2, 0.4, wfn=lambda c: ss(0.0, -0.06, c.y))
+            SF._lap(bm, 3, 0.45, wfn=lambda c: ss(0.03, -0.05, c.y) * ss(0.14, 0.08, c.z))
         # aplana la planta: todo lo que quedó por debajo de z=0.008 se apoya en la suela
         for v in bm.verts:
             if v.co.z < 0.008:
@@ -375,19 +375,19 @@ def botas():
         front = Vector((0.26 * sx, -0.97, 0)).normalized()
         up = Vector((0, 0, 1))
         side_v = front.cross(up).normalized()
-        O0 = Vector((sx * 0.183, 0.03, 0.275))   # eje interno de la caña
-        O1 = Vector((sx * 0.205, -0.055, 0.05))   # interior del empeine
+        bv = [v.co for v in b.data.vertices]
         eyes_l, eyes_r = [], []
         n_e = 7
         for i in range(n_e):
             t = i / (n_e - 1)
-            O = O0.lerp(O1, t)
-            phi = math.radians(8 + 62 * t)
+            z = 0.275 - 0.19 * t
+            slab = [c for c in bv if abs(c.z - z) < 0.012 and c.y > -0.06]
+            O = sum(slab, Vector()) / len(slab)
+            phi = math.radians(6 + 64 * t ** 1.5)
             nd = (front * math.cos(phi) + up * math.sin(phi)).normalized()
-            sv = nd.cross(side_v).cross(nd).normalized() * -1 if False else side_v
             for lst, sgn in ((eyes_l, 1), (eyes_r, -1)):
-                Q = O + sv * (sgn * 0.016)
-                hh = bvh.ray_cast(Q + nd * 0.25, -nd, 0.25)
+                Q = O + side_v * (sgn * 0.016)
+                hh = bvh.ray_cast(Q + nd * 0.3, -nd, 0.45)
                 lst.append((hh[0] if hh[0] else Q + nd * 0.05) + nd * 0.0035)
         laces = []
         for i in range(n_e - 1):
