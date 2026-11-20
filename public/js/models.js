@@ -1,5 +1,6 @@
 // Modelos low-poly procedurales (provisorios hasta reemplazarlos por GLB hechos en Blender).
 import * as THREE from 'three';
+import { cloneAsset } from './assets.js';
 
 const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.8, ...extra });
 
@@ -12,6 +13,23 @@ function box(w, h, d, mat, x = 0, y = 0, z = 0) {
 
 // Personaje articulado: el grupo raíz está en los pies, mira hacia -Z.
 export function createCharacter(color) {
+  const glb = cloneAsset('personaje', null, { Ropa: color });
+  if (glb) {
+    const root = new THREE.Group();
+    root.add(glb);
+    const n = (k) => glb.getObjectByName(k);
+    const glider = createGlider(color);
+    glider.visible = false;
+    glider.position.y = 2.3;
+    root.add(glider);
+    root.userData = { hips: n('Cadera'), armL: n('BrazoI'), armR: n('BrazoD'), legL: n('PiernaI'), legR: n('PiernaD'), headG: n('Cabeza'), gun: n('Mano'), glider, phase: 0, swing: 0, held: null };
+    setHeld(root, 'pico');
+    return root;
+  }
+  return createCharacterProcedural(color);
+}
+
+function createCharacterProcedural(color) {
   const root = new THREE.Group();
   const body = std(color), skin = std('#f1c29a'), dark = std('#2b2d42'), boots = std('#3a2a20');
   const hips = new THREE.Group(); hips.position.y = 0.95; root.add(hips);
@@ -49,6 +67,9 @@ export function createCharacter(color) {
 }
 
 export function createGlider(color) {
+  const glb = cloneAsset('planeador', null, { Tela: color });
+  if (glb) { const g = new THREE.Group(); glb.position.y = 0.6; g.add(glb); return g; }
+
   const g = new THREE.Group();
   const canopyMat = std(color, { side: THREE.DoubleSide });
   const shape = new THREE.Shape();
@@ -99,6 +120,14 @@ export function animateCharacter(char, state, speed, dt, aiming) {
 
 // Bus volador original: colectivo con alas, hélices y aleta de cola.
 export function createBus() {
+  const glb = cloneAsset('bus');
+  if (glb) {
+    const g = new THREE.Group();
+    g.add(glb);
+    g.userData.props = [glb.getObjectByName('Helice_I'), glb.getObjectByName('Helice_D')].filter(Boolean);
+    return g;
+  }
+
   const g = new THREE.Group();
   const paint = std('#2a9d8f'), stripe = std('#f4d35e'), glass = std('#bde0fe', { roughness: 0.1, metalness: 0.2 }), dark = std('#22223b');
   g.add(box(4, 3.4, 12, paint, 0, 0, 0));
@@ -163,6 +192,16 @@ const WEAPON_SHAPES = {
 
 // Arma orientada a lo largo de -Y (para la mano) o de -Z (para el piso), con franja del color de la rareza.
 export function createWeaponModel(type, color, alongZ = false) {
+  const glb = cloneAsset('armas', type, { Rareza: color });
+  if (glb) {
+    // En el GLB el cañón apunta a -Z; en la mano tiene que seguir el brazo (-Y).
+    const w = new THREE.Group();
+    if (!alongZ) glb.rotation.x = -Math.PI / 2;
+    w.add(glb);
+    w.userData.glb = true;
+    return w;
+  }
+
   const g = new THREE.Group();
   const [len, th, stock, mag, scope] = WEAPON_SHAPES[type] || WEAPON_SHAPES.rifle;
   const accent = std(color, { emissive: color, emissiveIntensity: 0.25 });
@@ -185,6 +224,9 @@ export function createWeaponModel(type, color, alongZ = false) {
 }
 
 export function createPickaxe() {
+  const glb = cloneAsset('armas', 'pico');
+  if (glb) { const w = new THREE.Group(); glb.rotation.x = -Math.PI / 2; glb.position.y = 0.1; w.add(glb); return w; }
+
   const g = new THREE.Group();
   g.add(box(0.07, 1.0, 0.07, std('#7a5233'), 0, -0.3, 0));
   const head = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.9, 5), std('#c9d6e3', { metalness: 0.6, roughness: 0.3 }));
@@ -215,10 +257,15 @@ export function createItemMesh(item, color) {
   const spin = new THREE.Group();
   spin.position.y = 0.45;
   g.add(spin);
+  const propName = item.kind === 'ammo' ? 'municion' : item.kind === 'mat' ? 'material' : item.kind === 'consumable' ? item.c : null;
+  const prop = propName && cloneAsset('objetos', propName, { Tinte: color, Mat: color });
   if (item.kind === 'weapon') {
     const w = createWeaponModel(item.w, color, true);
-    w.rotation.z = Math.PI / 2;
+    if (!w.userData.glb) w.rotation.z = Math.PI / 2;
+    else w.position.z = 0.4;
     spin.add(w);
+  } else if (prop) {
+    spin.add(prop);
   } else if (item.kind === 'ammo') {
     spin.add(box(0.45, 0.3, 0.3, std('#4b5320')));
     spin.add(box(0.47, 0.08, 0.32, std(color, { emissive: color, emissiveIntensity: 0.4 }), 0, 0.05, 0));

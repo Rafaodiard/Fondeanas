@@ -39,6 +39,14 @@ function makeNoise(seed) {
 
 export const SEA_LEVEL = 0;
 
+// Lo completa el cliente con los modelos de Blender (assets.js). El servidor no lo usa.
+export const MODEL = { clone: null, baked: null };
+const houseTints = [
+  { Pared: '#f2e6cf', Techo: '#d0563f' },
+  { Pared: '#cfe3f0', Techo: '#3d5a80' },
+  { Pared: '#f4c7a1', Techo: '#6b4a36' },
+];
+
 export class World {
   constructor(seed, size) {
     this.seed = seed;
@@ -298,6 +306,7 @@ export class World {
       new THREE.MeshStandardMaterial({ color: '#5b4636', flatShading: true })];
     const floorMat = new THREE.MeshStandardMaterial({ color: '#9c7b55' });
     const glass = new THREE.MeshStandardMaterial({ color: '#9bd3ff', emissive: '#1d3d55', roughness: 0.1 });
+    const hiddenMat = new THREE.MeshBasicMaterial({ visible: false });
     for (const h of this.houses) {
       const group = new THREE.Group();
       const { cx, cz, w, d, base, minBase } = h;
@@ -306,14 +315,21 @@ export class World {
       found.position.set(cx, minBase + foundH / 2 - 0.15, cz);
       found.receiveShadow = true;
       group.add(found);
+      const glb = MODEL.clone?.('casa', null, houseTints[h.style]);
+      if (glb) {
+        glb.position.set(cx, base - 0.02, cz);
+        glb.scale.set(w / 10, 1, d / 10);
+        group.add(glb);
+      }
       for (const [x, y, z, sx, sy, sz] of h.walls) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), wallMat[h.style]);
+        const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), glb ? hiddenMat : wallMat[h.style]);
         m.position.set(x, y, z);
         m.castShadow = true; m.receiveShadow = true;
         m.userData.harvest = { kind: 'house' };
         group.add(m);
         this.solidMeshes.push(m);
       }
+      if (glb) { scene.add(group); continue; }
       const roofGeo = new THREE.CylinderGeometry(0.01, Math.max(w, d) * 0.75, 3, 4, 1);
       roofGeo.rotateY(Math.PI / 4);
       roofGeo.scale(w / Math.max(w, d), 1, d / Math.max(w, d));
@@ -340,13 +356,21 @@ export class World {
     const pineGeo = mergeCones([[2.6, 3.4, 3.2], [2.0, 3.0, 5.0], [1.3, 2.6, 6.6]]);
     const roundGeo = new THREE.IcosahedronGeometry(2.4, 0);
     roundGeo.translate(0, 4.6, 0);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: '#7a5233', flatShading: true });
-    const pineMat = new THREE.MeshStandardMaterial({ color: '#2f7a3b', flatShading: true });
-    const roundMat = new THREE.MeshStandardMaterial({ color: '#59a83c', flatShading: true });
+    let trunkMat = new THREE.MeshStandardMaterial({ color: '#7a5233', flatShading: true });
+    let pineMat = new THREE.MeshStandardMaterial({ color: '#2f7a3b', flatShading: true });
+    let roundMat = new THREE.MeshStandardMaterial({ color: '#59a83c', flatShading: true });
+    let trunkGeoG = trunkGeo, pineGeoG = pineGeo, roundGeoG = roundGeo;
+    const pino = MODEL.baked?.('pino'), arbol = MODEL.baked?.('arbol');
+    if (pino && arbol) {
+      const by = (parts, n) => parts.find((p) => p.name === n);
+      ({ geometry: pineGeoG, material: pineMat } = by(pino, 'HojasPino'));
+      ({ geometry: roundGeoG, material: roundMat } = by(arbol, 'HojasArbol'));
+      ({ geometry: trunkGeoG, material: trunkMat } = by(arbol, 'TroncoArbol'));
+    }
     const list = this.trees;
-    this.trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, list.length);
-    this.pines = new THREE.InstancedMesh(pineGeo, pineMat, list.filter((t) => t.pine).length);
-    this.rounds = new THREE.InstancedMesh(roundGeo, roundMat, list.filter((t) => !t.pine).length);
+    this.trunks = new THREE.InstancedMesh(trunkGeoG, trunkMat, list.length);
+    this.pines = new THREE.InstancedMesh(pineGeoG, pineMat, list.filter((t) => t.pine).length);
+    this.rounds = new THREE.InstancedMesh(roundGeoG, roundMat, list.filter((t) => !t.pine).length);
     this.pineToTree = []; this.roundToTree = [];
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), eu = new THREE.Euler();
     list.forEach((t, i) => {
@@ -366,9 +390,11 @@ export class World {
   }
 
   buildRocks(scene) {
-    const geo = new THREE.DodecahedronGeometry(1, 0);
+    let geo = new THREE.DodecahedronGeometry(1, 0);
     geo.scale(1.3, 0.8, 1);
-    const mat = new THREE.MeshStandardMaterial({ color: '#9a958a', flatShading: true });
+    let mat = new THREE.MeshStandardMaterial({ color: '#9a958a', flatShading: true });
+    const roca = MODEL.baked?.('roca');
+    if (roca) ({ geometry: geo, material: mat } = roca[0]);
     this.rockMesh = new THREE.InstancedMesh(geo, mat, this.rocks.length);
     const m = new THREE.Matrix4();
     this.rocks.forEach((r, i) => {
@@ -385,6 +411,18 @@ export class World {
   buildChests(scene) {
     this.chestMeshes = this.chestSpots.map((c, idx) => {
       const g = new THREE.Group();
+      const glbChest = MODEL.clone?.('cofre');
+      if (glbChest) {
+        g.add(glbChest);
+        const glow = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffd76a', transparent: true, opacity: 0.18, depthWrite: false, blending: THREE.AdditiveBlending }));
+        glow.position.y = 0.5;
+        g.add(glow);
+        g.position.set(c.x, c.y, c.z);
+        g.rotation.y = c.rot;
+        g.userData = { lid: glbChest.getObjectByName('Tapa'), glow, idx, open: false };
+        scene.add(g);
+        return g;
+      }
       const wood = new THREE.MeshStandardMaterial({ color: '#8a5a2b', flatShading: true });
       const trim = new THREE.MeshStandardMaterial({ color: '#ffcf4a', metalness: 0.6, roughness: 0.3, emissive: '#5a3c00' });
       const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 0.8), wood);
@@ -416,7 +454,7 @@ export class World {
     const c = this.chestMeshes?.[idx];
     if (!c || c.userData.open) return;
     c.userData.open = true;
-    c.userData.lid.rotation.x = -1.9;
+    c.userData.lid.rotation.x = 1.9;
     c.remove(c.userData.glow);
   }
 
