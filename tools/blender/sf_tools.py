@@ -404,6 +404,78 @@ def add_mods(ob, thick=0.012, levels=2, offset=1.0, rim=True):
     return ob
 
 
+def border_loops(ob, min_len=6):
+    # Lazos de borde (aristas abiertas) de una malla: lista de [(co, normal), ...] en coords de mundo.
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bm.transform(ob.matrix_world)
+    bm.normal_update()
+    edges = set(e for e in bm.edges if e.is_boundary)
+    loops = []
+    while edges:
+        e0 = edges.pop()
+        chain = [e0.verts[0], e0.verts[1]]
+        while True:
+            v = chain[-1]
+            nxt = [e for e in v.link_edges if e in edges]
+            if not nxt:
+                break
+            e = nxt[0]
+            edges.discard(e)
+            w = e.other_vert(v)
+            if w is chain[0]:
+                break
+            chain.append(w)
+        if len(chain) >= min_len:
+            loops.append([(v.co.copy(), v.normal.copy()) for v in chain])
+    bm.free()
+    return loops
+
+
+def tube(name, pts, radius, mat=None, closed=True, res=6, color=(0.2, 0.2, 0.2, 1), smooth_iters=2):
+    # Tubo (vivo, ribete, correa redonda) a lo largo de una polilínea.
+    pts = [Vector(p) for p in pts]
+    for _ in range(smooth_iters):
+        n = len(pts)
+        pts = [(pts[(k - 1) % n] + pts[k] * 2 + pts[(k + 1) % n]) / 4 if (closed or 0 < k < n - 1) else pts[k]
+               for k in range(n)]
+    cu = bpy.data.curves.new(name + '_cu', 'CURVE')
+    cu.dimensions = '3D'
+    cu.bevel_depth = radius
+    cu.bevel_resolution = max(1, res // 2 - 1)
+    cu.use_fill_caps = True
+    sp = cu.splines.new('POLY')
+    sp.points.add(len(pts) - 1)
+    for k, p in enumerate(pts):
+        sp.points[k].co = (p.x, p.y, p.z, 1)
+    sp.use_cyclic_u = closed
+    tmp = bpy.data.objects.new(name + '_tmp', cu)
+    coll().objects.link(tmp)
+    dg = bpy.context.evaluated_depsgraph_get()
+    me = bpy.data.meshes.new_from_object(tmp.evaluated_get(dg))
+    bpy.data.objects.remove(tmp)
+    bpy.data.curves.remove(cu)
+    for p in me.polygons:
+        p.use_smooth = True
+    ob = new_obj(name, me)
+    ob.data.materials.append(mat or material('M_' + name, color))
+    return ob
+
+
+def trims(ob, name, radius, mat=None, thick=0.0, select=None, out=0.0):
+    # Ribetes en todos los bordes abiertos de una prenda (centrados en el espesor del solidify).
+    objs = []
+    for k, lp in enumerate(border_loops(ob)):
+        c = sum((p for p, n in lp), Vector()) / len(lp)
+        if select and not select(c, lp):
+            continue
+        pts = [p + n * (thick * 0.5 + out) for p, n in lp]
+        objs.append(tube('%s_%d' % (name, k), pts, radius, mat=mat))
+    if not objs:
+        return None
+    return join_meshes(name, objs) if len(objs) > 1 else objs[0]
+
+
 builtins.SF = type('SF', (), {k: staticmethod(v) if callable(v) else v for k, v in dict(globals()).items()
                                if not k.startswith('__') and k not in ('bpy', 'bmesh', 'builtins', 'math', 'base64', 'os', 'np',
                                                                        'Vector', 'Euler', 'Matrix')})
