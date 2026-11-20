@@ -301,6 +301,104 @@ def chaleco_detalles():
     SF.tube('ArgollaArnes', ring, 0.004, mat=metal, smooth_iters=0)
 
 
+def _suela(b, side, H, T, mat):
+    # Suela de bota militar: contorno ceñido a la planta, taco con quiebre en el arco, puntera levantada,
+    # canto casi recto con chaflán abajo y un reborde (vira) donde apoya el cuero.
+    import bmesh
+    for n in ('Suela' + side,):
+        o = bpy.data.objects.get(n)
+        if o:
+            bpy.data.objects.remove(o)
+    pts = [Vector((v.co.x, v.co.y)) for v in b.data.vertices if v.co.z < 0.02]
+    C = sum(pts, Vector((0, 0))) / len(pts)
+    M = 72
+    rad = [0.0] * M
+    for p in pts:
+        d = p - C
+        k = int(round(math.atan2(d.y, d.x) / (2 * math.pi) * M)) % M
+        rad[k] = max(rad[k], d.length)
+    for k in range(M):  # huecos de bins vacíos
+        if rad[k] == 0:
+            rad[k] = max(rad[k - 1], rad[(k + 1) % M])
+    for _ in range(3):
+        rad = [(rad[k - 1] + 2 * rad[k] + rad[(k + 1) % M]) / 4 for k in range(M)]
+    dirs = [Vector((math.cos(2 * math.pi * k / M), math.sin(2 * math.pi * k / M))) for k in range(M)]
+    ax = (T - H).to_2d()
+    L = ax.length
+    ax.normalize()
+
+    def tpar(q):
+        return max(0.0, min(1.0, (q - H.to_2d()).dot(ax) / L))
+
+    def zb(q):  # altura de la cara de abajo
+        t = tpar(q)
+        z = -0.032
+        z += 0.014 * ss(0.30, 0.335, t) * (1 - ss(0.46, 0.56, t))   # arco (entre taco y planta)
+        z += 0.006 * ss(0.30, 0.335, t)                              # planta más fina que el taco
+        z += 0.012 * ss(0.80, 1.0, t)                                # puntera levantada
+        return z
+
+    def ring(off, zf, scale=1.0):
+        out = []
+        for k in range(M):
+            q = C + dirs[k] * (rad[k] * scale + off)
+            out.append(Vector((q.x, q.y, zf(q) if callable(zf) else zf)))
+        return out
+
+    secs = [ring(0, zb, 0.06), ring(0, zb, 0.4), ring(0, zb, 0.72), ring(-0.002, zb, 0.93),
+            ring(0.002, lambda q: zb(q)), ring(0.0045, lambda q: zb(q) + 0.002), ring(0.005, lambda q: zb(q) + 0.005),
+            ring(0.005, -0.004), ring(0.0058, -0.002), ring(0.0058, 0.004), ring(0.004, 0.0065), ring(-0.004, 0.008),
+            ring(-0.004, 0.012, 0.6)]
+    so = SF.loft_mesh('Suela' + side, secs, closed_ends=True)
+    bm = bmesh.new()
+    bm.from_mesh(so.data)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bm.to_mesh(so.data)
+    bm.free()
+    SF._with_mat(so, mat)
+    d = so.modifiers.new('Sub', 'SUBSURF')
+    d.levels = 2
+    return so
+
+
+def pantalon_sobre_botas():
+    # Botamanga "blusada": el pantalón se ciñe a la caña y la tela sobrante cae por encima con pliegues.
+    import numpy as np
+    pa = bpy.data.objects['Pantalon']
+    me = pa.data
+    if 'co_orig' not in me.attributes:
+        at = me.attributes.new('co_orig', 'FLOAT_VECTOR', 'POINT')
+        at.data.foreach_set('vector', SF.get_co(pa).ravel())
+    co = np.empty(len(me.vertices) * 3)
+    me.attributes['co_orig'].data.foreach_get('vector', co)
+    co = co.reshape(-1, 3)
+    for side, sx in (('I', 1), ('D', -1)):
+        bo = bpy.data.objects['Bota' + side]
+        bvh = SF.surface_bvh(bo)
+        bc = SF.get_co(bo)
+        for i, p in enumerate(co):
+            z = p[2]
+            if z > 0.43 or p[0] * sx <= 0:
+                continue
+            zc = min(max(z, 0.27), 0.33)
+            sl = bc[np.abs(bc[:, 2] - zc) < 0.008]
+            c = Vector((sl[:, 0].min() + sl[:, 0].max(), sl[:, 1].min() + sl[:, 1].max(), 0)) / 2
+            d = Vector((p[0] - c.x, p[1] - c.y, 0))
+            r = d.length
+            d.normalize()
+            o = Vector((c.x, c.y, zc)) + d * 0.25
+            hit = bvh.ray_cast(o, -d, 0.3)
+            rb = ((hit[0] - Vector((c.x, c.y, zc))).to_2d().length if hit[0] else r - 0.03)
+            ang = math.atan2(d.y, d.x)
+            pli = 0.0035 * math.sin(9 * ang + 40 * z) * math.exp(-((z - 0.30) / 0.03) ** 2)
+            tgt = rb + 0.003 + 0.024 * ss(0.272, 0.30, z) + pli
+            w = ss(0.31, 0.42, z)
+            rn = tgt + (r - tgt) * w
+            co[i][0] = c.x + d.x * rn
+            co[i][1] = c.y + d.y * rn
+    SF.set_co(pa, co)
+
+
 def botas():
     # Bota procedural: caña (anillos ajustados a la pierna) + pie (secciones a lo largo del pie), unidos por vóxeles.
     import bmesh
@@ -317,51 +415,34 @@ def botas():
     for side, sx in (('I', 1), ('D', -1)):
         # --- caña: elipses que envuelven la pierna con holgura
         rings = []
-        for z in [0.105 + 0.215 * k / 11 for k in range(12)]:
+        for z in [0.105 + 0.235 * k / 11 for k in range(12)]:
             sl = body[(abs(body[:, 2] - z) < 0.016) & (body[:, 0] * sx > 0.06) & (body[:, 1] > -0.045)]
             cx = (sl[:, 0].min() + sl[:, 0].max()) / 2
             cy = (sl[:, 1].min() + sl[:, 1].max()) / 2
-            k_ = 0.78 + 0.22 * ss(0.105, 0.17, z)  # abajo se mete dentro del pie (sin escalón en el talón)
+            k_ = 0.9 + 0.1 * ss(0.105, 0.17, z)  # abajo se mete apenas dentro del pie
             rx = ((sl[:, 0].max() - sl[:, 0].min()) / 2 + 0.014 + 0.004 * ss(0.25, 0.32, z)) * k_
             ry = ((sl[:, 1].max() - sl[:, 1].min()) / 2 + 0.014 + 0.004 * ss(0.25, 0.32, z)) * k_
             rings.append(SF.superellipse((cx, cy, z), rx, ry, 2.2, (1, 0, 0), (0, 1, 0), N=40))
         cana = SF.loft_mesh('_Cana' + side, rings, closed_ends=True)
-        # --- pie: secciones transversales del talón a la punta, base plana
-        H = Vector((sx * 0.19, 0.075, 0))
-        T = Vector((sx * 0.243, -0.178, 0))
+        # --- pie: secciones del talón (que continúa la caña) a la punta, base plana y puntera ancha
+        H = Vector((sx * 0.19, 0.128, 0))
+        T = Vector((sx * 0.255, -0.178, 0))
         ax = (T - H).normalized()
         lat = Vector((-ax.y, ax.x, 0)) * (1 if sx > 0 else -1)
-        prof = [(0.0, 0.080, 0.115), (0.12, 0.092, 0.14), (0.3, 0.097, 0.13), (0.5, 0.102, 0.092), (0.68, 0.106, 0.074),
-                (0.82, 0.100, 0.064), (0.92, 0.084, 0.056), (0.98, 0.058, 0.046), (1.0, 0.03, 0.03)]
+        prof = [(0.0, 0.074, 0.13), (0.06, 0.092, 0.142), (0.22, 0.098, 0.138), (0.42, 0.106, 0.104),
+                (0.60, 0.114, 0.080), (0.76, 0.117, 0.067), (0.87, 0.112, 0.061), (0.94, 0.098, 0.056),
+                (0.985, 0.072, 0.048), (1.0, 0.044, 0.038)]
         secs = []
         L = (T - H).length
         for t, w, h in prof:
             P = H + ax * (L * t)
-            secs.append(SF.superellipse((P.x, P.y, 0.006 + h / 2), w / 2, h / 2, 2.4, lat, (0, 0, 1), N=40))
+            secs.append(SF.superellipse((P.x, P.y, 0.006 + h / 2), w / 2, h / 2, 2.8, lat, (0, 0, 1), N=40))
         pie = SF.loft_mesh('_Pie' + side, secs, closed_ends=True)
         b = SF.join_meshes('Bota' + side, [cana, pie])
-        SF.voxel(b, size=0.0026, smooth_iter=12)
+        SF.voxel(b, size=0.0024, smooth_iter=12)
         b.data.materials.clear()
         b.data.materials.append(cuero)
-        # --- suela: contorno de la planta, ensanchado, con canto redondeado
-        pts = [Vector((v.co.x, v.co.y)) for v in b.data.vertices if v.co.z < 0.03]
-        cx = sum(p.x for p in pts) / len(pts)
-        cy = sum(p.y for p in pts) / len(pts)
-        M = 48
-        ring = []
-        for k in range(M):
-            a = 2 * math.pi * k / M
-            d = Vector((math.cos(a), math.sin(a)))
-            ring.append(max(((p - Vector((cx, cy))).dot(d) for p in pts), default=0.05))
-        ring = [(ring[k - 1] + 2 * ring[k] + ring[(k + 1) % M]) / 4 for k in range(M)]
-        ssecs = []
-        for z, grow in ((-0.034, 0.003), (-0.031, 0.007), (-0.006, 0.008), (0.006, 0.006), (0.016, -0.002)):
-            ssecs.append([Vector((cx + math.cos(2 * math.pi * k / M) * (ring[k] + grow),
-                                  cy + math.sin(2 * math.pi * k / M) * (ring[k] + grow), z)) for k in range(M)])
-        so = SF.loft_mesh('Suela' + side, ssecs, closed_ends=True)
-        SF._with_mat(so, suela_m)
-        d = so.modifiers.new('Sub', 'SUBSURF')
-        d.levels = 2
+        _suela(b, side, H, T, suela_m)
         # --- cordones cruzados sobre el empeine
         bvh = SF.surface_bvh(b)
         front = Vector((0.26 * sx, -0.97, 0)).normalized()
@@ -388,9 +469,6 @@ def botas():
             laces.append(SF.tube('Cordon%s%db' % (side, i), [eyes_r[i], eyes_l[i + 1]], 0.0028, mat=cordon, closed=False,
                                  smooth_iters=0))
         SF.join_meshes('Cordones' + side, laces)
-        # --- cuello acolchado arriba de la caña
-        top = [Vector(p) + (Vector(p) - Vector((sum(q[0] for q in rings[-1]) / 40, sum(q[1] for q in rings[-1]) / 40,
-                                                     p[2]))).normalized() * 0.002 for p in rings[-1]]
-        SF.tube('BotaCuello' + side, top, 0.008, mat=cuero, smooth_iters=1)
+        # (sin cuello: la boca de la caña queda tapada por el pantalón y el tubo asomaba por delante)
         out.append(b)
     return out
