@@ -311,8 +311,15 @@ def botas():
             bpy.data.objects.remove(o)
     out = []
     for side, sx in (('I', 1), ('D', -1)):
-        def mask(c, n, sx=sx):
-            return c.z < 0.36 and c.x * sx > 0.04
+        C = Vector((sx * 0.216, -0.074, 0.03))
+        Rr = Vector((0.053, 0.099, 0.047))
+
+        def ell(c, C=C, Rr=Rr):
+            d = c - C
+            return Vector((d.x / Rr.x, d.y / Rr.y, d.z / Rr.z)).length
+
+        def mask(c, n, sx=sx, ell=ell):
+            return c.z < 0.36 and c.x * sx > 0.04 and ell(c) > 1.0
 
         def off(c, sx=sx):
             toe = ss(-0.02, -0.12, c.y)                      # puntera amplia
@@ -322,22 +329,64 @@ def botas():
         f = lambda c: c.z - (0.318 + 0.012 * ss(0.0, 0.06, c.y))
         b = SF.garment2('Bota' + side, mask, off, field=f, smooth=14, smooth_fac=0.5, subdiv=1, post_smooth=3,
                         mat=cuero, edge_smooth=5)
-        # puntera: proyecta la zona de los dedos sobre un elipsoide (bota de puntera redonda, sin dedos marcados)
+        # puntera: el agujero de los dedos se tapa con anillos sobre un elipsoide (sin pliegues ni dedos)
         import bmesh
-        C = Vector((sx * 0.216, -0.072, 0.036))
-        Rr = Vector((0.05, 0.094, 0.041))
         bm = bmesh.new()
         bm.from_mesh(b.data)
-        for _ in range(2):
-            for v in bm.verts:
-                w = ss(0.0, -0.085, v.co.y) * ss(0.12, 0.05, v.co.z)
-                if w <= 0:
-                    continue
-                d = v.co - C
-                e = Vector((d.x / Rr.x, d.y / Rr.y, d.z / Rr.z)).length
-                if e > 1e-6:
-                    v.co = v.co.lerp(C + d / e, w)
-            SF._lap(bm, 4, 0.5, wfn=lambda c: ss(0.03, -0.05, c.y) * ss(0.14, 0.08, c.z), taubin=True)
+        E2 = Rr + Vector((0.021, 0.021, 0.021))
+
+        def to_u(p):
+            d = p - C
+            return Vector((d.x / E2.x, d.y / E2.y, d.z / E2.z)).normalized()
+
+        def from_u(u):
+            return C + Vector((u.x * E2.x, u.y * E2.y, u.z * E2.z))
+
+        def slerp(a, b_, t):
+            th = a.angle(b_)
+            if th < 1e-5:
+                return b_.copy()
+            return (a * math.sin((1 - t) * th) + b_ * math.sin(t * th)) / math.sin(th)
+
+        edges = set(e for e in bm.edges if e.is_boundary)
+        loops = []
+        while edges:
+            e0 = edges.pop()
+            chain = [e0.verts[0], e0.verts[1]]
+            while True:
+                nx = [e for e in chain[-1].link_edges if e in edges]
+                if not nx:
+                    break
+                edges.discard(nx[0])
+                w = nx[0].other_vert(chain[-1])
+                if w is chain[0]:
+                    break
+                chain.append(w)
+            loops.append(chain)
+        toe = min(loops, key=lambda lp: sum(v.co.y for v in lp) / len(lp))
+        fwd = Vector((0.26 * sx, -0.97, -0.12)).normalized()
+        ut = to_u(C + fwd * 0.1)
+        us = [to_u(v.co) for v in toe]
+        for v, u in zip(toe, us):
+            v.co = from_u(u)
+        R = 9
+        rings = [toe]
+        for j in range(1, R):
+            r = 1 - j / R
+            rings.append([bm.verts.new(from_u(slerp(ut, u, r).normalized())) for u in us])
+        tip = bm.verts.new(from_u(ut))
+        M = len(toe)
+        for j in range(R - 1):
+            for k in range(M):
+                k2 = (k + 1) % M
+                bm.faces.new((rings[j][k], rings[j][k2], rings[j + 1][k2], rings[j + 1][k]))
+        for k in range(M):
+            bm.faces.new((rings[-1][k], rings[-1][(k + 1) % M], tip))
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+        for _ in range(3):
+            SF._lap(bm, 2, 0.5, wfn=lambda c: ss(-0.02, -0.07, c.y) * ss(0.16, 0.10, c.z), taubin=True)
+        for f_ in bm.faces:
+            f_.smooth = True
         # aplana la planta: todo lo que quedó por debajo de z=0.008 se apoya en la suela
         for v in bm.verts:
             if v.co.z < 0.008:
@@ -345,14 +394,7 @@ def botas():
         bm.to_mesh(b.data)
         bm.free()
         top_loop = [p for p, n in max(SF.border_loops(b), key=lambda lp: sum(p.z for p, n in lp) / len(lp))]
-        SF.add_mods(b, thick=0.02, levels=2, offset=-1.0)
-        # remallado por vóxeles: funde los pliegues que dejan los dedos y deja la bota como un sólido limpio
-        SF.voxel(b, size=0.0024, smooth_iter=10)
-        bm = bmesh.new()
-        bm.from_mesh(b.data)
-        SF._lap(bm, 10, 0.5, wfn=lambda c: ss(0.0, -0.06, c.y) * ss(0.13, 0.08, c.z), taubin=True)
-        bm.to_mesh(b.data)
-        bm.free()
+        SF.add_mods(b, thick=0.007, levels=2)
         # suela: contorno de la planta, ensanchado, con canto redondeado
         import bmesh
         pts = [Vector((v.co.x, v.co.y)) for v in b.data.vertices if v.co.z < 0.03]
