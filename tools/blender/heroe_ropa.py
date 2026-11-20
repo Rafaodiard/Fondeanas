@@ -321,8 +321,9 @@ def botas():
             sl = body[(abs(body[:, 2] - z) < 0.016) & (body[:, 0] * sx > 0.06) & (body[:, 1] > -0.045)]
             cx = (sl[:, 0].min() + sl[:, 0].max()) / 2
             cy = (sl[:, 1].min() + sl[:, 1].max()) / 2
-            rx = (sl[:, 0].max() - sl[:, 0].min()) / 2 + 0.014 + 0.004 * ss(0.25, 0.32, z)
-            ry = (sl[:, 1].max() - sl[:, 1].min()) / 2 + 0.014 + 0.004 * ss(0.25, 0.32, z)
+            k_ = 0.78 + 0.22 * ss(0.105, 0.17, z)  # abajo se mete dentro del pie (sin escalón en el talón)
+            rx = ((sl[:, 0].max() - sl[:, 0].min()) / 2 + 0.014 + 0.004 * ss(0.25, 0.32, z)) * k_
+            ry = ((sl[:, 1].max() - sl[:, 1].min()) / 2 + 0.014 + 0.004 * ss(0.25, 0.32, z)) * k_
             rings.append(SF.superellipse((cx, cy, z), rx, ry, 2.2, (1, 0, 0), (0, 1, 0), N=40))
         cana = SF.loft_mesh('_Cana' + side, rings, closed_ends=True)
         # --- pie: secciones transversales del talón a la punta, base plana
@@ -330,13 +331,13 @@ def botas():
         T = Vector((sx * 0.243, -0.178, 0))
         ax = (T - H).normalized()
         lat = Vector((-ax.y, ax.x, 0)) * (1 if sx > 0 else -1)
-        prof = [(0.0, 0.080, 0.10), (0.12, 0.090, 0.125), (0.3, 0.096, 0.118), (0.5, 0.102, 0.092), (0.68, 0.106, 0.074),
+        prof = [(0.0, 0.080, 0.115), (0.12, 0.092, 0.14), (0.3, 0.097, 0.13), (0.5, 0.102, 0.092), (0.68, 0.106, 0.074),
                 (0.82, 0.100, 0.064), (0.92, 0.084, 0.056), (0.98, 0.058, 0.046), (1.0, 0.03, 0.03)]
         secs = []
         L = (T - H).length
         for t, w, h in prof:
             P = H + ax * (L * t)
-            secs.append(SF.superellipse((P.x, P.y, 0.006 + h / 2), w / 2, h / 2, 2.6, lat, (0, 0, 1), N=40))
+            secs.append(SF.superellipse((P.x, P.y, 0.006 + h / 2), w / 2, h / 2, 2.4, lat, (0, 0, 1), N=40))
         pie = SF.loft_mesh('_Pie' + side, secs, closed_ends=True)
         b = SF.join_meshes('Bota' + side, [cana, pie])
         SF.voxel(b, size=0.0026, smooth_iter=12)
