@@ -299,3 +299,111 @@ def save():
 builtins.SF = type('SF', (), {k: staticmethod(v) if callable(v) else v for k, v in dict(globals()).items()
                                if not k.startswith('__') and k not in ('bpy', 'bmesh', 'builtins', 'math', 'base64', 'os', 'np',
                                                                        'Vector', 'Euler', 'Matrix')})
+
+
+# ---------------------------------------------------------------------------
+# Cortes por campo escalar: bordes limpios de cualquier forma (escotes, sisas, puños).
+def iso_cut(bm, f):
+    # Corta la malla por la isolinea f(co)=0 y borra el lado f>0, interpolando de verdad sobre cada arista.
+    bmesh.ops.triangulate(bm, faces=bm.faces[:])
+    val = {}
+    for v in bm.verts:
+        x = f(v.co)
+        val[v] = x if abs(x) > 1e-9 else -1e-9
+    newv = set()
+    for e in list(bm.edges):
+        a, b = e.verts
+        fa, fb = val[a], val[b]
+        if (fa > 0) != (fb > 0):
+            ne, nv = bmesh.utils.edge_split(e, a, fa / (fa - fb))
+            val[nv] = 0.0
+            newv.add(nv)
+    for fc in list(bm.faces):
+        vs = [v for v in fc.verts if v in newv]
+        if len(vs) == 2 and not any(e.other_vert(vs[0]) is vs[1] for e in vs[0].link_edges):
+            bmesh.utils.face_split(fc, vs[0], vs[1])
+    bmesh.ops.delete(bm, geom=[fc for fc in bm.faces if max(val.get(v, 0) for v in fc.verts) > 0], context='FACES')
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+    bmesh.ops.join_triangles(bm, faces=bm.faces[:], angle_face_threshold=math.radians(40),
+                             angle_shape_threshold=math.radians(40))
+
+
+def fmax(*fs):
+    return lambda c: max(g(c) for g in fs)
+
+
+def fmin(*fs):
+    return lambda c: min(g(c) for g in fs)
+
+
+def clean_border(bm, merge=0.0045, rings=2, iters=4):
+    # Junta segmentos cortitos del borde y relaja una franja alrededor para que el canto quede parejo.
+    bnd = [v for v in bm.verts if v.is_boundary]
+    bmesh.ops.remove_doubles(bm, verts=bnd, dist=merge)
+    bmesh.ops.dissolve_degenerate(bm, edges=bm.edges[:], dist=1e-5)
+    band = set(v for v in bm.verts if v.is_boundary)
+    ring = set(band)
+    for _ in range(rings):
+        ring = set(e.other_vert(v) for v in ring for e in v.link_edges) - band
+        band |= ring
+    for _ in range(iters):
+        new = {}
+        for v in band:
+            if v.is_boundary:
+                nb = [e.other_vert(v).co for e in v.link_edges if e.is_boundary]
+                if len(nb) == 2:
+                    new[v] = v.co * 0.5 + (nb[0] + nb[1]) * 0.25
+            else:
+                nb = [e.other_vert(v).co for e in v.link_edges]
+                new[v] = v.co * 0.4 + sum(nb, Vector()) / len(nb) * 0.6
+        for v, c in new.items():
+            v.co = c
+
+
+def garment2(name, mask_fn, offset_fn, field=None, smooth=6, smooth_fac=0.5, subdiv=1, src='Cuerpo',
+             post_smooth=2, mat=None, color=(0.5, 0.5, 0.5, 1), edge_smooth=3):
+    # Como garment() pero el borde lo define un campo escalar (field(co) > 0 se borra).
+    body = bpy.data.objects[src]
+    bm = bmesh.new()
+    bm.from_mesh(body.data)
+    bm.normal_update()
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if not mask_fn(f.calc_center_median(), f.normal)], context='FACES')
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+    _lap(bm, smooth, smooth_fac)
+    bm.normal_update()
+    for v in bm.verts:
+        v.co += v.normal * offset_fn(v.co)
+    _lap(bm, post_smooth, 0.3)
+    for _ in range(subdiv):
+        bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=1, use_grid_fill=True, smooth=1.0)
+    if field:
+        iso_cut(bm, field)
+        clean_border(bm, iters=edge_smooth)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=0.0008)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    for p in me.polygons:
+        p.use_smooth = True
+    ob = new_obj(name, me)
+    ob.data.materials.append(mat or material('M_' + name, color))
+    return ob
+
+
+def add_mods(ob, thick=0.012, levels=2, offset=1.0, rim=True):
+    s = ob.modifiers.new('Grosor', 'SOLIDIFY')
+    s.thickness = thick
+    s.offset = offset
+    s.use_rim = rim
+    s.use_even_offset = True
+    s.use_quality_normals = True
+    if levels:
+        d = ob.modifiers.new('Sub', 'SUBSURF')
+        d.levels = levels
+        d.render_levels = levels
+    return ob
+
+
+builtins.SF = type('SF', (), {k: staticmethod(v) if callable(v) else v for k, v in dict(globals()).items()
+                               if not k.startswith('__') and k not in ('bpy', 'bmesh', 'builtins', 'math', 'base64', 'os', 'np',
+                                                                       'Vector', 'Euler', 'Matrix')})
