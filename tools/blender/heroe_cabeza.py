@@ -54,11 +54,11 @@ def pelo():
     def height(c):
         front = ss(0.04, -0.10, c.y)
         crown = max(0.0, 1 - (c.x / 0.078) ** 2)
-        taper = ss(0.0, 0.03, c.z - hairline(c))
-        return 0.0035 + taper * (0.007 + 0.018 * front * (0.4 + 0.6 * crown) + 0.008 * crown)
+        taper = ss(0.0, 0.035, c.z - hairline(c))
+        return 0.0024 + taper * (0.008 + 0.022 * front * (0.4 + 0.6 * crown) + 0.008 * crown)
 
     def strands(c):
-        fade = ss(0.0, 0.014, xw(c) - abs(c.x))
+        fade = ss(0.0, 0.014, xw(c) - abs(c.x)) * ss(0.0, 0.02, c.z - hairline(c))
         ph = 0.012 * math.sin(c.y * 24) + 0.004 * math.sin(c.y * 61 + c.x * 30)
         g = math.cos(2 * math.pi * (c.x + ph) / 0.024)
         lump = 0.5 + 0.5 * math.sin(c.y * 40 + c.x * 90)
