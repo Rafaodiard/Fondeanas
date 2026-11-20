@@ -299,3 +299,86 @@ def chaleco_detalles():
     H, N = hit[0], hit[1].normalized()
     ring = [H + N * 0.012 + Vector((math.cos(a), 0, math.sin(a))) * 0.02 for a in [2 * math.pi * k / 24 for k in range(24)]]
     SF.tube('ArgollaArnes', ring, 0.004, mat=metal, smooth_iters=0)
+
+
+def botas():
+    cuero = SF.material('M_Bota', (0.13, 0.075, 0.045, 1), rough=0.6)
+    suela_m = SF.material('M_Suela', (0.035, 0.032, 0.03, 1), rough=0.8)
+    cordon = SF.material('M_Cordon', (0.06, 0.045, 0.03, 1), rough=0.9)
+    for n in ('BotaI', 'BotaD', 'SuelaI', 'SuelaD'):
+        o = bpy.data.objects.get(n)
+        if o:
+            bpy.data.objects.remove(o)
+    out = []
+    for side, sx in (('I', 1), ('D', -1)):
+        def mask(c, n, sx=sx):
+            return c.z < 0.36 and c.x * sx > 0.04
+
+        def off(c, sx=sx):
+            toe = ss(-0.02, -0.12, c.y)                      # puntera amplia
+            ankle = ss(0.20, 0.12, c.z) * (1 - toe)
+            return 0.009 + 0.008 * ss(0.16, 0.06, c.z) + 0.010 * toe + 0.003 * ankle + 0.004 * ss(0.26, 0.33, c.z)
+
+        f = lambda c: c.z - (0.318 + 0.012 * ss(0.0, 0.06, c.y))
+        b = SF.garment2('Bota' + side, mask, off, field=f, smooth=14, smooth_fac=0.5, subdiv=1, post_smooth=3,
+                        mat=cuero, edge_smooth=5)
+        # aplana la planta: todo lo que quedó por debajo de z=0.008 se apoya en la suela
+        for v in b.data.vertices:
+            if v.co.z < 0.008:
+                v.co.z = 0.008 + (v.co.z - 0.008) * 0.15
+        SF.add_mods(b, thick=0.005, levels=2)
+        # suela: contorno de la planta, ensanchado, con canto redondeado
+        import bmesh
+        pts = [Vector((v.co.x, v.co.y)) for v in b.data.vertices if v.co.z < 0.03]
+        cx = sum(p.x for p in pts) / len(pts)
+        cy = sum(p.y for p in pts) / len(pts)
+        M = 48
+        ring = []
+        for k in range(M):
+            a = 2 * math.pi * k / M
+            d = Vector((math.cos(a), math.sin(a)))
+            r = max(((p - Vector((cx, cy))).dot(d) for p in pts), default=0.05)
+            ring.append(r)
+        ring = [(ring[k - 1] + 2 * ring[k] + ring[(k + 1) % M]) / 4 for k in range(M)]
+        secs = []
+        for z, grow in ((-0.034, 0.004), (-0.031, 0.008), (-0.006, 0.009), (0.006, 0.007), (0.016, 0.0)):
+            sec = []
+            for k in range(M):
+                a = 2 * math.pi * k / M
+                r = ring[k] + grow
+                sec.append(Vector((cx + math.cos(a) * r, cy + math.sin(a) * r, z)))
+            secs.append(sec)
+        s = SF.loft_mesh('Suela' + side, secs, closed_ends=True)
+        SF._with_mat(s, suela_m)
+        d = s.modifiers.new('Sub', 'SUBSURF')
+        d.levels = 2
+        # cordones cruzados sobre el empeine
+        bvh = SF.surface_bvh(b)
+        front = Vector((0.26 * sx, -0.97, 0)).normalized()
+        up = Vector((0, 0, 1))
+        side_v = front.cross(up).normalized()
+        A = Vector((sx * 0.188, -0.03, 0.285))
+        B = Vector((sx * 0.207, -0.112, 0.085))
+        eyes_l, eyes_r = [], []
+        n_e = 7
+        for i in range(n_e):
+            t = i / (n_e - 1)
+            P = A.lerp(B, t)
+            phi = math.radians(10 + 55 * t)
+            nd = (front * math.cos(phi) + up * math.sin(phi)).normalized()
+            for lst, sgn in ((eyes_l, 1), (eyes_r, -1)):
+                Q = P + side_v * (sgn * 0.017)
+                hh = bvh.ray_cast(Q + nd * 0.12, -nd, 0.2)
+                lst.append((hh[0] if hh[0] else Q) + nd * 0.004)
+        laces = []
+        for i in range(n_e - 1):
+            laces.append(SF.tube('Cordon%s%da' % (side, i), [eyes_l[i], eyes_r[i + 1]], 0.0028, mat=cordon, closed=False,
+                                 smooth_iters=0))
+            laces.append(SF.tube('Cordon%s%db' % (side, i), [eyes_r[i], eyes_l[i + 1]], 0.0028, mat=cordon, closed=False,
+                                 smooth_iters=0))
+        SF.join_meshes('Cordones' + side, laces)
+        # cuello acolchado arriba de la caña
+        top = [p for p, n in max(SF.border_loops(b), key=lambda lp: sum(p.z for p, n in lp) / len(lp))]
+        SF.tube('BotaCuello' + side, top, 0.0075, mat=cuero, smooth_iters=2)
+        out.append(b)
+    return out
