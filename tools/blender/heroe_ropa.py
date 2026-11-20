@@ -305,21 +305,14 @@ def botas():
     cuero = SF.material('M_Bota', (0.13, 0.075, 0.045, 1), rough=0.6)
     suela_m = SF.material('M_Suela', (0.035, 0.032, 0.03, 1), rough=0.8)
     cordon = SF.material('M_Cordon', (0.06, 0.045, 0.03, 1), rough=0.9)
-    for n in ('BotaI', 'BotaD', 'SuelaI', 'SuelaD'):
+    for n in ('BotaI', 'BotaD', 'SuelaI', 'SuelaD', 'PunteraI', 'PunteraD'):
         o = bpy.data.objects.get(n)
         if o:
             bpy.data.objects.remove(o)
     out = []
     for side, sx in (('I', 1), ('D', -1)):
-        C = Vector((sx * 0.216, -0.074, 0.03))
-        Rr = Vector((0.053, 0.099, 0.047))
-
-        def ell(c, C=C, Rr=Rr):
-            d = c - C
-            return Vector((d.x / Rr.x, d.y / Rr.y, d.z / Rr.z)).length
-
-        def mask(c, n, sx=sx, ell=ell):
-            return c.z < 0.36 and c.x * sx > 0.04 and ell(c) > 0.9
+        def mask(c, n, sx=sx):
+            return c.z < 0.36 and c.x * sx > 0.04
 
         def off(c, sx=sx):
             toe = ss(-0.02, -0.12, c.y)                      # puntera amplia
@@ -329,33 +322,35 @@ def botas():
         f = lambda c: c.z - (0.318 + 0.012 * ss(0.0, 0.06, c.y))
         b = SF.garment2('Bota' + side, mask, off, field=f, smooth=14, smooth_fac=0.5, subdiv=1, post_smooth=3,
                         mat=cuero, edge_smooth=5)
+        # puntera: proyecta la zona de los dedos sobre un elipsoide (bota de puntera redonda, sin dedos marcados)
         import bmesh
+        C = Vector((sx * 0.216, -0.072, 0.036))
+        Rr = Vector((0.05, 0.094, 0.041))
         bm = bmesh.new()
         bm.from_mesh(b.data)
+        for _ in range(2):
+            for v in bm.verts:
+                w = ss(0.0, -0.085, v.co.y) * ss(0.12, 0.05, v.co.z)
+                if w <= 0:
+                    continue
+                d = v.co - C
+                e = Vector((d.x / Rr.x, d.y / Rr.y, d.z / Rr.z)).length
+                if e > 1e-6:
+                    v.co = v.co.lerp(C + d / e, w)
+            SF._lap(bm, 4, 0.5, wfn=lambda c: ss(0.03, -0.05, c.y) * ss(0.14, 0.08, c.z), taubin=True)
         # aplana la planta: todo lo que quedó por debajo de z=0.008 se apoya en la suela
         for v in bm.verts:
             if v.co.z < 0.008:
                 v.co.z = 0.008 + (v.co.z - 0.008) * 0.15
         bm.to_mesh(b.data)
         bm.free()
-        SF.add_mods(b, thick=0.005, levels=2)
-        # puntera reforzada: medio elipsoide que tapa los dedos
-        bmc = bmesh.new()
-        bmesh.ops.create_uvsphere(bmc, u_segments=32, v_segments=20, radius=1.0)
-        for v in bmc.verts:
-            v.co = C + Vector((v.co.x * Rr.x, v.co.y * Rr.y, v.co.z * Rr.z))
-        bmesh.ops.delete(bmc, geom=[v for v in bmc.verts if v.co.z < 0.004], context='VERTS')
-        mec = bpy.data.meshes.new('Puntera' + side)
-        bmc.to_mesh(mec)
-        bmc.free()
-        for p_ in mec.polygons:
-            p_.use_smooth = True
-        cap = SF.new_obj('Puntera' + side, mec)
-        cap.data.materials.append(SF.material('M_Puntera', (0.10, 0.058, 0.035, 1), rough=0.5))
-        SF.add_mods(cap, thick=0.004, levels=1, offset=-1.0)
+        top_loop = [p for p, n in max(SF.border_loops(b), key=lambda lp: sum(p.z for p, n in lp) / len(lp))]
+        SF.add_mods(b, thick=0.008, levels=2)
+        # remallado por vóxeles: funde los pliegues que dejan los dedos y deja la bota como un sólido limpio
+        SF.voxel(b, size=0.0024, smooth_iter=10)
         # suela: contorno de la planta, ensanchado, con canto redondeado
         import bmesh
-        pts = [Vector((v.co.x, v.co.y)) for o_ in (b, cap) for v in o_.data.vertices if v.co.z < 0.03]
+        pts = [Vector((v.co.x, v.co.y)) for v in b.data.vertices if v.co.z < 0.03]
         cx = sum(p.x for p in pts) / len(pts)
         cy = sum(p.y for p in pts) / len(pts)
         M = 48
@@ -405,7 +400,6 @@ def botas():
                                  smooth_iters=0))
         SF.join_meshes('Cordones' + side, laces)
         # cuello acolchado arriba de la caña
-        top = [p for p, n in max(SF.border_loops(b), key=lambda lp: sum(p.z for p, n in lp) / len(lp))]
-        SF.tube('BotaCuello' + side, top, 0.0075, mat=cuero, smooth_iters=2)
+        SF.tube('BotaCuello' + side, top_loop, 0.0085, mat=cuero, smooth_iters=2)
         out.append(b)
     return out
