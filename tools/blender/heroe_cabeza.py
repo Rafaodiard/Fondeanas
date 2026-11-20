@@ -66,5 +66,24 @@ def pelo():
 
     top = SF.garment2('PeloArriba', _scalp, height, field=f_top, smooth=2, subdiv=2, post_smooth=2, mat=largo,
                       edge_smooth=5, detail=strands)
+    # grosor 0 en el borde de la frente (el pelo nace al ras) y pared completa en los costados del undercut
+    from mathutils.kdtree import KDTree
+    me = top.data
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bpts = [v.co.copy() for v in bm.verts if v.is_boundary and _az(v.co) < 58]
+    bm.free()
+    kd = KDTree(len(bpts))
+    for i, p in enumerate(bpts):
+        kd.insert(p, i)
+    kd.balance()
+    vg = top.vertex_groups.new(name='Grosor')
+    for v in me.vertices:
+        d = kd.find(v.co)[2] if bpts else 1.0
+        vg.add([v.index], ss(0.0, 0.018, d), 'REPLACE')
     SF.add_mods(top, thick=0.03, levels=2, offset=-1.0)
+    sol = top.modifiers['Grosor']
+    sol.vertex_group = 'Grosor'
+    sol.thickness_vertex_group = 0.0
     return pc, top
