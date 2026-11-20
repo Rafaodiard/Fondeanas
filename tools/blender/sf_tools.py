@@ -305,6 +305,32 @@ def render_view(center, ortho_scale, rot=(math.pi / 2, 0, 0), res=(1000, 1000), 
         return base64.b64encode(f.read()).decode()
 
 
+def voxel_close(ob, r=0.02, size=0.003, smooth_iter=8):
+    # Cierre morfológico (dilatar r y volver a erosionar r) con remallado por vóxeles:
+    # rellena los pliegues cóncavos donde se unen piezas (empeine, talón) y deja casi igual lo convexo.
+    for st in (r, -r):
+        m = ob.modifiers.new('Rm', 'REMESH')
+        m.mode = 'VOXEL'
+        m.voxel_size = size
+        m.adaptivity = 0
+        d = ob.modifiers.new('Dp', 'DISPLACE')
+        d.strength = st
+        d.mid_level = 0.0
+        d.direction = 'NORMAL'
+    m = ob.modifiers.new('Rm', 'REMESH')
+    m.mode = 'VOXEL'
+    m.voxel_size = size
+    m.adaptivity = 0
+    if smooth_iter:
+        s = ob.modifiers.new('Suave', 'CORRECTIVE_SMOOTH')
+        s.iterations = smooth_iter
+        s.use_only_smooth = True
+    apply_mods(ob)
+    for p in ob.data.polygons:
+        p.use_smooth = True
+    return ob
+
+
 VIEWS = {'FRONT': (math.pi / 2, 0, 0), 'RIGHT': (math.pi / 2, 0, math.pi / 2), 'LEFT': (math.pi / 2, 0, -math.pi / 2),
          'BACK': (math.pi / 2, 0, math.pi), '34': (math.radians(80), 0, math.radians(30)),
          '34L': (math.radians(80), 0, math.radians(-35)), '34B': (math.radians(80), 0, math.radians(150))}

@@ -390,8 +390,8 @@ def pantalon_sobre_botas():
             hit = bvh.ray_cast(o, -d, 0.3)
             rb = ((hit[0] - Vector((c.x, c.y, zc))).to_2d().length if hit[0] else r - 0.03)
             ang = math.atan2(d.y, d.x)
-            pli = 0.0035 * math.sin(9 * ang + 40 * z) * math.exp(-((z - 0.30) / 0.03) ** 2)
-            tgt = rb + 0.003 + 0.024 * ss(0.272, 0.30, z) + pli
+            pli = 0.0045 * math.sin(9 * ang + 40 * z) * math.exp(-((z - 0.30) / 0.03) ** 2)
+            tgt = rb + 0.003 + 0.017 * ss(0.272, 0.30, z) + pli
             w = ss(0.31, 0.42, z)
             rn = tgt + (r - tgt) * w
             co[i][0] = c.x + d.x * rn
@@ -429,7 +429,7 @@ def botas():
         T = Vector((sx * 0.255, -0.178, 0))
         ax = (T - H).normalized()
         lat = Vector((-ax.y, ax.x, 0)) * (1 if sx > 0 else -1)
-        prof = [(0.0, 0.074, 0.13), (0.06, 0.092, 0.142), (0.22, 0.098, 0.138), (0.42, 0.106, 0.104),
+        prof = [(0.0, 0.074, 0.115), (0.06, 0.09, 0.12), (0.22, 0.098, 0.115), (0.42, 0.106, 0.096),
                 (0.60, 0.114, 0.080), (0.76, 0.117, 0.067), (0.87, 0.112, 0.061), (0.94, 0.098, 0.056),
                 (0.985, 0.072, 0.048), (1.0, 0.044, 0.038)]
         secs = []
@@ -439,7 +439,7 @@ def botas():
             secs.append(SF.superellipse((P.x, P.y, 0.006 + h / 2), w / 2, h / 2, 2.8, lat, (0, 0, 1), N=40))
         pie = SF.loft_mesh('_Pie' + side, secs, closed_ends=True)
         b = SF.join_meshes('Bota' + side, [cana, pie])
-        SF.voxel(b, size=0.0024, smooth_iter=12)
+        SF.voxel_close(b, r=0.028, size=0.0024, smooth_iter=10)
         b.data.materials.clear()
         b.data.materials.append(cuero)
         _suela(b, side, H, T, suela_m)
