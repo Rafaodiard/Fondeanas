@@ -1,0 +1,86 @@
+// Efectos de sonido sintetizados con WebAudio (sin archivos).
+let ctx = null;
+let master = null;
+
+function ac() {
+  if (!ctx) {
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      master = ctx.createGain();
+      master.gain.value = 0.35;
+      master.connect(ctx.destination);
+    } catch { return null; }
+  }
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+
+function noiseBuffer(c, dur) {
+  const buf = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 2;
+  return buf;
+}
+
+function burst({ dur = 0.15, freq = 1200, q = 0.8, vol = 1, type = 'lowpass', pan = 0 }) {
+  const c = ac(); if (!c) return;
+  const src = c.createBufferSource();
+  src.buffer = noiseBuffer(c, dur);
+  const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+  const g = c.createGain(); g.gain.value = vol;
+  const p = c.createStereoPanner ? c.createStereoPanner() : null;
+  src.connect(f); f.connect(g);
+  if (p) { p.pan.value = pan; g.connect(p); p.connect(master); } else g.connect(master);
+  src.start();
+}
+
+function tone({ f1 = 440, f2 = 440, dur = 0.12, vol = 0.3, type = 'sine', delay = 0 }) {
+  const c = ac(); if (!c) return;
+  const o = c.createOscillator(); o.type = type;
+  const g = c.createGain();
+  const t = c.currentTime + delay;
+  o.frequency.setValueAtTime(f1, t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(1, f2), t + dur);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(master);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+
+const SHOTS = {
+  pistola: { dur: 0.12, freq: 2500, vol: 0.8 },
+  subfusil: { dur: 0.08, freq: 3000, vol: 0.6 },
+  rifle: { dur: 0.14, freq: 1800, vol: 0.9 },
+  escopeta: { dur: 0.3, freq: 900, vol: 1.3 },
+  francotirador: { dur: 0.5, freq: 1300, vol: 1.4 },
+  lanzacohetes: { dur: 0.35, freq: 500, vol: 1.0 },
+};
+
+export const sfx = {
+  unlock: () => ac(),
+  shot(w, distance = 0) {
+    const s = SHOTS[w] || SHOTS.rifle;
+    const att = Math.max(0.05, 1 - distance / 250);
+    burst({ ...s, vol: s.vol * att, freq: s.freq * (distance > 60 ? 0.5 : 1) });
+  },
+  hit(head) { tone({ f1: head ? 1400 : 900, f2: head ? 1800 : 1100, dur: 0.06, vol: 0.25, type: 'square' }); },
+  shieldHit() { tone({ f1: 1800, f2: 2400, dur: 0.07, vol: 0.18, type: 'triangle' }); },
+  hurt() { tone({ f1: 180, f2: 90, dur: 0.18, vol: 0.4, type: 'sawtooth' }); },
+  pickaxe(kind) {
+    if (kind === 'tree') burst({ dur: 0.1, freq: 600, q: 4, vol: 0.9, type: 'bandpass' });
+    else if (kind === 'rock' || kind === 'house') { burst({ dur: 0.08, freq: 3500, q: 6, vol: 0.7, type: 'bandpass' }); tone({ f1: 1200, f2: 800, dur: 0.1, vol: 0.1, type: 'triangle' }); }
+    else burst({ dur: 0.08, freq: 1500, vol: 0.4 });
+  },
+  whiff() { burst({ dur: 0.12, freq: 800, q: 0.5, vol: 0.2, type: 'highpass' }); },
+  build() { burst({ dur: 0.1, freq: 400, q: 2, vol: 0.8, type: 'bandpass' }); tone({ f1: 300, f2: 500, dur: 0.08, vol: 0.12, type: 'square' }); },
+  structBreak() { burst({ dur: 0.35, freq: 700, q: 1, vol: 1 }); },
+  pickup() { tone({ f1: 600, f2: 900, dur: 0.08, vol: 0.2, type: 'triangle' }); tone({ f1: 900, f2: 1300, dur: 0.08, vol: 0.2, type: 'triangle', delay: 0.07 }); },
+  chest() { [523, 659, 784, 1046].forEach((f, i) => tone({ f1: f, f2: f, dur: 0.18, vol: 0.18, type: 'triangle', delay: i * 0.08 })); },
+  reload() { burst({ dur: 0.05, freq: 3000, q: 3, vol: 0.4, type: 'bandpass' }); setTimeout(() => burst({ dur: 0.06, freq: 2000, q: 3, vol: 0.5, type: 'bandpass' }), 250); },
+  heal() { tone({ f1: 500, f2: 1000, dur: 0.35, vol: 0.2, type: 'sine' }); },
+  shield() { tone({ f1: 700, f2: 1600, dur: 0.4, vol: 0.2, type: 'sine' }); },
+  boom(distance = 0) { const v = Math.max(0.08, 1 - distance / 200); burst({ dur: 0.8, freq: 300, vol: 2 * v }); tone({ f1: 90, f2: 30, dur: 0.6, vol: 0.6 * v, type: 'sine' }); },
+  glider() { burst({ dur: 0.3, freq: 1200, q: 0.3, vol: 0.4, type: 'highpass' }); },
+  elim() { tone({ f1: 400, f2: 400, dur: 0.12, vol: 0.25, type: 'square' }); tone({ f1: 800, f2: 800, dur: 0.2, vol: 0.25, type: 'square', delay: 0.12 }); },
+  click() { tone({ f1: 1200, f2: 1100, dur: 0.03, vol: 0.12, type: 'square' }); },
+};

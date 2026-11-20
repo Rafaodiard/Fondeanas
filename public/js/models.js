@@ -43,7 +43,8 @@ export function createCharacter(color) {
   glider.visible = false;
   glider.position.y = 2.3;
   root.add(glider);
-  root.userData = { hips, armL, armR, legL, legR, headG, gun, glider, phase: 0 };
+  root.userData = { hips, armL, armR, legL, legR, headG, gun, glider, phase: 0, swing: 0, held: null };
+  setHeld(root, 'pico');
   return root;
 }
 
@@ -78,6 +79,7 @@ export function animateCharacter(char, state, speed, dt, aiming) {
     u.legL.rotation.x = s; u.legR.rotation.x = -s;
     u.armL.rotation.x = -s * 0.7;
     u.armR.rotation.x = aiming ? 1.5 : 0.5 + s * 0.2;
+    if (u.swing > 0) { u.swing = Math.max(0, u.swing - dt * 3); u.armR.rotation.x = 2.6 - Math.sin((1 - u.swing) * Math.PI) * 2.4; }
     u.armL.rotation.z = 0; u.armR.rotation.z = 0;
     u.hips.rotation.x = 0;
     u.hips.position.y = 0.95 + Math.abs(Math.cos(u.phase)) * 0.06 * swing;
@@ -145,4 +147,104 @@ export function createNameTag(name, color) {
   spr.position.y = 2.5;
   spr.renderOrder = 10;
   return spr;
+}
+
+// ---------- Armas y objetos ----------
+const darkMetal = std('#2d3142', { metalness: 0.3 });
+const WEAPON_SHAPES = {
+  // [largo del cañón, grosor, culata, cargador, mira]
+  pistola: [0.35, 0.09, 0, 0.18, false],
+  subfusil: [0.55, 0.11, 0.15, 0.28, false],
+  rifle: [0.8, 0.12, 0.25, 0.25, true],
+  escopeta: [0.75, 0.14, 0.25, 0, false],
+  francotirador: [1.1, 0.1, 0.3, 0.15, true],
+  lanzacohetes: [1.0, 0.24, 0, 0, true],
+};
+
+// Arma orientada a lo largo de -Y (para la mano) o de -Z (para el piso), con franja del color de la rareza.
+export function createWeaponModel(type, color, alongZ = false) {
+  const g = new THREE.Group();
+  const [len, th, stock, mag, scope] = WEAPON_SHAPES[type] || WEAPON_SHAPES.rifle;
+  const accent = std(color, { emissive: color, emissiveIntensity: 0.25 });
+  if (type === 'lanzacohetes') {
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(th / 2, th / 2, len, 10), std('#5b6b3a'));
+    tube.position.y = -len * 0.35; g.add(tube);
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(th / 2 + 0.02, th / 2 + 0.02, 0.12, 10), accent);
+    ring.position.y = -len * 0.8; g.add(ring);
+  } else {
+    g.add(box(th, len, th * 1.3, darkMetal, 0, -len * 0.35, 0));
+    g.add(box(th * 0.7, len * 0.5, th * 0.5, accent, 0, -len * 0.3, -th * 0.8));
+    if (stock) g.add(box(th * 0.9, stock, th * 1.6, std('#6b4a2f'), 0, stock / 2 + len * 0.1, 0.03));
+    if (mag) g.add(box(th * 0.8, 0.1, mag, darkMetal, 0, -len * 0.15, mag / 2 + th * 0.4));
+    if (type === 'escopeta') g.add(box(th * 0.9, len * 0.35, th, std('#8b5a2b'), 0, -len * 0.45, th * 0.9));
+  }
+  if (scope) g.add(box(th * 0.7, 0.25, 0.1, std('#111'), 0, -len * 0.15, -th * 1.1));
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  if (alongZ) { const w = new THREE.Group(); g.rotation.x = Math.PI / 2; w.add(g); return w; }
+  return g;
+}
+
+export function createPickaxe() {
+  const g = new THREE.Group();
+  g.add(box(0.07, 1.0, 0.07, std('#7a5233'), 0, -0.3, 0));
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.9, 5), std('#c9d6e3', { metalness: 0.6, roughness: 0.3 }));
+  head.rotation.x = Math.PI / 2; head.position.set(0, -0.78, 0);
+  g.add(head);
+  g.add(box(0.1, 0.12, 0.12, std('#ffcf4a'), 0, -0.78, 0));
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+
+export function setHeld(char, what, color = '#b8bcc4') {
+  const u = char.userData;
+  const key = `${what}:${color}`;
+  if (u.held === key) return;
+  u.held = key;
+  u.gun.clear();
+  if (what === 'pico') u.gun.add(createPickaxe());
+  else if (WEAPON_SHAPES[what]) u.gun.add(createWeaponModel(what, color));
+  else if (what) {
+    const it = box(0.25, 0.25, 0.25, std(color, { emissive: color, emissiveIntensity: 0.3 }), 0, -0.1, 0);
+    u.gun.add(it);
+  }
+}
+
+// Objeto tirado en el piso: modelo + haz de luz del color de la rareza.
+export function createItemMesh(item, color) {
+  const g = new THREE.Group();
+  const spin = new THREE.Group();
+  spin.position.y = 0.45;
+  g.add(spin);
+  if (item.kind === 'weapon') {
+    const w = createWeaponModel(item.w, color, true);
+    w.rotation.z = Math.PI / 2;
+    spin.add(w);
+  } else if (item.kind === 'ammo') {
+    spin.add(box(0.45, 0.3, 0.3, std('#4b5320')));
+    spin.add(box(0.47, 0.08, 0.32, std(color, { emissive: color, emissiveIntensity: 0.4 }), 0, 0.05, 0));
+  } else if (item.kind === 'mat') {
+    for (let k = 0; k < 3; k++) spin.add(box(0.5, 0.12, 0.25, std(color), 0, k * 0.13 - 0.13, 0));
+  } else if (item.kind === 'consumable') {
+    if (item.c === 'frasco' || item.c === 'bidon') {
+      const big = item.c === 'bidon';
+      const b = new THREE.Mesh(new THREE.CylinderGeometry(big ? 0.18 : 0.12, big ? 0.22 : 0.14, big ? 0.5 : 0.3, 10), std(color, { emissive: color, emissiveIntensity: 0.5, transparent: true, opacity: 0.85 }));
+      spin.add(b);
+      spin.add(box(0.1, 0.1, 0.1, std('#ffffff'), 0, big ? 0.3 : 0.2, 0));
+    } else {
+      spin.add(box(0.4, item.c === 'botiquin' ? 0.3 : 0.15, 0.3, std('#ffffff')));
+      spin.add(box(0.12, item.c === 'botiquin' ? 0.32 : 0.17, 0.05, std('#ff3b3b'), 0, 0, 0.14));
+      spin.add(box(0.05, item.c === 'botiquin' ? 0.32 : 0.17, 0.12, std('#ff3b3b'), 0, 0, 0.14));
+    }
+  }
+  if (item.kind === 'weapon') {
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.25, 4, 8, 1, true),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide }));
+    beam.position.y = 2;
+    g.add(beam);
+  }
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.5, 20), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03;
+  g.add(ring);
+  g.userData.spin = spin;
+  return g;
 }
