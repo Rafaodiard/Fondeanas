@@ -46,7 +46,9 @@ Abrí http://localhost:3000, poné tu nombre y tocá **Crear sala**. Tus amigos 
 - `public/js/world.js`: genera la isla (terreno, pueblos con casas, árboles, rocas, agua) de forma determinística a partir de la semilla de la sala, así todos ven el mismo mapa.
 - `public/js/items.js`: armas, rarezas, munición, consumibles y materiales (lo usan el cliente y el servidor).
 - `public/js/audio.js`: efectos de sonido sintetizados.
-- `public/js/models.js`: modelos del personaje, las armas, el pico, el bus volador y el planeador. Son provisorios, hechos con código, y la idea es reemplazarlos por modelos GLB hechos en Blender.
+- `public/models/*.glb`: modelos 3D hechos en Blender (personaje, bus volador, planeador, armas y pico, casa, pino, árbol, roca, cofre y objetos del piso). El color de la ropa, las rarezas y las paredes se tiñe en el juego.
+- `public/js/assets.js`: carga los GLB. Si alguno no carga, el juego usa los modelos procedurales de `models.js`.
+- `public/js/models.js`: arma los personajes, armas y objetos a partir de los GLB (o de primitivas como respaldo). Son provisorios, hechos con código, y la idea es reemplazarlos por modelos GLB hechos en Blender.
 - `public/js/main.js`: el juego en sí (cámara en tercera persona, física, disparo, HUD, minimapa, red).
 
 ## Capturas
@@ -54,3 +56,5 @@ Abrí http://localhost:3000, poné tu nombre y tocá **Crear sala**. Tus amigos 
 ![Bus volador](docs/bus.png)
 ![Combate](docs/combate.png)
 ![Construcción](docs/construccion.png)
+![Personajes](docs/personajes.png)
+![Pueblo](docs/modelos.png)

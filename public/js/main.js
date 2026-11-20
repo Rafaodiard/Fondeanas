@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { World, makeStructMesh } from './world.js';
+import { World, makeStructMesh, MODEL } from './world.js';
+import { loadAssets, cloneAsset, bakedParts } from './assets.js';
 import { createCharacter, animateCharacter, createBus, createNameTag, createItemMesh, setHeld } from './models.js';
 import {
   WEAPONS, CONSUMABLES, AMMO, MATERIALS, MAT_ORDER, RARITIES, BUILD_COST, PICKAXE, SLOTS, GRID, DIRS,
@@ -24,6 +25,14 @@ const ui = {
   pickupFeed: $('pickupFeed'), buildbar: $('buildbar'), scope: $('scope'), dmgnums: $('dmgnums'), crosshair: $('crosshair'),
 };
 ui.name.value = storageGet('br-name') || '';
+// Modelos de Blender: se cargan antes de habilitar el menú.
+const btns = [$('btnCreate'), $('btnJoin')];
+btns.forEach((b) => { b.disabled = true; });
+ui.menuError.textContent = 'Cargando modelos…';
+await loadAssets((k) => { ui.menuError.textContent = `Cargando modelos… ${Math.round(k * 100)}%`; });
+MODEL.clone = cloneAsset; MODEL.baked = bakedParts;
+btns.forEach((b) => { b.disabled = false; });
+ui.menuError.textContent = '';
 function storageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function storageSet(k, v) { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } }
 
@@ -59,7 +68,7 @@ function addClouds() {
   const m = new THREE.Matrix4();
   let k = 0;
   for (let c = 0; c < 40; c++) {
-    const cx = (Math.random() - 0.5) * 1800, cz = (Math.random() - 0.5) * 1800, cy = 170 + Math.random() * 80;
+    const cx = (Math.random() - 0.5) * 1800, cz = (Math.random() - 0.5) * 1800, cy = 300 + Math.random() * 70;
     for (let p = 0; p < 6 && k < n; p++, k++) {
       const s = 10 + Math.random() * 14;
       m.compose(new THREE.Vector3(cx + (Math.random() - 0.5) * 50, cy + Math.random() * 8, cz + (Math.random() - 0.5) * 25),
@@ -769,7 +778,7 @@ function tryUseHeld() {
   if (!it) { if (mouseDown) trySwing(); return; }
   if (it.kind === 'consumable') { if (mouseClicked) startUse(); return; }
   const def = WEAPONS[it.w];
-  if (!def.auto && !mouseClicked) return;
+  if (def.auto ? !mouseDown : !mouseClicked) return;
   tryShoot(it, def);
 }
 
