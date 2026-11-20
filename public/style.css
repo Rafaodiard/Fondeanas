@@ -1,0 +1,56 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #87c5ea; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #fff; }
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.hidden { display: none !important; }
+.screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, rgba(20,40,80,.55), rgba(90,30,110,.55)); padding: 16px; }
+.panel { background: rgba(15, 20, 40, .82); border: 2px solid rgba(255,255,255,.15); border-radius: 18px; padding: 28px; width: min(420px, 100%); display: flex; flex-direction: column; gap: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+h1 { margin: 0; font-size: 44px; letter-spacing: 3px; text-align: center; font-weight: 900; background: linear-gradient(#ffe259, #ffa751); -webkit-background-clip: text; background-clip: text; color: transparent; font-style: italic; }
+.sub { margin: 0; text-align: center; opacity: .85; }
+.hint { margin: 0; text-align: center; font-size: 14px; opacity: .7; }
+label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; opacity: .9; }
+input { font: inherit; padding: 12px 14px; border-radius: 10px; border: 2px solid rgba(255,255,255,.2); background: rgba(255,255,255,.08); color: #fff; outline: none; }
+input:focus { border-color: #ffd23f; }
+#code { flex: 1; text-transform: uppercase; letter-spacing: 4px; font-weight: 700; min-width: 0; }
+.row { display: flex; gap: 8px; }
+button { font: inherit; font-weight: 800; padding: 12px 18px; border-radius: 10px; border: none; cursor: pointer; background: #3fa7ff; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+button.primary { background: linear-gradient(#ffd23f, #ff9f1c); color: #2b1900; font-size: 18px; }
+button:hover { filter: brightness(1.1); }
+.error { color: #ff7b7b; text-align: center; margin: 0; min-height: 1.2em; }
+.code { font-size: 48px; font-weight: 900; letter-spacing: 8px; text-align: center; color: #ffd23f; cursor: pointer; user-select: all; }
+#playerList { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow: auto; }
+#playerList li { padding: 8px 12px; background: rgba(255,255,255,.06); border-radius: 8px; display: flex; align-items: center; gap: 10px; }
+#playerList .dot { width: 14px; height: 14px; border-radius: 50%; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; }
+#crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); }
+#crosshair::before, #crosshair::after { content: ''; position: absolute; background: #fff; box-shadow: 0 0 2px #000; }
+#crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
+#crosshair::after { top: 10px; left: 0; height: 2px; width: 22px; }
+#hitmarker { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; transform: translate(-50%, -50%) rotate(45deg); opacity: 0; transition: opacity .15s; }
+#hitmarker::before, #hitmarker::after { content: ''; position: absolute; background: #fff; }
+#hitmarker::before { left: 14px; top: 0; width: 3px; height: 30px; }
+#hitmarker::after { top: 14px; left: 0; height: 3px; width: 30px; }
+#hitmarker.head::before, #hitmarker.head::after { background: #ffd23f; }
+#hitmarker.show { opacity: 1; transition: none; }
+#center-msg { position: absolute; top: 22%; width: 100%; text-align: center; font-size: 34px; font-weight: 900; text-shadow: 0 3px 8px rgba(0,0,0,.6); padding: 0 16px; }
+#center-msg small { display: block; font-size: 18px; font-weight: 600; opacity: .9; margin-top: 6px; }
+#topbar { position: absolute; top: 12px; left: 12px; display: flex; gap: 10px; font-weight: 800; flex-wrap: wrap; }
+#topbar span { background: rgba(0,0,0,.45); padding: 6px 12px; border-radius: 8px; }
+#minimap { position: absolute; top: 12px; right: 12px; width: 180px; height: 180px; border-radius: 12px; border: 3px solid rgba(255,255,255,.6); background: #000; }
+#killfeed { position: absolute; top: 205px; right: 12px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; font-size: 14px; }
+#killfeed div { background: rgba(0,0,0,.5); padding: 4px 10px; border-radius: 6px; }
+#bottom { position: absolute; bottom: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+#hpbar { position: relative; width: min(320px, 60vw); height: 26px; background: rgba(0,0,0,.5); border-radius: 8px; overflow: hidden; border: 2px solid rgba(255,255,255,.4); }
+#hpfill { position: absolute; inset: 0; width: 100%; background: linear-gradient(#7cf27c, #34b234); transition: width .2s; }
+#hptext { position: relative; display: block; text-align: center; font-weight: 900; line-height: 22px; text-shadow: 0 1px 2px #000; }
+#weapons { display: flex; gap: 8px; }
+.slot { background: rgba(0,0,0,.5); border: 2px solid rgba(255,255,255,.25); border-radius: 8px; padding: 8px 12px; font-weight: 700; }
+.slot.active { border-color: #ffd23f; background: rgba(255,210,63,.25); }
+.slot b { color: #ffd23f; margin-right: 4px; }
+#help { position: absolute; bottom: 60px; left: 16px; font-size: 12px; opacity: .75; text-shadow: 0 1px 2px #000; max-width: calc(100% - 32px); }
+#chatlog { position: absolute; left: 16px; bottom: 90px; font-size: 14px; display: flex; flex-direction: column; gap: 2px; text-shadow: 0 1px 2px #000; max-width: 50vw; }
+#chatInput { position: absolute; left: 16px; bottom: 210px; width: min(360px, 80vw); pointer-events: auto; }
+#damage { position: absolute; inset: 0; box-shadow: inset 0 0 120px 40px rgba(255,0,0,.6); opacity: 0; transition: opacity .4s; }
+#damage.show { opacity: 1; transition: none; }
+#clickToPlay { position: absolute; top: 60%; width: 100%; text-align: center; font-weight: 800; font-size: 20px; text-shadow: 0 2px 4px #000; }
+@media (max-width: 600px) { #minimap { width: 120px; height: 120px; } #killfeed { top: 140px; } h1 { font-size: 34px; } }

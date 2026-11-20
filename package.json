@@ -1,0 +1,19 @@
+{
+  "name": "salto-final",
+  "version": "1.0.0",
+  "description": "Battle royale 3D multijugador para navegador",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "three": "^0.170.0",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
