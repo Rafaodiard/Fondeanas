@@ -201,7 +201,7 @@ def cinturon():
         o = bpy.data.objects.get(n)
         if o:
             bpy.data.objects.remove(o)
-    z = 1.03
+    z = 1.006
     c = Vector((0, -0.01, z))
     path = _ring_path(bvh, c, z, 1, a0=-84, a1=266, step=8, r_out=0.3, lift=0.002)
     SF.strap('Cinturon', None, path, width=0.042, thick=0.007, mat=cuero, bvh=bvh, gap=0.001)
@@ -217,11 +217,15 @@ def cinturon():
         ang = math.radians(a)
         d = Vector((math.cos(ang), math.sin(ang), 0))
         pts = []
-        for dz in (-0.03, 0.0, 0.03):
+        for dz in (-0.026, 0.0, 0.024):
             hh = bvh.ray_cast(c + Vector((0, 0, dz)) + d * 0.3, -d, 0.3)
+            if hh[0] is None:
+                break
             pts.append(hh[0] + d * (0.011 if dz == 0 else 0.004))
-        loops.append(SF.strap('Presilla%d' % a, None, pts, width=0.014, thick=0.003, mat=bpy.data.materials['M_Pantalon'],
-                              bvh=bvh, gap=0.0, project=False, smooth=0, step=0.006))
+        if len(pts) == 3:
+            loops.append(SF.strap('Presilla%d' % a, None, pts, width=0.014, thick=0.003,
+                                  mat=bpy.data.materials['M_Pantalon'], bvh=bvh, gap=0.0, project=False, smooth=0,
+                                  step=0.006))
     SF.join_meshes('Presillas', loops)
 
 
@@ -282,13 +286,15 @@ def chaleco_detalles():
                 (-sx * 0.11, 0.14, 1.06)]
         path = [_onto(bvh, p) for p in ctrl]
         SF.strap('Arnes%d' % i, None, path, width=0.034, thick=0.005, mat=arnes, bvh=bvh, gap=0.002, step=0.008)
-        hit = bvh.ray_cast(Vector((sx * 0.1, -0.5, 1.23)), Vector((0, 1, 0)), 0.6)
-        H, N = hit[0], hit[1].normalized()
+        st = bpy.data.objects['Arnes%d' % i]
+        front = [v.co for v in st.data.vertices if v.co.y < -0.05 and abs(v.co.z - 1.23) < 0.006]
+        H = sum(front, Vector()) / len(front)
+        N = bvh.find_nearest(H)[1].normalized()
         uu = Vector((1, 0, 0))
         vv = N.cross(uu).normalized()
         if vv.z < 0:
             vv = -vv
-        hebilla('HebillaArnes%d' % i, H + N * 0.011, uu, vv, N, w=0.044, h=0.03, r=0.0035, mat=metal)
+        hebilla('HebillaArnes%d' % i, H + N * 0.004, uu, vv, N, w=0.046, h=0.03, r=0.0035, mat=metal)
     hit = bvh.ray_cast(Vector((0, 0.6, 1.30)), Vector((0, -1, 0)), 0.7)
     H, N = hit[0], hit[1].normalized()
     ring = [H + N * 0.012 + Vector((math.cos(a), 0, math.sin(a))) * 0.02 for a in [2 * math.pi * k / 24 for k in range(24)]]
