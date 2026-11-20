@@ -342,6 +342,12 @@ def clean_border(bm, merge=0.0045, rings=2, iters=4):
     bmesh.ops.remove_doubles(bm, verts=bnd, dist=merge)
     bmesh.ops.dissolve_degenerate(bm, edges=bm.edges[:], dist=merge * 0.35)
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+    for _ in range(3):  # orejas: caras colgando de un solo vértice en el borde
+        ears = [v for v in bm.verts if v.is_boundary and len(v.link_faces) == 1]
+        if not ears:
+            break
+        bmesh.ops.delete(bm, geom=ears, context='VERTS')
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
     band = set(v for v in bm.verts if v.is_boundary)
     ring = set(band)
     for _ in range(rings):
@@ -391,7 +397,7 @@ def garment2(name, mask_fn, offset_fn, field=None, smooth=6, smooth_fac=0.5, sub
     return ob
 
 
-def add_mods(ob, thick=0.012, levels=2, offset=1.0, rim=True, even=True):
+def add_mods(ob, thick=0.012, levels=2, offset=1.0, rim=True, even=False):
     s = ob.modifiers.new('Grosor', 'SOLIDIFY')
     s.thickness = thick
     s.offset = offset
