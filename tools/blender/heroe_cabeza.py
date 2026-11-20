@@ -187,14 +187,15 @@ def antiparras():
                       mat=aro, smooth_iters=0)
         parts += [cup, ln, rim]
     SF.rbox('AntiparraPuente', P + F * 0.012, (X, U, F), (0.016, 0.01, 0.008), bevel=0.003, mat=goma)
-    # correa elástica alrededor de la cabeza
-    path = []
-    for a in range(55, 306, 10):
+    # correa elástica alrededor de la cabeza, enganchada a los costados de las copas
+    path = [P + X * 0.064 + F * 0.008]
+    for a in range(75, 286, 10):
         th = math.radians(a)
         d = Vector((math.sin(th), -math.cos(th), 0))
         z = 1.806 + 0.022 * max(0.0, math.cos(th))
         o = Vector((0, -0.055, z))
         hh = bvh.ray_cast(o + d * 0.25, -d, 0.25)
         path.append((hh[0] if hh[0] else o + d * 0.1) + d * 0.004)
-    SF.strap('AntiparraCorrea', None, path, width=0.022, thick=0.004, mat=goma, bvh=bvh, gap=0.003, step=0.008)
+    path.append(P - X * 0.064 + F * 0.008)
+    SF.strap('AntiparraCorrea', None, path, width=0.02, thick=0.004, mat=goma, bvh=bvh, gap=0.003, step=0.008)
     return parts
