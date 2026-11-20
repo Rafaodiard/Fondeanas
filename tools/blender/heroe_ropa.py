@@ -348,6 +348,11 @@ def botas():
         SF.add_mods(b, thick=0.008, levels=2)
         # remallado por vóxeles: funde los pliegues que dejan los dedos y deja la bota como un sólido limpio
         SF.voxel(b, size=0.0024, smooth_iter=10)
+        bm = bmesh.new()
+        bm.from_mesh(b.data)
+        SF._lap(bm, 10, 0.5, wfn=lambda c: ss(0.0, -0.06, c.y) * ss(0.13, 0.08, c.z), taubin=True)
+        bm.to_mesh(b.data)
+        bm.free()
         # suela: contorno de la planta, ensanchado, con canto redondeado
         import bmesh
         pts = [Vector((v.co.x, v.co.y)) for v in b.data.vertices if v.co.z < 0.03]
