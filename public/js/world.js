@@ -1,6 +1,7 @@
 // Generación determinística de la isla a partir de la semilla de la sala.
 // Todos los clientes de una sala generan exactamente el mismo mundo.
 import * as THREE from 'three';
+import { GRID, MATERIALS } from './items.js';
 
 export function rng(seed) {
   let s = seed >>> 0;
@@ -50,7 +51,10 @@ export class World {
     this.floors = []; // pisos de casas {minX,maxX,minZ,maxZ,y}
     this.solidMeshes = []; // para raycasts de disparo
     this.pois = [];
+    this.structs = new Map(); // construcciones de los jugadores
+    this.structMeshes = [];
     this.buildHeights();
+    this.layout();
   }
 
   rawHeight(x, z) {
@@ -106,16 +110,128 @@ export class World {
     for (const f of this.floors) {
       if (x > f.minX && x < f.maxX && z > f.minZ && z < f.maxZ && y >= f.y - 2.5) h = Math.max(h, f.y);
     }
+    for (const s of this.structs.values()) {
+      if (s.type === 'pared') continue;
+      const x0 = s.i * GRID, z0 = s.j * GRID;
+      if (x < x0 || x > x0 + GRID || z < z0 || z > z0 + GRID) continue;
+      let top = s.y;
+      if (s.type === 'rampa') {
+        const t = s.dir === 0 ? z0 + GRID - z : s.dir === 2 ? z - z0 : s.dir === 1 ? x - x0 : x0 + GRID - x;
+        top = s.y + t;
+      }
+      if (y >= top - 1.2 && top > h) h = top;
+    }
     return h;
   }
 
+  // ---------- Disposición (sin Three.js: la usa también el servidor) ----------
+  layout() {
+    const rand = rng(this.seed ^ 0x9e3779b9);
+    this.houses = [];
+    this.trees = [];
+    this.rocks = [];
+    this.chestSpots = [];
+    this.lootSpots = [];
+    this.layoutTowns(rand);
+    this.layoutTrees(rand);
+    this.layoutRocks(rand);
+    // Loot suelto por la isla, además del de las casas.
+    for (let k = 0; k < 4000 && this.lootSpots.length < this.houses.length * 2 + 70; k++) {
+      const x = (rand() - 0.5) * this.size, z = (rand() - 0.5) * this.size;
+      const h = this.terrainHeight(x, z);
+      if (h < 2 || this.slopeAt(x, z) > 0.4 || this.insideHouse(x, z, 2)) continue;
+      this.lootSpots.push({ x, y: h, z });
+    }
+  }
+
+  layoutTowns(rand) {
+    const names = ['Puerto Bruma', 'Villa Cardo', 'Loma Ventosa', 'Barrio Faro', 'Los Pinares', 'Cantera Roja', 'Bahía Quieta'];
+    const half = this.size / 2;
+    let placed = 0, tries = 0;
+    while (placed < names.length && tries < 400) {
+      tries++;
+      const x = (rand() - 0.5) * half * 1.3, z = (rand() - 0.5) * half * 1.3;
+      const h = this.terrainHeight(x, z);
+      if (h < 5 || h > 55 || this.slopeAt(x, z) > 0.25) continue;
+      if (this.pois.some((p) => Math.hypot(p.x - x, p.z - z) < 170)) continue;
+      this.pois.push({ name: names[placed], x, z });
+      placed++;
+      const houses = 4 + Math.floor(rand() * 5);
+      for (let k = 0; k < houses; k++) {
+        const hx = x + (rand() - 0.5) * 70, hz = z + (rand() - 0.5) * 70;
+        const w = 8 + rand() * 5, d = 8 + rand() * 4, style = Math.floor(rand() * 3), chest = rand() < 0.6;
+        if (this.slopeAt(hx, hz) > 0.35) continue;
+        if (this.floors.some((f) => hx > f.minX - 6 && hx < f.maxX + 6 && hz > f.minZ - 6 && hz < f.maxZ + 6)) continue;
+        this.layoutHouse(hx, hz, w, d, style, chest);
+      }
+    }
+  }
+
+  layoutHouse(cx, cz, w, d, style, chest) {
+    const t = 0.4, H = 4;
+    const hs = [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2]].map(([dx, dz]) => this.terrainHeight(cx + dx, cz + dz));
+    const base = Math.max(...hs) + 0.25;
+    const minBase = Math.min(...hs) - 2;
+    const wy = base + H / 2, door = 2.2, side = (w - door) / 2;
+    const walls = [
+      [cx, wy, cz - d / 2, w, H, t],
+      [cx - w / 2, wy, cz, t, H, d],
+      [cx + w / 2, wy, cz, t, H, d],
+      [cx - w / 2 + side / 2, wy, cz + d / 2, side, H, t],
+      [cx + w / 2 - side / 2, wy, cz + d / 2, side, H, t],
+      [cx, base + H - 0.6, cz + d / 2, door, 1.2, t],
+    ];
+    for (const [x, y, z, sx, sy, sz] of walls) {
+      this.colliders.push({ minX: x - sx / 2, maxX: x + sx / 2, minY: y - sy / 2, maxY: y + sy / 2, minZ: z - sz / 2, maxZ: z + sz / 2 });
+    }
+    this.colliders.push({ minX: cx - w / 2, maxX: cx + w / 2, minY: base + H, maxY: base + H + 0.5, minZ: cz - d / 2, maxZ: cz + d / 2 });
+    this.floors.push({ minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, y: base });
+    this.houses.push({ cx, cz, w, d, base, minBase, style, walls });
+    this.lootSpots.push({ x: cx - w / 4, y: base, z: cz });
+    if (chest) this.chestSpots.push({ x: cx + w / 2 - 1.2, y: base, z: cz - d / 2 + 1.2, rot: 0 });
+    else this.lootSpots.push({ x: cx + w / 4, y: base, z: cz - d / 4 });
+  }
+
+  layoutTrees(rand) {
+    const half = this.size / 2;
+    for (let k = 0; k < 9000 && this.trees.length < 900; k++) {
+      const x = (rand() - 0.5) * this.size, z = (rand() - 0.5) * this.size;
+      const s = 0.8 + rand() * 0.7, r = rand() * Math.PI * 2, kind = rand();
+      if (Math.hypot(x, z) > half) continue;
+      const h = this.terrainHeight(x, z);
+      if (h < 3.5 || h > 75 || this.slopeAt(x, z) > 0.5) continue;
+      const forest = this.noise(x / 120 + 50, z / 120 + 50);
+      if (forest < -0.02 && kind > 0.12) continue;
+      if (this.insideHouse(x, z, 4)) continue;
+      const tree = { x, z, y: h, s, r, pine: h > 35 || kind < 0.4, alive: true };
+      tree.circle = { x, z, r: 0.45 * s, bottom: h - 1, top: h + 7 * s };
+      this.circles.push(tree.circle);
+      this.trees.push(tree);
+    }
+  }
+
+  layoutRocks(rand) {
+    for (let k = 0; k < 3000 && this.rocks.length < 260; k++) {
+      const x = (rand() - 0.5) * this.size, z = (rand() - 0.5) * this.size;
+      const s = 0.6 + rand() * 2.2, r = rand() * 6;
+      const h = this.terrainHeight(x, z);
+      if (h < 1 || this.insideHouse(x, z, 3)) continue;
+      const rock = { x, z, y: h, s, r, alive: true };
+      rock.circle = { x, z, r: s * 1.1, bottom: h - s, top: h + s * 0.75 };
+      this.circles.push(rock.circle);
+      this.rocks.push(rock);
+    }
+  }
+
+  // ---------- Mallas (sólo cliente) ----------
   build(scene) {
+    this.scene = scene;
     this.buildTerrain(scene);
     this.buildWater(scene);
-    const rand = rng(this.seed ^ 0x9e3779b9);
-    this.buildTowns(scene, rand);
-    this.buildTrees(scene, rand);
-    this.buildRocks(scene, rand);
+    this.buildHouses(scene);
+    this.buildTrees(scene);
+    this.buildRocks(scene);
+    this.buildChests(scene);
   }
 
   buildTerrain(scene) {
@@ -127,14 +243,15 @@ export class World {
     const sand = new THREE.Color('#e8d39a'), grass = new THREE.Color('#6cbf4b'), grass2 = new THREE.Color('#4f9e3a');
     const rock = new THREE.Color('#8a8576'), snow = new THREE.Color('#f4f7fb'), seabed = new THREE.Color('#c9b98a');
     const v = (i, j) => [-half + i * this.cell, this.heights[j * N + i], -half + j * this.cell];
+    const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), nrm = new THREE.Vector3();
     for (let j = 0; j < this.res; j++) {
       for (let i = 0; i < this.res; i++) {
         const a = v(i, j), b = v(i + 1, j), d = v(i, j + 1), e = v(i + 1, j + 1);
         for (const tri of [[a, d, b], [d, e, b]]) {
           const y = (tri[0][1] + tri[1][1] + tri[2][1]) / 3;
-          const nrm = new THREE.Vector3().crossVectors(
-            new THREE.Vector3(...tri[1]).sub(new THREE.Vector3(...tri[0])),
-            new THREE.Vector3(...tri[2]).sub(new THREE.Vector3(...tri[0]))).normalize();
+          e1.set(tri[1][0] - tri[0][0], tri[1][1] - tri[0][1], tri[1][2] - tri[0][2]);
+          e2.set(tri[2][0] - tri[0][0], tri[2][1] - tri[0][1], tri[2][2] - tri[0][2]);
+          nrm.crossVectors(e1, e2).normalize();
           const slope = 1 - Math.abs(nrm.y);
           const jitter = this.noise(tri[0][0] / 9, tri[0][2] / 9) * 0.5 + 0.5;
           if (y < -1) c.copy(seabed);
@@ -172,9 +289,7 @@ export class World {
     return Math.hypot(dx, dz) / (2 * s);
   }
 
-  buildTowns(scene, rand) {
-    const names = ['Puerto Bruma', 'Villa Cardo', 'Loma Ventosa', 'Barrio Faro', 'Los Pinares', 'Cantera Roja', 'Bahía Quieta'];
-    const half = this.size / 2;
+  buildHouses(scene) {
     const wallMat = [new THREE.MeshStandardMaterial({ color: '#f2e6cf', roughness: 0.9 }),
       new THREE.MeshStandardMaterial({ color: '#cfe3f0', roughness: 0.9 }),
       new THREE.MeshStandardMaterial({ color: '#f4c7a1', roughness: 0.9 })];
@@ -182,92 +297,44 @@ export class World {
       new THREE.MeshStandardMaterial({ color: '#3d5a80', flatShading: true }),
       new THREE.MeshStandardMaterial({ color: '#5b4636', flatShading: true })];
     const floorMat = new THREE.MeshStandardMaterial({ color: '#9c7b55' });
-    let placed = 0, tries = 0;
-    while (placed < names.length && tries < 400) {
-      tries++;
-      const x = (rand() - 0.5) * half * 1.3, z = (rand() - 0.5) * half * 1.3;
-      const h = this.terrainHeight(x, z);
-      if (h < 5 || h > 55 || this.slopeAt(x, z) > 0.25) continue;
-      if (this.pois.some((p) => Math.hypot(p.x - x, p.z - z) < 170)) continue;
-      this.pois.push({ name: names[placed], x, z });
-      placed++;
-      const houses = 4 + Math.floor(rand() * 5);
-      for (let k = 0; k < houses; k++) {
-        const hx = x + (rand() - 0.5) * 70, hz = z + (rand() - 0.5) * 70;
-        if (this.slopeAt(hx, hz) > 0.35) continue;
-        if (this.floors.some((f) => hx > f.minX - 6 && hx < f.maxX + 6 && hz > f.minZ - 6 && hz < f.maxZ + 6)) continue;
-        const style = Math.floor(rand() * 3);
-        this.buildHouse(scene, hx, hz, 8 + rand() * 5, 8 + rand() * 4, wallMat[style], roofMat[style], floorMat, rand);
-      }
-    }
-  }
-
-  buildHouse(scene, cx, cz, w, d, wallMat, roofMat, floorMat, rand) {
-    const t = 0.4, H = 4;
-    const hs = [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2]].map(([dx, dz]) => this.terrainHeight(cx + dx, cz + dz));
-    const base = Math.max(...hs) + 0.25;
-    const minBase = Math.min(...hs) - 2;
-    const group = new THREE.Group();
-    const addBox = (x, y, z, sx, sy, sz, mat, solid = true) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
-      m.position.set(x, y, z);
-      m.castShadow = true; m.receiveShadow = true;
-      group.add(m);
-      if (solid) {
-        this.colliders.push({ minX: x - sx / 2, maxX: x + sx / 2, minY: y - sy / 2, maxY: y + sy / 2, minZ: z - sz / 2, maxZ: z + sz / 2 });
+    const glass = new THREE.MeshStandardMaterial({ color: '#9bd3ff', emissive: '#1d3d55', roughness: 0.1 });
+    for (const h of this.houses) {
+      const group = new THREE.Group();
+      const { cx, cz, w, d, base, minBase } = h;
+      const foundH = base - minBase;
+      const found = new THREE.Mesh(new THREE.BoxGeometry(w, foundH - 0.3, d), floorMat);
+      found.position.set(cx, minBase + foundH / 2 - 0.15, cz);
+      found.receiveShadow = true;
+      group.add(found);
+      for (const [x, y, z, sx, sy, sz] of h.walls) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), wallMat[h.style]);
+        m.position.set(x, y, z);
+        m.castShadow = true; m.receiveShadow = true;
+        m.userData.harvest = { kind: 'house' };
+        group.add(m);
         this.solidMeshes.push(m);
       }
-      return m;
-    };
-    // Cimiento y piso
-    const foundH = base - minBase;
-    addBox(cx, minBase + foundH / 2 - 0.15, cz, w, foundH - 0.3, d, floorMat, false);
-    this.floors.push({ minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, y: base });
-    const wy = base + H / 2;
-    // Paredes; la del frente (z+) tiene puerta de 2 m.
-    addBox(cx, wy, cz - d / 2, w, H, t, wallMat);
-    addBox(cx - w / 2, wy, cz, t, H, d, wallMat);
-    addBox(cx + w / 2, wy, cz, t, H, d, wallMat);
-    const door = 2.2, side = (w - door) / 2;
-    addBox(cx - w / 2 + side / 2, wy, cz + d / 2, side, H, t, wallMat);
-    addBox(cx + w / 2 - side / 2, wy, cz + d / 2, side, H, t, wallMat);
-    addBox(cx, base + H - 0.6, cz + d / 2, door, 1.2, t, wallMat);
-    // Techo a dos aguas
-    const roofGeo = new THREE.CylinderGeometry(0.01, Math.max(w, d) * 0.75, 3, 4, 1);
-    roofGeo.rotateY(Math.PI / 4);
-    roofGeo.scale(w / Math.max(w, d), 1, d / Math.max(w, d));
-    const roof = new THREE.Mesh(roofGeo, roofMat);
-    roof.position.set(cx, base + H + 1.5, cz);
-    roof.castShadow = true;
-    group.add(roof);
-    this.colliders.push({ minX: cx - w / 2, maxX: cx + w / 2, minY: base + H, maxY: base + H + 0.5, minZ: cz - d / 2, maxZ: cz + d / 2 });
-    // Ventanas decorativas
-    const glass = new THREE.MeshStandardMaterial({ color: '#9bd3ff', emissive: '#1d3d55', roughness: 0.1 });
-    for (const sx of [-1, 1]) {
-      const win = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.2, 1.6), glass);
-      win.position.set(cx + sx * (w / 2 + 0.16), base + 2.3, cz);
-      group.add(win);
+      const roofGeo = new THREE.CylinderGeometry(0.01, Math.max(w, d) * 0.75, 3, 4, 1);
+      roofGeo.rotateY(Math.PI / 4);
+      roofGeo.scale(w / Math.max(w, d), 1, d / Math.max(w, d));
+      const roof = new THREE.Mesh(roofGeo, roofMat[h.style]);
+      roof.position.set(cx, base + 5.5, cz);
+      roof.castShadow = true;
+      group.add(roof);
+      for (const sx of [-1, 1]) {
+        const win = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.2, 1.6), glass);
+        win.position.set(cx + sx * (w / 2 + 0.16), base + 2.3, cz);
+        group.add(win);
+      }
+      scene.add(group);
     }
-    scene.add(group);
   }
 
   insideHouse(x, z, pad = 3) {
     return this.floors.some((f) => x > f.minX - pad && x < f.maxX + pad && z > f.minZ - pad && z < f.maxZ + pad);
   }
 
-  buildTrees(scene, rand) {
-    const half = this.size / 2;
-    const list = [];
-    for (let k = 0; k < 9000 && list.length < 900; k++) {
-      const x = (rand() - 0.5) * this.size, z = (rand() - 0.5) * this.size;
-      if (Math.hypot(x, z) > half) continue;
-      const h = this.terrainHeight(x, z);
-      if (h < 3.5 || h > 75 || this.slopeAt(x, z) > 0.5) continue;
-      const forest = this.noise(x / 120 + 50, z / 120 + 50);
-      if (forest < -0.02 && rand() > 0.12) continue;
-      if (this.insideHouse(x, z, 4)) continue;
-      list.push({ x, z, y: h, s: 0.8 + rand() * 0.7, r: rand() * Math.PI * 2, pine: h > 35 || rand() < 0.4 });
-    }
+  buildTrees(scene) {
     const trunkGeo = new THREE.CylinderGeometry(0.25, 0.4, 3, 6);
     trunkGeo.translate(0, 1.5, 0);
     const pineGeo = mergeCones([[2.6, 3.4, 3.2], [2.0, 3.0, 5.0], [1.3, 2.6, 6.6]]);
@@ -276,44 +343,152 @@ export class World {
     const trunkMat = new THREE.MeshStandardMaterial({ color: '#7a5233', flatShading: true });
     const pineMat = new THREE.MeshStandardMaterial({ color: '#2f7a3b', flatShading: true });
     const roundMat = new THREE.MeshStandardMaterial({ color: '#59a83c', flatShading: true });
-    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, list.length);
-    const pines = new THREE.InstancedMesh(pineGeo, pineMat, list.filter((t) => t.pine).length);
-    const rounds = new THREE.InstancedMesh(roundGeo, roundMat, list.filter((t) => !t.pine).length);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3();
-    let ip = 0, ir = 0;
+    const list = this.trees;
+    this.trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, list.length);
+    this.pines = new THREE.InstancedMesh(pineGeo, pineMat, list.filter((t) => t.pine).length);
+    this.rounds = new THREE.InstancedMesh(roundGeo, roundMat, list.filter((t) => !t.pine).length);
+    this.pineToTree = []; this.roundToTree = [];
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), eu = new THREE.Euler();
     list.forEach((t, i) => {
-      q.setFromEuler(new THREE.Euler(0, t.r, 0));
+      q.setFromEuler(eu.set(0, t.r, 0));
       sc.set(t.s, t.s, t.s);
       p.set(t.x, t.y - 0.2, t.z);
       m.compose(p, q, sc);
-      trunks.setMatrixAt(i, m);
-      if (t.pine) pines.setMatrixAt(ip++, m); else rounds.setMatrixAt(ir++, m);
-      this.circles.push({ x: t.x, z: t.z, r: 0.45 * t.s, bottom: t.y - 1, top: t.y + 7 * t.s });
+      t.matrix = m.clone();
+      this.trunks.setMatrixAt(i, m);
+      if (t.pine) { t.fol = [this.pines, this.pineToTree.length]; this.pines.setMatrixAt(this.pineToTree.length, m); this.pineToTree.push(i); }
+      else { t.fol = [this.rounds, this.roundToTree.length]; this.rounds.setMatrixAt(this.roundToTree.length, m); this.roundToTree.push(i); }
     });
-    for (const im of [trunks, pines, rounds]) { im.castShadow = true; im.receiveShadow = true; scene.add(im); this.solidMeshes.push(im); }
+    this.trunks.userData.harvest = { kind: 'tree', map: null };
+    this.pines.userData.harvest = { kind: 'tree', map: this.pineToTree };
+    this.rounds.userData.harvest = { kind: 'tree', map: this.roundToTree };
+    for (const im of [this.trunks, this.pines, this.rounds]) { im.castShadow = true; im.receiveShadow = true; scene.add(im); this.solidMeshes.push(im); }
   }
 
-  buildRocks(scene, rand) {
-    const list = [];
-    for (let k = 0; k < 3000 && list.length < 260; k++) {
-      const x = (rand() - 0.5) * this.size, z = (rand() - 0.5) * this.size;
-      const h = this.terrainHeight(x, z);
-      if (h < 1 || this.insideHouse(x, z, 3)) continue;
-      list.push({ x, z, y: h, s: 0.6 + rand() * 2.2, r: rand() * 6 });
-    }
+  buildRocks(scene) {
     const geo = new THREE.DodecahedronGeometry(1, 0);
     geo.scale(1.3, 0.8, 1);
     const mat = new THREE.MeshStandardMaterial({ color: '#9a958a', flatShading: true });
-    const rocks = new THREE.InstancedMesh(geo, mat, list.length);
+    this.rockMesh = new THREE.InstancedMesh(geo, mat, this.rocks.length);
     const m = new THREE.Matrix4();
-    list.forEach((r, i) => {
+    this.rocks.forEach((r, i) => {
       m.compose(new THREE.Vector3(r.x, r.y, r.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(r.r, r.r * 2, 0)), new THREE.Vector3(r.s, r.s, r.s));
-      rocks.setMatrixAt(i, m);
-      this.circles.push({ x: r.x, z: r.z, r: r.s * 1.1, bottom: r.y - r.s, top: r.y + r.s * 0.75 });
+      r.matrix = m.clone();
+      this.rockMesh.setMatrixAt(i, m);
     });
-    rocks.castShadow = true; rocks.receiveShadow = true;
-    scene.add(rocks);
-    this.solidMeshes.push(rocks);
+    this.rockMesh.userData.harvest = { kind: 'rock', map: null };
+    this.rockMesh.castShadow = true; this.rockMesh.receiveShadow = true;
+    scene.add(this.rockMesh);
+    this.solidMeshes.push(this.rockMesh);
+  }
+
+  buildChests(scene) {
+    this.chestMeshes = this.chestSpots.map((c, idx) => {
+      const g = new THREE.Group();
+      const wood = new THREE.MeshStandardMaterial({ color: '#8a5a2b', flatShading: true });
+      const trim = new THREE.MeshStandardMaterial({ color: '#ffcf4a', metalness: 0.6, roughness: 0.3, emissive: '#5a3c00' });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 0.8), wood);
+      body.position.y = 0.3;
+      g.add(body);
+      for (const x of [-0.5, 0.5]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.62, 0.82), trim); b.position.set(x, 0.3, 0); g.add(b); }
+      const lidG = new THREE.Group();
+      lidG.position.set(0, 0.6, 0.4);
+      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.2, 8, 1, false, 0, Math.PI), wood);
+      lid.rotation.z = Math.PI / 2; lid.position.z = -0.4;
+      lidG.add(lid);
+      const lock = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.08), trim);
+      lock.position.set(0, 0, 0.02);
+      lidG.add(lock);
+      g.add(lidG);
+      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffd76a', transparent: true, opacity: 0.18, depthWrite: false, blending: THREE.AdditiveBlending }));
+      glow.position.y = 0.5;
+      g.add(glow);
+      g.position.set(c.x, c.y, c.z);
+      g.rotation.y = c.rot;
+      g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      g.userData = { lid: lidG, glow, idx, open: false };
+      scene.add(g);
+      return g;
+    });
+  }
+
+  openChest(idx) {
+    const c = this.chestMeshes?.[idx];
+    if (!c || c.userData.open) return;
+    c.userData.open = true;
+    c.userData.lid.rotation.x = -1.9;
+    c.remove(c.userData.glow);
+  }
+
+  destroyResource(kind, idx) {
+    const list = kind === 'tree' ? this.trees : this.rocks;
+    const r = list[idx];
+    if (!r || !r.alive) return;
+    r.alive = false;
+    r.circle.top = -1e9; // ya no choca
+    if (!this.scene) return;
+    const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    if (kind === 'tree') {
+      this.trunks.setMatrixAt(idx, zero); this.trunks.instanceMatrix.needsUpdate = true;
+      const [mesh, k] = r.fol; mesh.setMatrixAt(k, zero); mesh.instanceMatrix.needsUpdate = true;
+      this.trunks.computeBoundingSphere(); mesh.computeBoundingSphere();
+    } else {
+      this.rockMesh.setMatrixAt(idx, zero); this.rockMesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  // Sacudón visual al pegarle con el pico.
+  shakeResource(kind, idx) {
+    const r = (kind === 'tree' ? this.trees : this.rocks)[idx];
+    if (!r || !r.alive || !this.scene) return;
+    const meshes = kind === 'tree' ? [[this.trunks, idx], r.fol] : [[this.rockMesh, idx]];
+    const m = r.matrix.clone().multiply(new THREE.Matrix4().makeScale(0.93, 0.93, 0.93));
+    for (const [mesh, k] of meshes) { mesh.setMatrixAt(k, m); mesh.instanceMatrix.needsUpdate = true; }
+    setTimeout(() => {
+      if (!r.alive) return;
+      for (const [mesh, k] of meshes) { mesh.setMatrixAt(k, r.matrix); mesh.instanceMatrix.needsUpdate = true; }
+    }, 90);
+  }
+
+  // ---------- Construcciones ----------
+  addStruct(s) {
+    if (this.structs.has(s.key)) return;
+    const x0 = s.i * GRID, z0 = s.j * GRID;
+    if (s.type === 'pared') {
+      const t = 0.15;
+      s.box = s.dir === 0
+        ? { minX: x0, maxX: x0 + GRID, minZ: z0 - t, maxZ: z0 + t, minY: s.y, maxY: s.y + GRID }
+        : { minX: x0 - t, maxX: x0 + t, minZ: z0, maxZ: z0 + GRID, minY: s.y, maxY: s.y + GRID };
+    }
+    this.structs.set(s.key, s);
+    if (this.scene) {
+      s.mesh = makeStructMesh(s);
+      s.mesh.userData.structKey = s.key;
+      this.scene.add(s.mesh);
+      this.structMeshes.push(s.mesh);
+      s.mesh.scale.setScalar(0.01);
+      s.born = performance.now();
+    }
+  }
+
+  removeStruct(key) {
+    const s = this.structs.get(key);
+    if (!s) return;
+    this.structs.delete(key);
+    if (s.mesh) {
+      this.scene.remove(s.mesh);
+      this.structMeshes.splice(this.structMeshes.indexOf(s.mesh), 1);
+    }
+  }
+
+  updateStructs() {
+    const t = performance.now();
+    for (const s of this.structs.values()) {
+      if (!s.mesh || s.grown) continue;
+      const k = Math.min(1, (t - s.born) / 180);
+      s.mesh.scale.setScalar(0.01 + 0.99 * k);
+      if (k >= 1) s.grown = true;
+    }
   }
 
   // Mueve una cápsula (pos = pies) resolviendo choques con paredes, árboles y rocas.
@@ -324,25 +499,9 @@ export class World {
       const d = Math.hypot(dx, dz), min = c.r + radius;
       if (d < min && d > 1e-4) { pos.x = c.x + (dx / d) * min; pos.z = c.z + (dz / d) * min; }
     }
-    for (const b of this.colliders) {
-      if (pos.y + height <= b.minY || pos.y >= b.maxY) continue;
-      const cx = Math.max(b.minX, Math.min(pos.x, b.maxX));
-      const cz = Math.max(b.minZ, Math.min(pos.z, b.maxZ));
-      const dx = pos.x - cx, dz = pos.z - cz;
-      const d2 = dx * dx + dz * dz;
-      if (d2 < radius * radius) {
-        if (d2 > 1e-8) {
-          const d = Math.sqrt(d2);
-          pos.x = cx + (dx / d) * radius; pos.z = cz + (dz / d) * radius;
-        } else {
-          // Centro dentro de la caja: empujar por el eje más corto.
-          const ex = [b.minX - radius - pos.x, b.maxX + radius - pos.x], ez = [b.minZ - radius - pos.z, b.maxZ + radius - pos.z];
-          const bx = Math.abs(ex[0]) < Math.abs(ex[1]) ? ex[0] : ex[1];
-          const bz = Math.abs(ez[0]) < Math.abs(ez[1]) ? ez[0] : ez[1];
-          if (Math.abs(bx) < Math.abs(bz)) pos.x += bx; else pos.z += bz;
-        }
-      }
-    }
+    const boxes = this.colliders;
+    for (let k = 0; k < boxes.length; k++) pushOut(pos, boxes[k], radius, height);
+    for (const s of this.structs.values()) if (s.box) pushOut(pos, s.box, radius, height);
   }
 
   // Distancia hasta donde un rayo choca con el terreno (marcha simple), o Infinity.
@@ -351,7 +510,6 @@ export class World {
     for (let t = 0.5; t <= maxDist; t += 1) {
       const x = origin.x + dir.x * t, y = origin.y + dir.y * t, z = origin.z + dir.z * t;
       if (y < this.terrainHeight(x, z)) {
-        // refinar
         let lo = prev, hi = t;
         for (let k = 0; k < 6; k++) {
           const mid = (lo + hi) / 2;
@@ -411,4 +569,75 @@ function mergeCones(defs) {
   out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   out.computeVertexNormals();
   return out;
+}
+
+function pushOut(pos, b, radius, height) {
+  if (pos.y + height <= b.minY || pos.y >= b.maxY) return;
+  const cx = Math.max(b.minX, Math.min(pos.x, b.maxX));
+  const cz = Math.max(b.minZ, Math.min(pos.z, b.maxZ));
+  const dx = pos.x - cx, dz = pos.z - cz;
+  const d2 = dx * dx + dz * dz;
+  if (d2 >= radius * radius) return;
+  if (d2 > 1e-8) {
+    const d = Math.sqrt(d2);
+    pos.x = cx + (dx / d) * radius; pos.z = cz + (dz / d) * radius;
+  } else {
+    const ex = [b.minX - radius - pos.x, b.maxX + radius - pos.x], ez = [b.minZ - radius - pos.z, b.maxZ + radius - pos.z];
+    const bx = Math.abs(ex[0]) < Math.abs(ex[1]) ? ex[0] : ex[1];
+    const bz = Math.abs(ez[0]) < Math.abs(ez[1]) ? ez[0] : ez[1];
+    if (Math.abs(bx) < Math.abs(bz)) pos.x += bx; else pos.z += bz;
+  }
+}
+
+const structMats = {};
+function structMat(m, ghost) {
+  const k = m + (ghost ? ':g' : '');
+  if (!structMats[k]) {
+    structMats[k] = ghost
+      ? new THREE.MeshBasicMaterial({ color: '#59b8ff', transparent: true, opacity: 0.35, depthWrite: false })
+      : new THREE.MeshStandardMaterial({ color: MATERIALS[m].color, flatShading: true, roughness: m === 'metal' ? 0.4 : 0.9, metalness: m === 'metal' ? 0.5 : 0 });
+  }
+  return structMats[k];
+}
+
+// Malla de una pieza de construcción. El grupo se ubica en la esquina (i*GRID, y, j*GRID).
+export function makeStructMesh(s, ghost = false) {
+  const g = new THREE.Group();
+  const mat = structMat(s.mat || 'madera', ghost);
+  const frameMat = ghost ? mat : new THREE.MeshStandardMaterial({ color: new THREE.Color(MATERIALS[s.mat || 'madera'].color).multiplyScalar(0.6), flatShading: true });
+  const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = !ghost; o.receiveShadow = !ghost; g.add(o); return o; };
+  const G = GRID;
+  if (s.type === 'pared') {
+    const horiz = s.dir === 0;
+    const geo = horiz ? new THREE.BoxGeometry(G, G, 0.25) : new THREE.BoxGeometry(0.25, G, G);
+    const cx = horiz ? G / 2 : 0, cz = horiz ? 0 : G / 2;
+    add(geo, mat, cx, G / 2, cz);
+    if (!ghost) {
+      // Marco para que se lea la pieza.
+      const fb = horiz ? [G, 0.25, 0.3] : [0.3, 0.25, G];
+      add(new THREE.BoxGeometry(...fb), frameMat, cx, 0.12, cz);
+      add(new THREE.BoxGeometry(...fb), frameMat, cx, G - 0.12, cz);
+      const fs = horiz ? [0.25, G, 0.3] : [0.3, G, 0.25];
+      add(new THREE.BoxGeometry(...fs), frameMat, horiz ? 0.12 : 0, G / 2, horiz ? 0 : 0.12);
+      add(new THREE.BoxGeometry(...fs), frameMat, horiz ? G - 0.12 : 0, G / 2, horiz ? 0 : G - 0.12);
+    }
+  } else if (s.type === 'piso') {
+    add(new THREE.BoxGeometry(G, 0.25, G), mat, G / 2, -0.125, G / 2);
+  } else if (s.type === 'rampa') {
+    const len = Math.hypot(G, G);
+    const ramp = new THREE.Group();
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(G, 0.25, len), mat);
+    slab.castShadow = !ghost; slab.receiveShadow = !ghost;
+    slab.rotation.x = Math.PI / 4; // sube hacia -Z local
+    ramp.add(slab);
+    ramp.position.set(G / 2, G / 2 - 0.12, G / 2);
+    ramp.rotation.y = [0, -Math.PI / 2, Math.PI, Math.PI / 2][s.dir];
+    g.add(ramp);
+    if (!ghost) for (const x of [-G / 2 + 0.15, G / 2 - 0.15]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, len), frameMat);
+      rail.rotation.x = Math.PI / 4; rail.position.set(x, 0.1, 0); ramp.add(rail);
+    }
+  }
+  g.position.set(s.i * G, s.y, s.j * G);
+  return g;
 }

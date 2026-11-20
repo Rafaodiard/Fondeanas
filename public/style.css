@@ -40,13 +40,7 @@ button:hover { filter: brightness(1.1); }
 #killfeed { position: absolute; top: 205px; right: 12px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; font-size: 14px; }
 #killfeed div { background: rgba(0,0,0,.5); padding: 4px 10px; border-radius: 6px; }
 #bottom { position: absolute; bottom: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-#hpbar { position: relative; width: min(320px, 60vw); height: 26px; background: rgba(0,0,0,.5); border-radius: 8px; overflow: hidden; border: 2px solid rgba(255,255,255,.4); }
 #hpfill { position: absolute; inset: 0; width: 100%; background: linear-gradient(#7cf27c, #34b234); transition: width .2s; }
-#hptext { position: relative; display: block; text-align: center; font-weight: 900; line-height: 22px; text-shadow: 0 1px 2px #000; }
-#weapons { display: flex; gap: 8px; }
-.slot { background: rgba(0,0,0,.5); border: 2px solid rgba(255,255,255,.25); border-radius: 8px; padding: 8px 12px; font-weight: 700; }
-.slot.active { border-color: #ffd23f; background: rgba(255,210,63,.25); }
-.slot b { color: #ffd23f; margin-right: 4px; }
 #help { position: absolute; bottom: 60px; left: 16px; font-size: 12px; opacity: .75; text-shadow: 0 1px 2px #000; max-width: calc(100% - 32px); }
 #chatlog { position: absolute; left: 16px; bottom: 90px; font-size: 14px; display: flex; flex-direction: column; gap: 2px; text-shadow: 0 1px 2px #000; max-width: 50vw; }
 #chatInput { position: absolute; left: 16px; bottom: 210px; width: min(360px, 80vw); pointer-events: auto; }
@@ -54,3 +48,42 @@ button:hover { filter: brightness(1.1); }
 #damage.show { opacity: 1; transition: none; }
 #clickToPlay { position: absolute; top: 60%; width: 100%; text-align: center; font-weight: 800; font-size: 20px; text-shadow: 0 2px 4px #000; }
 @media (max-width: 600px) { #minimap { width: 120px; height: 120px; } #killfeed { top: 140px; } h1 { font-size: 34px; } }
+
+/* --- HUD v2 --- */
+#bars { display: flex; flex-direction: column; gap: 4px; }
+.bar { position: relative; width: min(320px, 60vw); height: 22px; background: rgba(0,0,0,.5); border-radius: 6px; overflow: hidden; border: 2px solid rgba(255,255,255,.4); transform: skewX(-12deg); }
+#shieldbar { height: 16px; }
+#shieldfill { position: absolute; inset: 0; width: 0%; background: linear-gradient(#8fd8ff, #2f7bff); transition: width .2s; }
+#shieldtext, #hptext { position: relative; display: block; text-align: center; font-weight: 900; font-size: 13px; line-height: 18px; text-shadow: 0 1px 2px #000; }
+#shieldtext { line-height: 12px; font-size: 11px; }
+#hpbar { height: 22px; }
+#slots { display: flex; gap: 6px; }
+.slot { position: relative; width: 74px; height: 74px; background: rgba(0,0,0,.5); border: 3px solid rgba(255,255,255,.2); border-radius: 10px; padding: 4px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+.slot .k { position: absolute; top: 2px; left: 5px; color: #ffd23f; font-size: 12px; }
+.slot .n { line-height: 1.1; text-shadow: 0 1px 2px #000; }
+.slot .a { position: absolute; top: 2px; right: 5px; font-size: 12px; }
+.slot.active { border-color: #fff; transform: translateY(-6px); box-shadow: 0 0 12px rgba(255,255,255,.5); }
+.slot .rar { position: absolute; inset: 0; opacity: .55; z-index: -1; }
+.slot { z-index: 0; }
+#mats { position: absolute; right: 16px; bottom: 110px; display: flex; flex-direction: column; gap: 4px; }
+.mat { display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,.45); padding: 3px 10px; border-radius: 6px; font-weight: 800; min-width: 80px; border: 2px solid transparent; }
+.mat i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+.mat.active { border-color: #ffd23f; }
+#buildbar { display: flex; gap: 6px; }
+#buildbar div { background: rgba(0,0,0,.5); border: 3px solid rgba(255,255,255,.2); border-radius: 10px; padding: 8px 12px; font-weight: 800; }
+#buildbar div.active { border-color: #59b8ff; background: rgba(89,184,255,.3); }
+#prompt { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); background: rgba(0,0,0,.6); padding: 8px 14px; border-radius: 8px; font-weight: 700; white-space: nowrap; }
+#prompt b { background: #fff; color: #000; padding: 1px 7px; border-radius: 4px; margin-right: 6px; }
+#usebar { position: absolute; left: 50%; top: 56%; transform: translateX(-50%); width: 220px; height: 16px; background: rgba(0,0,0,.6); border-radius: 8px; overflow: hidden; }
+#usefill { position: absolute; inset: 0; width: 0; background: #7cf27c; }
+#usetext { position: relative; display: block; text-align: center; font-size: 11px; font-weight: 800; line-height: 16px; }
+#pickupFeed { position: absolute; left: 16px; top: 60px; display: flex; flex-direction: column; gap: 3px; font-size: 13px; font-weight: 700; }
+#pickupFeed div { background: rgba(0,0,0,.45); padding: 3px 8px; border-radius: 5px; border-left: 4px solid #fff; }
+#dmgnums div { position: absolute; font-weight: 900; font-size: 20px; text-shadow: 0 2px 3px #000; transform: translate(-50%, -50%); pointer-events: none; }
+#scope { position: absolute; inset: 0; background: radial-gradient(circle at center, transparent 0 32vmin, #000 32.3vmin); }
+#scope::before, #scope::after { content: ''; position: absolute; background: #000; }
+#scope::before { left: 50%; top: 18vh; bottom: 18vh; width: 2px; }
+#scope::after { top: 50%; left: 30vw; right: 30vw; height: 2px; }
+#help { bottom: 150px; }
+#chatlog { bottom: 175px; }
+@media (max-width: 700px) { .slot { width: 52px; height: 52px; font-size: 9px; } #mats { bottom: 90px; } }
