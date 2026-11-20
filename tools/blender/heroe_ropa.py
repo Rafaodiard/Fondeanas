@@ -345,7 +345,7 @@ def botas():
         bm.to_mesh(b.data)
         bm.free()
         top_loop = [p for p, n in max(SF.border_loops(b), key=lambda lp: sum(p.z for p, n in lp) / len(lp))]
-        SF.add_mods(b, thick=0.008, levels=2)
+        SF.add_mods(b, thick=0.02, levels=2, offset=-1.0)
         # remallado por vóxeles: funde los pliegues que dejan los dedos y deja la bota como un sólido limpio
         SF.voxel(b, size=0.0024, smooth_iter=10)
         bm = bmesh.new()
