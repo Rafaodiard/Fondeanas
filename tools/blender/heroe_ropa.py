@@ -302,101 +302,47 @@ def chaleco_detalles():
 
 
 def botas():
+    # Bota procedural: caña (anillos ajustados a la pierna) + pie (secciones a lo largo del pie), unidos por vóxeles.
+    import bmesh
     cuero = SF.material('M_Bota', (0.13, 0.075, 0.045, 1), rough=0.6)
     suela_m = SF.material('M_Suela', (0.035, 0.032, 0.03, 1), rough=0.8)
     cordon = SF.material('M_Cordon', (0.06, 0.045, 0.03, 1), rough=0.9)
-    for n in ('BotaI', 'BotaD', 'SuelaI', 'SuelaD', 'PunteraI', 'PunteraD'):
+    for n in ('BotaI', 'BotaD', 'SuelaI', 'SuelaD', 'PunteraI', 'PunteraD', 'BotaCuelloI', 'BotaCuelloD',
+              'CordonesI', 'CordonesD'):
         o = bpy.data.objects.get(n)
         if o:
             bpy.data.objects.remove(o)
+    body = SF.get_co(bpy.data.objects['Cuerpo'])
     out = []
     for side, sx in (('I', 1), ('D', -1)):
-        C = Vector((sx * 0.216, -0.074, 0.03))
-        Rr = Vector((0.053, 0.099, 0.047))
-
-        def ell(c, C=C, Rr=Rr):
-            d = c - C
-            return Vector((d.x / Rr.x, d.y / Rr.y, d.z / Rr.z)).length
-
-        def mask(c, n, sx=sx, ell=ell):
-            return c.z < 0.36 and c.x * sx > 0.04 and ell(c) > 1.0
-
-        def off(c, sx=sx):
-            toe = ss(-0.02, -0.12, c.y)                      # puntera amplia
-            ankle = ss(0.20, 0.12, c.z) * (1 - toe)
-            return 0.009 + 0.008 * ss(0.16, 0.06, c.z) + 0.010 * toe + 0.003 * ankle + 0.004 * ss(0.26, 0.33, c.z)
-
-        f = lambda c: c.z - (0.318 + 0.012 * ss(0.0, 0.06, c.y))
-        b = SF.garment2('Bota' + side, mask, off, field=f, smooth=14, smooth_fac=0.5, subdiv=1, post_smooth=3,
-                        mat=cuero, edge_smooth=5)
-        # puntera: el agujero de los dedos se tapa con anillos sobre un elipsoide (sin pliegues ni dedos)
-        import bmesh
-        bm = bmesh.new()
-        bm.from_mesh(b.data)
-        E2 = Rr + Vector((0.021, 0.021, 0.021))
-
-        def to_u(p):
-            d = p - C
-            return Vector((d.x / E2.x, d.y / E2.y, d.z / E2.z)).normalized()
-
-        def from_u(u):
-            return C + Vector((u.x * E2.x, u.y * E2.y, u.z * E2.z))
-
-        def slerp(a, b_, t):
-            th = a.angle(b_)
-            if th < 1e-5:
-                return b_.copy()
-            return (a * math.sin((1 - t) * th) + b_ * math.sin(t * th)) / math.sin(th)
-
-        edges = set(e for e in bm.edges if e.is_boundary)
-        loops = []
-        while edges:
-            e0 = edges.pop()
-            chain = [e0.verts[0], e0.verts[1]]
-            while True:
-                nx = [e for e in chain[-1].link_edges if e in edges]
-                if not nx:
-                    break
-                edges.discard(nx[0])
-                w = nx[0].other_vert(chain[-1])
-                if w is chain[0]:
-                    break
-                chain.append(w)
-            loops.append(chain)
-        toe = min(loops, key=lambda lp: sum(v.co.y for v in lp) / len(lp))
-        fwd = Vector((0.26 * sx, -0.97, -0.12)).normalized()
-        ut = to_u(C + fwd * 0.1)
-        us = [to_u(v.co) for v in toe]
-        for v, u in zip(toe, us):
-            v.co = from_u(u)
-        R = 9
-        rings = [toe]
-        for j in range(1, R):
-            r = 1 - j / R
-            rings.append([bm.verts.new(from_u(slerp(ut, u, r).normalized())) for u in us])
-        tip = bm.verts.new(from_u(ut))
-        M = len(toe)
-        for j in range(R - 1):
-            for k in range(M):
-                k2 = (k + 1) % M
-                bm.faces.new((rings[j][k], rings[j][k2], rings[j + 1][k2], rings[j + 1][k]))
-        for k in range(M):
-            bm.faces.new((rings[-1][k], rings[-1][(k + 1) % M], tip))
-        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
-        for _ in range(3):
-            SF._lap(bm, 2, 0.5, wfn=lambda c: ss(-0.02, -0.07, c.y) * ss(0.16, 0.10, c.z), taubin=True)
-        for f_ in bm.faces:
-            f_.smooth = True
-        # aplana la planta: todo lo que quedó por debajo de z=0.008 se apoya en la suela
-        for v in bm.verts:
-            if v.co.z < 0.008:
-                v.co.z = 0.008 + (v.co.z - 0.008) * 0.15
-        bm.to_mesh(b.data)
-        bm.free()
-        top_loop = [p for p, n in max(SF.border_loops(b), key=lambda lp: sum(p.z for p, n in lp) / len(lp))]
-        SF.add_mods(b, thick=0.007, levels=2)
-        # suela: contorno de la planta, ensanchado, con canto redondeado
-        import bmesh
+        # --- caña: elipses que envuelven la pierna con holgura
+        rings = []
+        for z in [0.07 + 0.25 * k / 12 for k in range(13)]:
+            sl = body[(abs(body[:, 2] - z) < 0.008) & (body[:, 0] * sx > 0.06)]
+            cx = (sl[:, 0].min() + sl[:, 0].max()) / 2
+            cy = (sl[:, 1].min() + sl[:, 1].max()) / 2
+            rx = (sl[:, 0].max() - sl[:, 0].min()) / 2 + 0.014 + 0.004 * ss(0.25, 0.32, z)
+            ry = (sl[:, 1].max() - sl[:, 1].min()) / 2 + 0.014 + 0.004 * ss(0.25, 0.32, z)
+            rings.append(SF.superellipse((cx, cy, z), rx, ry, 2.2, (1, 0, 0), (0, 1, 0), N=40))
+        cana = SF.loft_mesh('_Cana' + side, rings, closed_ends=True)
+        # --- pie: secciones transversales del talón a la punta, base plana
+        H = Vector((sx * 0.19, 0.075, 0))
+        T = Vector((sx * 0.243, -0.178, 0))
+        ax = (T - H).normalized()
+        lat = Vector((-ax.y, ax.x, 0)) * (1 if sx > 0 else -1)
+        prof = [(0.0, 0.080, 0.10), (0.12, 0.090, 0.125), (0.3, 0.096, 0.118), (0.5, 0.102, 0.092), (0.68, 0.106, 0.074),
+                (0.82, 0.100, 0.064), (0.92, 0.084, 0.056), (0.98, 0.058, 0.046), (1.0, 0.03, 0.03)]
+        secs = []
+        L = (T - H).length
+        for t, w, h in prof:
+            P = H + ax * (L * t)
+            secs.append(SF.superellipse((P.x, P.y, 0.006 + h / 2), w / 2, h / 2, 2.6, lat, (0, 0, 1), N=40))
+        pie = SF.loft_mesh('_Pie' + side, secs, closed_ends=True)
+        b = SF.join_meshes('Bota' + side, [cana, pie])
+        SF.voxel(b, size=0.0026, smooth_iter=12)
+        b.data.materials.clear()
+        b.data.materials.append(cuero)
+        # --- suela: contorno de la planta, ensanchado, con canto redondeado
         pts = [Vector((v.co.x, v.co.y)) for v in b.data.vertices if v.co.z < 0.03]
         cx = sum(p.x for p in pts) / len(pts)
         cy = sum(p.y for p in pts) / len(pts)
@@ -405,22 +351,17 @@ def botas():
         for k in range(M):
             a = 2 * math.pi * k / M
             d = Vector((math.cos(a), math.sin(a)))
-            r = max(((p - Vector((cx, cy))).dot(d) for p in pts), default=0.05)
-            ring.append(r)
+            ring.append(max(((p - Vector((cx, cy))).dot(d) for p in pts), default=0.05))
         ring = [(ring[k - 1] + 2 * ring[k] + ring[(k + 1) % M]) / 4 for k in range(M)]
-        secs = []
-        for z, grow in ((-0.034, 0.004), (-0.031, 0.008), (-0.006, 0.009), (0.006, 0.007), (0.016, 0.0)):
-            sec = []
-            for k in range(M):
-                a = 2 * math.pi * k / M
-                r = ring[k] + grow
-                sec.append(Vector((cx + math.cos(a) * r, cy + math.sin(a) * r, z)))
-            secs.append(sec)
-        s = SF.loft_mesh('Suela' + side, secs, closed_ends=True)
-        SF._with_mat(s, suela_m)
-        d = s.modifiers.new('Sub', 'SUBSURF')
+        ssecs = []
+        for z, grow in ((-0.034, 0.003), (-0.031, 0.007), (-0.006, 0.008), (0.006, 0.006), (0.016, -0.002)):
+            ssecs.append([Vector((cx + math.cos(2 * math.pi * k / M) * (ring[k] + grow),
+                                  cy + math.sin(2 * math.pi * k / M) * (ring[k] + grow), z)) for k in range(M)])
+        so = SF.loft_mesh('Suela' + side, ssecs, closed_ends=True)
+        SF._with_mat(so, suela_m)
+        d = so.modifiers.new('Sub', 'SUBSURF')
         d.levels = 2
-        # cordones cruzados sobre el empeine
+        # --- cordones cruzados sobre el empeine
         bvh = SF.surface_bvh(b)
         front = Vector((0.26 * sx, -0.97, 0)).normalized()
         up = Vector((0, 0, 1))
@@ -430,8 +371,8 @@ def botas():
         n_e = 7
         for i in range(n_e):
             t = i / (n_e - 1)
-            z = 0.278 - 0.175 * t
-            slab = [c for c in bv if abs(c.z - z) < 0.012 and c.y > -0.06]
+            z = 0.29 - 0.17 * t
+            slab = [c for c in bv if abs(c.z - z) < 0.01 and c.y > -0.05]
             O = sum(slab, Vector()) / len(slab)
             phi = math.radians(6 + 50 * t ** 1.3)
             nd = (front * math.cos(phi) + up * math.sin(phi)).normalized()
@@ -446,7 +387,9 @@ def botas():
             laces.append(SF.tube('Cordon%s%db' % (side, i), [eyes_r[i], eyes_l[i + 1]], 0.0028, mat=cordon, closed=False,
                                  smooth_iters=0))
         SF.join_meshes('Cordones' + side, laces)
-        # cuello acolchado arriba de la caña
-        SF.tube('BotaCuello' + side, top_loop, 0.0085, mat=cuero, smooth_iters=2)
+        # --- cuello acolchado arriba de la caña
+        top = [Vector(p) + (Vector(p) - Vector((sum(q[0] for q in rings[-1]) / 40, sum(q[1] for q in rings[-1]) / 40,
+                                                     p[2]))).normalized() * 0.002 for p in rings[-1]]
+        SF.tube('BotaCuello' + side, top, 0.008, mat=cuero, smooth_iters=1)
         out.append(b)
     return out
