@@ -44,7 +44,7 @@ def pelo():
     SF.add_mods(pc, thick=0.0015, levels=1)
 
     def xw(c):
-        return 0.068 + 0.012 * ss(-0.10, 0.04, c.y) + 0.004 * math.sin(c.y * 95)
+        return 0.066 + 0.014 * ss(-0.10, 0.04, c.y) + 0.0015 * math.sin(c.y * 95)
 
     def zt(c):
         return 1.786 - 0.012 * ss(-0.02, 0.06, c.y)
@@ -52,9 +52,10 @@ def pelo():
     f_top = SF.fmax(lambda c: abs(c.x) - xw(c), lambda c: hairline(c) - c.z, lambda c: zt(c) - c.z)
 
     def height(c):
-        front = ss(0.03, -0.12, c.y)
-        crown = max(0.0, 1 - (c.x / 0.075) ** 2)
-        return 0.0045 + 0.020 * front + 0.007 * crown + 0.008 * ss(-0.10, -0.155, c.y)
+        front = ss(0.04, -0.10, c.y)
+        crown = max(0.0, 1 - (c.x / 0.078) ** 2)
+        taper = ss(0.0, 0.03, c.z - hairline(c))
+        return 0.0035 + taper * (0.007 + 0.018 * front * (0.4 + 0.6 * crown) + 0.008 * crown)
 
     def strands(c):
         fade = ss(0.0, 0.014, xw(c) - abs(c.x))
