@@ -322,10 +322,28 @@ def botas():
         f = lambda c: c.z - (0.318 + 0.012 * ss(0.0, 0.06, c.y))
         b = SF.garment2('Bota' + side, mask, off, field=f, smooth=14, smooth_fac=0.5, subdiv=1, post_smooth=3,
                         mat=cuero, edge_smooth=5)
+        # puntera: proyecta la zona de los dedos sobre un elipsoide (bota de puntera redonda, sin dedos marcados)
+        import bmesh
+        C = Vector((sx * 0.214, -0.085, 0.045))
+        Rr = Vector((0.052, 0.105, 0.05))
+        bm = bmesh.new()
+        bm.from_mesh(b.data)
+        for _ in range(2):
+            for v in bm.verts:
+                w = ss(-0.02, -0.075, v.co.y) * ss(0.13, 0.07, v.co.z)
+                if w <= 0:
+                    continue
+                d = v.co - C
+                e = Vector((d.x / Rr.x, d.y / Rr.y, d.z / Rr.z)).length
+                if e > 1e-6:
+                    v.co = v.co.lerp(C + d / e, w)
+            SF._lap(bm, 2, 0.4, wfn=lambda c: ss(0.0, -0.06, c.y))
         # aplana la planta: todo lo que quedó por debajo de z=0.008 se apoya en la suela
-        for v in b.data.vertices:
+        for v in bm.verts:
             if v.co.z < 0.008:
                 v.co.z = 0.008 + (v.co.z - 0.008) * 0.15
+        bm.to_mesh(b.data)
+        bm.free()
         SF.add_mods(b, thick=0.005, levels=2)
         # suela: contorno de la planta, ensanchado, con canto redondeado
         import bmesh
@@ -357,19 +375,20 @@ def botas():
         front = Vector((0.26 * sx, -0.97, 0)).normalized()
         up = Vector((0, 0, 1))
         side_v = front.cross(up).normalized()
-        A = Vector((sx * 0.188, -0.03, 0.285))
-        B = Vector((sx * 0.207, -0.112, 0.085))
+        O0 = Vector((sx * 0.183, 0.03, 0.275))   # eje interno de la caña
+        O1 = Vector((sx * 0.205, -0.055, 0.05))   # interior del empeine
         eyes_l, eyes_r = [], []
         n_e = 7
         for i in range(n_e):
             t = i / (n_e - 1)
-            P = A.lerp(B, t)
-            phi = math.radians(10 + 55 * t)
+            O = O0.lerp(O1, t)
+            phi = math.radians(8 + 62 * t)
             nd = (front * math.cos(phi) + up * math.sin(phi)).normalized()
+            sv = nd.cross(side_v).cross(nd).normalized() * -1 if False else side_v
             for lst, sgn in ((eyes_l, 1), (eyes_r, -1)):
-                Q = P + side_v * (sgn * 0.017)
-                hh = bvh.ray_cast(Q + nd * 0.12, -nd, 0.2)
-                lst.append((hh[0] if hh[0] else Q) + nd * 0.004)
+                Q = O + sv * (sgn * 0.016)
+                hh = bvh.ray_cast(Q + nd * 0.25, -nd, 0.25)
+                lst.append((hh[0] if hh[0] else Q + nd * 0.05) + nd * 0.0035)
         laces = []
         for i in range(n_e - 1):
             laces.append(SF.tube('Cordon%s%da' % (side, i), [eyes_l[i], eyes_r[i + 1]], 0.0028, mat=cordon, closed=False,
