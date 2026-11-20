@@ -368,7 +368,7 @@ def clean_border(bm, merge=0.0045, rings=2, iters=4):
 
 
 def garment2(name, mask_fn, offset_fn, field=None, smooth=6, smooth_fac=0.5, subdiv=1, src='Cuerpo',
-             post_smooth=2, mat=None, color=(0.5, 0.5, 0.5, 1), edge_smooth=3):
+             post_smooth=2, mat=None, color=(0.5, 0.5, 0.5, 1), edge_smooth=3, detail=None):
     # Como garment() pero el borde lo define un campo escalar (field(co) > 0 se borra).
     body = bpy.data.objects[src]
     bm = bmesh.new()
@@ -386,6 +386,11 @@ def garment2(name, mask_fn, offset_fn, field=None, smooth=6, smooth_fac=0.5, sub
     if field:
         iso_cut(bm, field)
         clean_border(bm, iters=edge_smooth)
+    if detail:  # relieve fino (mechones, arrugas) después de subdividir
+        bm.normal_update()
+        disp = [(v, v.normal * detail(v.co)) for v in bm.verts]
+        for v, d in disp:
+            v.co += d
     bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=0.0008)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
@@ -604,13 +609,9 @@ def strap(name, targets, path, width=0.035, thick=0.004, gap=0.003, mat=None, co
     pts = _catmull(path, step)
     base, nors = [], []
     for p in pts:
-        if project:
-            loc, nrm, i, d = bvh.find_nearest(p)
-            base.append(loc)
-            nors.append(nrm.normalized())
-        else:
-            base.append(p)
-            nors.append(None)
+        loc, nrm, i, d = bvh.find_nearest(p)
+        base.append(loc if project else p)
+        nors.append(nrm.normalized())
     for _ in range(smooth):
         base = [base[0]] + [(base[k - 1] + base[k] * 2 + base[k + 1]) / 4 for k in range(1, len(base) - 1)] + [base[-1]]
         nors = [nors[0]] + [((nors[k - 1] + nors[k] * 2 + nors[k + 1]) / 4).normalized() if nors[k] else None
