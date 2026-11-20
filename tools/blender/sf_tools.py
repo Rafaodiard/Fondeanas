@@ -483,6 +483,203 @@ def trims(ob, name, radius, mat=None, thick=0.0, select=None, out=0.0):
     return join_meshes(name, objs) if len(objs) > 1 else objs[0]
 
 
+def surface_bvh(objs):
+    # BVH (en coords de mundo) de una o varias mallas evaluadas, para proyectar piezas sobre la ropa.
+    from mathutils.bvhtree import BVHTree
+    objs = objs if isinstance(objs, (list, tuple)) else [objs]
+    dg = bpy.context.evaluated_depsgraph_get()
+    bm = bmesh.new()
+    for o in objs:
+        ev = o.evaluated_get(dg)
+        me = ev.to_mesh()
+        me.transform(o.matrix_world)
+        bm.from_mesh(me)
+        ev.to_mesh_clear()
+    bvh = BVHTree.FromBMesh(bm)
+    bm.free()
+    return bvh
+
+
+def _frame(bvh, center, up):
+    loc, nrm, i, d = bvh.find_nearest(Vector(center))
+    n0 = nrm.normalized()
+    up = Vector(up)
+    v = (up - n0 * up.dot(n0)).normalized()
+    u = v.cross(n0)
+    return loc, n0, u, v
+
+
+def _cast(bvh, P0, n0, smooth_n=0.5):
+    hit = bvh.ray_cast(P0, -n0, 0.4)
+    if hit[0] is None:
+        hit = bvh.find_nearest(P0)
+    H, N = hit[0], hit[1].normalized()
+    return H, (N * (1 - smooth_n) + n0 * smooth_n).normalized()
+
+
+def patch(name, targets, center, up, size, thick=0.012, gap=0.002, exp=4.0, rings=7, N=40, puff=0.65,
+          seam=0.0015, mat=None, color=(0.5, 0.5, 0.5, 1), levels=2, bvh=None, depth=0.10, shape=None):
+    # Pieza acolchada (bolsillo, tapa, rodillera, parche) proyectada sobre la superficie de 'targets'.
+    bvh = bvh or surface_bvh(targets)
+    loc, n0, u, v = _frame(bvh, center, up)
+    w, h = size
+    ss_ = [k / rings for k in range(1, rings + 1)]
+    if seam:
+        ss_ = sorted(set(ss_ + [0.86, 0.9, 0.94]))
+    def outline(k):
+        a = 2 * math.pi * k / N
+        c_, s_ = math.cos(a), math.sin(a)
+        x = math.copysign(abs(c_) ** (2 / exp), c_) * w / 2
+        y = math.copysign(abs(s_) ** (2 / exp), s_) * h / 2
+        if shape:
+            x, y = shape(x, y)
+        return x, y
+    ol = [outline(k) for k in range(N)]
+    verts, top_idx, bot_idx = [], [], []
+    def add(P):
+        verts.append(P)
+        return len(verts) - 1
+    H, Nn = _cast(bvh, loc + n0 * depth, n0)
+    tc = add(H + Nn * (gap + thick))
+    bc = add(H + Nn * gap)
+    for sv in ss_:
+        prof = (1 - puff) + puff * max(0.0, 1 - sv ** 4) ** 0.5
+        if seam and abs(sv - 0.9) < 1e-6:
+            prof -= seam / thick
+        tr, br = [], []
+        for (x, y) in ol:
+            P0 = loc + u * (x * sv) + v * (y * sv) + n0 * depth
+            H, Nn = _cast(bvh, P0, n0)
+            tr.append(add(H + Nn * (gap + thick * prof)))
+            br.append(add(H + Nn * gap))
+        top_idx.append(tr)
+        bot_idx.append(br)
+    faces = []
+    for k in range(N):
+        k2 = (k + 1) % N
+        faces.append((tc, top_idx[0][k], top_idx[0][k2]))
+        faces.append((bc, bot_idx[0][k2], bot_idx[0][k]))
+        for r in range(len(ss_) - 1):
+            faces.append((top_idx[r][k], top_idx[r + 1][k], top_idx[r + 1][k2], top_idx[r][k2]))
+            faces.append((bot_idx[r][k2], bot_idx[r + 1][k2], bot_idx[r + 1][k], bot_idx[r][k]))
+        faces.append((top_idx[-1][k], bot_idx[-1][k], bot_idx[-1][k2], top_idx[-1][k2]))
+    me = bpy.data.meshes.new(name)
+    me.from_pydata([tuple(p) for p in verts], [], faces)
+    me.validate()
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bm.to_mesh(me)
+    bm.free()
+    for p in me.polygons:
+        p.use_smooth = True
+    ob = new_obj(name, me)
+    ob.data.materials.append(mat or material('M_' + name, color))
+    if levels:
+        d = ob.modifiers.new('Sub', 'SUBSURF')
+        d.levels = levels
+        d.render_levels = levels
+    return ob
+
+
+def _catmull(path, step):
+    P = [Vector(p) for p in path]
+    P = [P[0] * 2 - P[1]] + P + [P[-1] * 2 - P[-2]]
+    out = []
+    for i in range(1, len(P) - 2):
+        p0, p1, p2, p3 = P[i - 1], P[i], P[i + 1], P[i + 2]
+        n = max(2, int((p2 - p1).length / step))
+        for k in range(n):
+            t = k / n
+            t2, t3 = t * t, t * t * t
+            out.append(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3))
+    out.append(P[-2])
+    return out
+
+
+def strap(name, targets, path, width=0.035, thick=0.004, gap=0.003, mat=None, color=(0.1, 0.1, 0.1, 1),
+          bvh=None, step=0.01, smooth=3, sec=10, exp=6.0, project=True):
+    # Correa plana que sigue la superficie: 'path' son puntos de control aproximados.
+    bvh = bvh or surface_bvh(targets)
+    pts = _catmull(path, step)
+    base, nors = [], []
+    for p in pts:
+        if project:
+            loc, nrm, i, d = bvh.find_nearest(p)
+            base.append(loc)
+            nors.append(nrm.normalized())
+        else:
+            base.append(p)
+            nors.append(None)
+    for _ in range(smooth):
+        base = [base[0]] + [(base[k - 1] + base[k] * 2 + base[k + 1]) / 4 for k in range(1, len(base) - 1)] + [base[-1]]
+        nors = [nors[0]] + [((nors[k - 1] + nors[k] * 2 + nors[k + 1]) / 4).normalized() if nors[k] else None
+                            for k in range(1, len(nors) - 1)] + [nors[-1]]
+    sections = []
+    for k, P in enumerate(base):
+        t = (base[min(k + 1, len(base) - 1)] - base[max(k - 1, 0)]).normalized()
+        n = nors[k] if nors[k] else Vector((0, 0, 1))
+        sd = t.cross(n).normalized()
+        n = sd.cross(t).normalized()
+        C = P + n * (gap + thick / 2)
+        sections.append(superellipse(C, width / 2, thick / 2, exp, sd, n, N=sec))
+    ob = loft_mesh(name, sections, closed_ends=True)
+    return _with_mat(ob, mat or material('M_' + name, color))
+
+
+def _with_mat(ob, mat):
+    ob.data.materials.clear()
+    ob.data.materials.append(mat)
+    for p in ob.data.polygons:
+        p.use_smooth = True
+    return ob
+
+
+def rbox(name, center, axes, size, bevel=0.003, segs=3, mat=None, color=(0.5, 0.5, 0.5, 1)):
+    # Caja redondeada orientada (hebillas, botones, cargadores).
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    for v in bm.verts:
+        v.co = Vector((v.co.x * size[0], v.co.y * size[1], v.co.z * size[2]))
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    ob = new_obj(name, me)
+    u, v, n = [Vector(a).normalized() for a in axes]
+    ob.matrix_world = Matrix((u, v, n)).transposed().to_4x4()
+    ob.matrix_world.translation = Vector(center)
+    b = ob.modifiers.new('Bisel', 'BEVEL')
+    b.width = bevel
+    b.segments = segs
+    b.limit_method = 'NONE'
+    ob.data.materials.append(mat or material('M_' + name, color))
+    for p in ob.data.polygons:
+        p.use_smooth = True
+    return ob
+
+
+def cyl(name, center, axis, r, depth, segs=20, mat=None, color=(0.5, 0.5, 0.5, 1), bevel=0.0):
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=segs, radius1=r, radius2=r, depth=depth)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    ob = new_obj(name, me)
+    z = Vector(axis).normalized()
+    q = Vector((0, 0, 1)).rotation_difference(z)
+    ob.matrix_world = q.to_matrix().to_4x4()
+    ob.matrix_world.translation = Vector(center)
+    if bevel:
+        b = ob.modifiers.new('Bisel', 'BEVEL')
+        b.width = bevel
+        b.segments = 2
+        b.limit_method = 'ANGLE'
+    ob.data.materials.append(mat or material('M_' + name, color))
+    for p in ob.data.polygons:
+        p.use_smooth = True
+    return ob
+
+
 builtins.SF = type('SF', (), {k: staticmethod(v) if callable(v) else v for k, v in dict(globals()).items()
                                if not k.startswith('__') and k not in ('bpy', 'bmesh', 'builtins', 'math', 'base64', 'os', 'np',
                                                                        'Vector', 'Euler', 'Matrix')})
