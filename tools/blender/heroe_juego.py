@@ -524,3 +524,40 @@ def unir():
     for k in list(j.keys()):
         del j[k]
     return {'tris': sum(len(p.vertices) - 2 for p in j.data.polygons), 'mats': [m.name for m in j.data.materials]}
+
+
+# ---------------------------------------------------------------------------
+# Normales hacia afuera en las piezas de alta (los lofts y tubos salían invertidos: arruina AO y normal map).
+def normales(aplicar=True):
+    from mathutils.bvhtree import BVHTree
+    cu = bpy.data.objects['Cuerpo']
+    bvh = BVHTree.FromObject(cu, bpy.context.evaluated_depsgraph_get())
+    rep = {}
+    for o in fuentes():
+        if o.name in ('Cuerpo', 'OjoI', 'OjoD') or any(m.type == 'SOLIDIFY' for m in o.modifiers):
+            continue
+        bm = bmesh.new()
+        bm.from_mesh(o.data)
+        bm.faces.ensure_lookup_table()
+        mw = o.matrix_world
+        cerrado = all(e.is_manifold for e in bm.edges)
+        if cerrado:
+            vol = sum((mw @ f.calc_center_median()).dot((mw.to_3x3() @ f.normal)) * f.calc_area() for f in bm.faces)
+            voltear = vol < 0
+            score = vol
+        else:
+            score = 0.0
+            for f in bm.faces:
+                c = mw @ f.calc_center_median()
+                hit = bvh.find_nearest(c)
+                if hit[0] is None:
+                    continue
+                score += (mw.to_3x3() @ f.normal).normalized().dot(hit[1]) * f.calc_area()
+            voltear = score < 0
+        if voltear and aplicar:
+            bmesh.ops.reverse_faces(bm, faces=bm.faces[:])
+            bm.to_mesh(o.data)
+            o.data.update()
+        bm.free()
+        rep[o.name] = ('VOLTEADO ' if voltear else '') + ('cerrado' if cerrado else 'abierto') + ' %.4f' % score
+    return rep
