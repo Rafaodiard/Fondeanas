@@ -55,6 +55,17 @@ def transferir():
     m = bpy.data.objects[MALLA]
     src = bpy.data.objects['_CuerpoPesos']
     arm = bpy.data.objects[ARM]
+    # la fuente tiene modificador de esqueleto: transferir siempre en pose de reposo
+    pos0 = arm.data.pose_position
+    arm.data.pose_position = 'REST'
+    bpy.context.view_layer.update()
+    try:
+        return _transferir(m, src, arm)
+    finally:
+        arm.data.pose_position = pos0
+
+
+def _transferir(m, src, arm):
     for g in list(m.vertex_groups):
         m.vertex_groups.remove(g)
     for g in src.vertex_groups:
