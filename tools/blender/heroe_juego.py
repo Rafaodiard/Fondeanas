@@ -329,3 +329,198 @@ def hornear(pases=('COLOR', 'NORMAL', 'ROUGH', 'AO'), solo=None):
             for s, mt in zip(o.material_slots, mats0[o.name]):
                 s.material = mt
     return rep
+
+
+# ---------------------------------------------------------------------------
+# Post-proceso de las texturas y malla final con 3 materiales (Heroe, Ropa teñible y Metal).
+CHALECO_BASE = (0.20, 0.035, 0.03)   # color lineal del chaleco; en la textura queda gris y el tinte lo multiplica
+GRIS_ROPA = 0.8
+
+
+def _np(name):
+    import numpy as np
+    im = bpy.data.images[name]
+    W, H = im.size
+    a = np.empty(W * H * 4, np.float32)
+    im.pixels.foreach_get(a)
+    return a.reshape(H, W, 4)
+
+
+def _dilatar(a, cov, iters=24):
+    import numpy as np
+    a = a.copy()
+    cov = cov.copy()
+    for _ in range(iters):
+        acc = np.zeros_like(a)
+        n = np.zeros(cov.shape, np.float32)
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            c = np.roll(cov, (dy, dx), (0, 1))
+            acc += np.roll(a, (dy, dx), (0, 1)) * c[..., None]
+            n += c
+        nuevo = (~cov) & (n > 0)
+        a[nuevo] = acc[nuevo] / n[nuevo][:, None]
+        cov = cov | nuevo
+    return a
+
+
+def _mascara_uv(obs, W):
+    # rasteriza las islas UV de unas piezas (para saber qué píxeles son del chaleco)
+    import numpy as np
+    m = np.zeros((W, W), bool)
+    for ob in obs:
+        me = ob.data
+        uvl = me.uv_layers.active.data
+        me.calc_loop_triangles()
+        for t in me.loop_triangles:
+            p = np.array([uvl[i].uv[:] for i in t.loops]) * W
+            x0, y0 = np.floor(p.min(0)).astype(int)
+            x1, y1 = np.ceil(p.max(0)).astype(int)
+            x0, y0 = max(x0, 0), max(y0, 0)
+            x1, y1 = min(x1, W - 1), min(y1, W - 1)
+            if x1 < x0 or y1 < y0:
+                continue
+            xs, ys = np.meshgrid(np.arange(x0, x1 + 1) + 0.5, np.arange(y0, y1 + 1) + 0.5)
+            (ax, ay), (bx, by), (cx, cy) = p
+            d = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+            if abs(d) < 1e-12:
+                continue
+            l1 = ((by - cy) * (xs - cx) + (cx - bx) * (ys - cy)) / d
+            l2 = ((cy - ay) * (xs - cx) + (ax - cx) * (ys - cy)) / d
+            l3 = 1 - l1 - l2
+            e = -0.02
+            ins = (l1 >= e) & (l2 >= e) & (l3 >= e)
+            m[y0:y1 + 1, x0:x1 + 1] |= ins
+    return m
+
+
+def _guardar(arr, name, srgb):
+    import numpy as np
+    H, W = arr.shape[:2]
+    rgb = np.clip(arr[..., :3], 0, 1)
+    if srgb:
+        rgb = np.where(rgb <= 0.0031308, rgb * 12.92, 1.055 * np.power(rgb, 1 / 2.4) - 0.055)
+    out = np.concatenate([rgb, np.ones((H, W, 1), np.float32)], 2).astype(np.float32)
+    im = bpy.data.images.get(name)
+    if im:
+        bpy.data.images.remove(im)
+    im = bpy.data.images.new(name, W, H, alpha=False)
+    im.colorspace_settings.name = 'sRGB' if srgb else 'Non-Color'
+    im.pixels.foreach_set(out.ravel())
+    os.makedirs(OUT_DIR, exist_ok=True)
+    im.filepath_raw = os.path.join(OUT_DIR, name + '.png')
+    im.file_format = 'PNG'
+    im.save()
+    im.pack()
+    return im
+
+
+def post():
+    import numpy as np
+    col = _np('H_COLOR')
+    nor = _np('H_NORMAL')
+    rou = _np('H_ROUGH')
+    ao = _np('H_AO')
+    cov = col[..., 3] > 0.5
+    W = col.shape[0]
+    chal = _mascara_uv([o for o in lows() if o['fuente'] in ROPA], W) & cov
+    a = ao[..., 0:1]
+    c = col[..., :3].copy()
+    base = np.array(CHALECO_BASE, np.float32)
+    c[chal] = np.clip(c[chal] / base * GRIS_ROPA, 0, 1)
+    c = c * (0.55 + 0.45 * a)
+    c = _dilatar(np.concatenate([c, col[..., 3:]], 2), cov)
+    n = _dilatar(nor, nor[..., 3] > 0.5)
+    orm = np.stack([ao[..., 0], rou[..., 0], np.zeros_like(ao[..., 0]), np.ones_like(ao[..., 0])], 2)
+    orm = _dilatar(orm, cov)
+    for im in ('H_COLOR', 'H_NORMAL', 'H_ROUGH', 'H_AO'):
+        bpy.data.images[im].pack()
+    _guardar(c, 'Heroe_color', True)
+    _guardar(n, 'Heroe_normal', False)
+    _guardar(orm, 'Heroe_orm', False)
+    return {'cobertura': float(cov.mean()), 'chaleco_px': int(chal.sum())}
+
+
+def _mat_final(name, metal=0.0, tinte=None):
+    m = bpy.data.materials.get(name) or bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new('ShaderNodeOutputMaterial')
+    b = nt.nodes.new('ShaderNodeBsdfPrincipled')
+    nt.links.new(b.outputs[0], out.inputs[0])
+    tc = nt.nodes.new('ShaderNodeTexImage')
+    tc.image = bpy.data.images['Heroe_color']
+    if tinte:
+        mx = nt.nodes.new('ShaderNodeMix')
+        mx.data_type = 'RGBA'
+        mx.blend_type = 'MULTIPLY'
+        mx.inputs[0].default_value = 1.0
+        A = [i for i in mx.inputs if i.name == 'A' and i.type == 'RGBA'][0]
+        B = [i for i in mx.inputs if i.name == 'B' and i.type == 'RGBA'][0]
+        nt.links.new(tc.outputs['Color'], A)
+        B.default_value = tuple(tinte) + (1,)
+        nt.links.new([o for o in mx.outputs if o.type == 'RGBA'][0], b.inputs['Base Color'])
+    else:
+        nt.links.new(tc.outputs['Color'], b.inputs['Base Color'])
+    tn = nt.nodes.new('ShaderNodeTexImage')
+    tn.image = bpy.data.images['Heroe_normal']
+    nm = nt.nodes.new('ShaderNodeNormalMap')
+    nt.links.new(tn.outputs['Color'], nm.inputs['Color'])
+    nt.links.new(nm.outputs['Normal'], b.inputs['Normal'])
+    to = nt.nodes.new('ShaderNodeTexImage')
+    to.image = bpy.data.images['Heroe_orm']
+    sp = nt.nodes.new('ShaderNodeSeparateColor')
+    nt.links.new(to.outputs['Color'], sp.inputs[0])
+    nt.links.new(sp.outputs['Green'], b.inputs['Roughness'])
+    if metal:
+        b.inputs['Metallic'].default_value = metal
+    else:
+        nt.links.new(sp.outputs['Blue'], b.inputs['Metallic'])
+    # oclusión para el exportador glTF
+    g = bpy.data.node_groups.get('glTF Material Output')
+    if g is None:
+        g = bpy.data.node_groups.new('glTF Material Output', 'ShaderNodeTree')
+        g.interface.new_socket('Occlusion', in_out='INPUT', socket_type='NodeSocketFloat')
+    gn = nt.nodes.new('ShaderNodeGroup')
+    gn.node_tree = g
+    nt.links.new(sp.outputs['Red'], gn.inputs['Occlusion'])
+    return m
+
+
+def unir():
+    old = bpy.data.objects.get('HeroeJuego')
+    if old:
+        bpy.data.objects.remove(old, do_unlink=True)
+    heroe = _mat_final('Heroe')
+    ropa = _mat_final('Ropa', tinte=tuple(x / GRIS_ROPA for x in CHALECO_BASE))
+    metal = _mat_final('Metal', metal=1.0)
+    col = bpy.data.collections.get('HeroeFinal')
+    if col is None:
+        col = bpy.data.collections.new('HeroeFinal')
+        bpy.context.scene.collection.children.link(col)
+    copias = []
+    for o in lows():
+        c = o.copy()
+        c.data = o.data.copy()
+        col.objects.link(c)
+        c.data.materials.clear()
+        f = o['fuente']
+        c.data.materials.append(ropa if f in ROPA else metal if f in METAL else heroe)
+        for p in c.data.polygons:
+            p.material_index = 0
+        for g in list(c.vertex_groups):
+            c.vertex_groups.remove(g)
+        copias.append(c)
+    bpy.ops.object.mode_set(mode='OBJECT') if bpy.context.object and bpy.context.object.mode != 'OBJECT' else None
+    for x in bpy.context.view_layer.objects:
+        x.select_set(False)
+    for c in copias:
+        c.select_set(True)
+    bpy.context.view_layer.objects.active = copias[0]
+    bpy.ops.object.join()
+    j = bpy.context.view_layer.objects.active
+    j.name = 'HeroeJuego'
+    j.data.name = 'HeroeJuego'
+    for k in list(j.keys()):
+        del j[k]
+    return {'tris': sum(len(p.vertices) - 2 for p in j.data.polygons), 'mats': [m.name for m in j.data.materials]}
