@@ -409,21 +409,21 @@ TROTE = dict(T=22, duty=0.33, y_land=-0.30, y_off=0.30, ancho=0.115, giro_pie=-7
                                 (0.8, 0.0, -0.31, 0.22, -6.0, 0.0)],
              brazo_adelante=(-0.08, -0.19, -0.27), brazo_atras=(0.0, 0.15, -0.40), puno=(50.0, 30.0))
 
-CORRER = dict(T=20, duty=0.26, y_land=-0.38, y_off=0.34, ancho=0.11, giro_pie=-8.0,
+CORRER = dict(T=20, duty=0.26, y_land=-0.36, y_off=0.34, ancho=0.11, giro_pie=-8.0,
               p_land=-5.0, p_mid=0.0, p_off=50.0, roll=(0.18, 0.42),
-              cadera=[(0.0, -0.06), (0.12, -0.09), (0.26, -0.055), (0.39, -0.025)],
+              cadera=[(0.0, -0.065), (0.12, -0.095), (0.26, -0.06), (0.38, -0.035)],
               balanceo=0.012, giro_cadera=9.0, ladeo_cadera=4.0, incl_cadera=6.0, incl=10.0, giro_hombros=12.0,
               cabeza=2.0, vuelo=[(0.22, 0.0, 0.40, 0.42, 72.0, -5.0), (0.5, -0.005, 0.02, 0.50, 34.0, 0.0),
-                                 (0.79, 0.0, -0.41, 0.29, -2.0, 0.0)],
+                                 (0.79, 0.0, -0.39, 0.30, -2.0, 0.0)],
               brazo_adelante=(-0.09, -0.25, -0.24), brazo_atras=(0.01, 0.21, -0.40), puno=(55.0, 35.0),
               hombros=3.0)
 
-SPRINT = dict(T=18, duty=0.24, y_land=-0.40, y_off=0.40, ancho=0.10, giro_pie=-9.0,
+SPRINT = dict(T=18, duty=0.24, y_land=-0.38, y_off=0.38, ancho=0.10, giro_pie=-9.0,
               p_land=8.0, p_mid=4.0, p_off=55.0, roll=(0.15, 0.36),
-              cadera=[(0.0, -0.07), (0.11, -0.10), (0.24, -0.06), (0.38, -0.028)],
+              cadera=[(0.0, -0.075), (0.11, -0.105), (0.24, -0.065), (0.37, -0.035)],
               balanceo=0.01, giro_cadera=10.0, ladeo_cadera=4.0, incl_cadera=10.0, incl=16.0, giro_hombros=14.0,
               cabeza=4.0, vuelo=[(0.22, 0.0, 0.42, 0.55, 78.0, -5.0), (0.5, -0.005, -0.03, 0.58, 38.0, 0.0),
-                                 (0.8, 0.0, -0.45, 0.31, 4.0, 0.0)],
+                                 (0.8, 0.0, -0.42, 0.32, 4.0, 0.0)],
               brazo_adelante=(-0.08, -0.31, -0.17), brazo_atras=(0.02, 0.27, -0.36), puno=(45.0, 30.0),
               muneca=-4.0, hombros=5.0)
 
@@ -616,9 +616,9 @@ GOLPE = Claves({
             mL=V(0.085, -0.04, -0.528), cab=(2.0, 0.0, 0.0)),
     4: dict(G=V(-0.26, 0.06, 1.66), a=-38.0, gi=10.0, la=-12.0, tg=-22.0, ti=-5.0, ad=0.0,
             mL=V(-0.02, -0.38, -0.20), cab=(0.0, 12.0, 0.0)),
-    7: dict(G=V(-0.13, -0.50, 1.22), a=112.0, gi=6.0, la=-6.0, tg=16.0, ti=12.0, ad=0.0,
+    7: dict(G=V(-0.13, -0.44, 1.24), a=112.0, gi=6.0, la=-6.0, tg=16.0, ti=12.0, ad=0.0,
             mL=V(0.10, 0.12, -0.40), cab=(8.0, 4.0, 0.0)),
-    10: dict(G=V(-0.03, -0.42, 0.98), a=148.0, gi=14.0, la=0.0, tg=22.0, ti=16.0, ad=0.0,
+    10: dict(G=V(-0.06, -0.28, 1.06), a=148.0, gi=14.0, la=0.0, tg=22.0, ti=16.0, ad=0.0,
              mL=V(0.12, 0.16, -0.42), cab=(8.0, 6.0, 0.0)),
     15: dict(G=V(-0.21, -0.20, 1.04), a=32.0, gi=0.0, la=0.0, tg=0.0, ti=2.0, ad=0.0,
              mL=V(0.085, -0.04, -0.528), cab=(2.0, 0.0, 0.0)),
@@ -653,15 +653,15 @@ def pose_sostener_pico(f, T=90):
 # ---------------------------------------------------------------------------
 # Armas. Convención (igual que el hueso Arma.R): origen en el centro del puño derecho, 'd' es hacia donde apunta
 # el cañón y 'u' hacia arriba del arma. El guardamanos (apoyo de la mano izquierda) está a APOYO adelante.
-APOYO = 0.30
+APOYO = 0.26
 
 
 def arma_en_manos(p, G, d, u, tipo='largo', polo_R=V(-0.8, 0.4, -0.6), polo_L=V(0.3, 0.0, -1.0), gatillo=30.0):
-    D = p.delta('Spine2')
-    D3 = D.to_3x3()
-    G = D @ Vector(G)
-    d = (D3 @ Vector(d)).normalized()
-    u = D3 @ Vector(u)
+    # G, d y u en espacio del personaje: el arma apunta adonde se pide aunque el torso esté girado
+    D3 = Matrix.Identity(3)
+    G = Vector(G)
+    d = Vector(d).normalized()
+    u = Vector(u)
     u = (u - d * u.dot(d)).normalized()
     r = d.cross(u)                     # derecha del arma
     poner_mano(p, 'R', G, rot_agarre('R', d, u), D3 @ Vector(polo_R))
@@ -680,7 +680,7 @@ def arma_en_manos(p, G, d, u, tipo='largo', polo_R=V(-0.8, 0.4, -0.6), polo_L=V(
         p.dedos('L', 58, 12)
     elif tipo == 'vertical':
         # izquierda en una empuñadura vertical delantera
-        P = G + d * (APOYO + 0.02)
+        P = G + d * APOYO
         poner_mano(p, 'L', P, rot_agarre('L', d, u), D3 @ Vector(polo_L))
         p.dedos('L', 70, 35)
     return G, d, u
@@ -688,16 +688,16 @@ def arma_en_manos(p, G, d, u, tipo='largo', polo_R=V(-0.8, 0.4, -0.6), polo_L=V(
 
 ARMAS = {
     # nombre: (G, d, u, tipo, polo_R, polo_L, cabeza (incl, giro, ladeo), columna (giro, incl), hombro_R)
-    'Rifle': (V(-0.14, -0.27, 1.17), V(0.05, -1, -0.17), V(0, 0, 1), 'largo', V(-0.8, 0.4, -0.6), V(0.3, 0.0, -1.0),
-              (3.0, 0.0, 0.0), (-4.0, 3.0), 0.0),
-    'RifleApunta': (V(-0.10, -0.34, 1.42), V(0.03, -1, 0.07), V(0, 0, 1), 'largo', V(-1.0, 0.2, -0.15), V(0.2, 0.1, -1.0),
-                    (11.0, -3.0, 9.0), (-3.0, 4.0), 7.0),
+    'Rifle': (V(-0.10, -0.22, 1.16), V(0.12, -1, -0.17), V(0, 0, 1), 'largo', V(-0.8, 0.4, -0.6), V(0.4, 0.0, -1.0),
+              (3.0, 0.0, 0.0), (-18.0, 3.0), 0.0),
+    'RifleApunta': (V(-0.11, -0.31, 1.39), V(0.04, -1, 0.04), V(0, 0, 1), 'largo', V(-1.0, 0.2, -0.15), V(0.3, 0.1, -1.0),
+                    (12.0, -4.0, 10.0), (-20.0, 4.0), 8.0),
     'Pistola': (V(-0.06, -0.30, 1.13), V(0.03, -1, -0.25), V(0, 0, 1), 'pistola', V(-0.6, 0.3, -1.0), V(0.6, 0.3, -1.0),
                 (4.0, 0.0, 0.0), (0.0, 3.0), 0.0),
     'PistolaApunta': (V(-0.05, -0.47, 1.46), V(0.06, -1, 0.04), V(0, 0, 1), 'pistola', V(-0.6, 0.2, -1.0),
                       V(0.6, 0.2, -1.0), (5.0, 0.0, 2.0), (0.0, 4.0), 3.0),
-    'Lanzacohetes': (V(-0.15, -0.20, 1.40), V(0.02, -1, 0.03), V(0, 0, 1), 'vertical', V(-0.9, 0.3, -0.5),
-                     V(0.4, 0.1, -1.0), (7.0, -2.0, 6.0), (-3.0, 3.0), 5.0),
+    'Lanzacohetes': (V(-0.15, -0.18, 1.40), V(0.03, -1, 0.03), V(0, 0, 1), 'vertical', V(-0.9, 0.3, -0.5),
+                     V(0.4, 0.1, -1.0), (7.0, -3.0, 6.0), (-12.0, 3.0), 5.0),
     'Objeto': (V(-0.12, -0.26, 1.13), V(0.15, -1, 0.2), V(0, 0.2, 1), 'ninguno', V(-0.6, 0.4, -1.0), V(0.4, 0.4, -1.0),
                (8.0, 0.0, 0.0), (0.0, 2.0), 0.0),
 }
@@ -713,10 +713,11 @@ def pose_arma(nombre, f, T=90):
     p.mover_cadera(V(-0.012 + 0.005 * sw, 0.0, -0.03 + 0.003 * br))
     p.orientar('Hips', GIRO(-2 + 0.6 * sw) @ LADEO(-1.2 - 0.4 * sw))
     giro, incl = col
-    columna(p, giro, incl - 0.8 * br, 0.4 * sw, 0.0, (cab[0] + 0.5 * br, cab[1], cab[2]))
+    columna(p, giro, incl - 0.8 * br, 0.4 * sw, 0.0, (cab[0] + 0.5 * br, cab[1], cab[2]), reparto=(0.0, 0.45, 0.55))
     if hR:
         hombro(p, 'R', hR, 2.0)
-        hombro(p, 'L', 0.0, 3.0)
+    if tipo in ('largo', 'vertical'):
+        hombro(p, 'L', 0.0, 7.0)
     piernas_quietas(p, abre=0.02, adelante_L=-0.06, adelante_R=0.05)
     Gb = Vector(G) + V(0.0, -0.003 * br, 0.004 * br)
     arma_en_manos(p, Gb, d, u, tipo, pR, pL)
