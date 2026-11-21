@@ -258,6 +258,9 @@ def hornear(pases=('COLOR', 'NORMAL', 'ROUGH', 'AO'), solo=None):
     m, nodo = _mat_bake()
     objs = [o for o in lows() if solo is None or o['fuente'] in solo]
     vis0 = {o.name: o.hide_render for o in sc.objects}
+    cols0 = {c: bpy.data.collections[c].hide_render for c in (SRC, LOW)}
+    for c in cols0:
+        bpy.data.collections[c].hide_render = False
     # sin metal ni subsuperficie al hornear el color (si no el color difuso sale negro o lavado)
     guard = []
     for mat in bpy.data.materials:
@@ -317,6 +320,8 @@ def hornear(pases=('COLOR', 'NORMAL', 'ROUGH', 'AO'), solo=None):
                 bpy.context.view_layer.objects.active = o
                 bpy.ops.object.bake(type='AO', use_selected_to_active=False, margin=4, use_clear=False)
     finally:
+        for c, v in cols0.items():
+            bpy.data.collections[c].hide_render = v
         for o in sc.objects:
             if o.name in vis0:
                 o.hide_render = vis0[o.name]
