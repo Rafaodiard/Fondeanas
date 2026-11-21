@@ -9,15 +9,18 @@ ACCIONES = None       # None = todas las de MARCHAS y CLIPS
 def _solo(objs, activo):
     if bpy.context.object and bpy.context.object.mode != 'OBJECT':
         bpy.ops.object.mode_set(mode='OBJECT')
-    for o in bpy.context.view_layer.objects:
-        o.select_set(False)
+    for o in bpy.data.objects:
+        try:
+            o.select_set(False)
+        except RuntimeError:
+            pass
     for o in objs:
         o.hide_set(False)
         o.select_set(True)
     bpy.context.view_layer.objects.active = activo
 
 
-def exportar(ruta, calidad=82, rehacer=True):
+def exportar(ruta, calidad=82, rehacer=True, meshopt=True):
     arm = bpy.data.objects['Esqueleto']
     m = bpy.data.objects['HeroeJuego']
     if rehacer:
@@ -49,7 +52,8 @@ def exportar(ruta, calidad=82, rehacer=True):
             export_skins=True, export_def_bones=False, export_leaf_bone=False, export_rest_position_armature=True,
             export_animations=True, export_animation_mode='ACTIONS', export_force_sampling=True,
             export_optimize_animation_size=True, export_anim_single_armature=True, export_reset_pose_bones=True,
-            export_anim_slide_to_zero=True, export_bake_animation=False, export_frame_step=1)
+            export_anim_slide_to_zero=True, export_bake_animation=False, export_frame_step=1,
+            export_meshopt_compression_enable=meshopt)
     finally:
         arm.location = loc0
         bpy.context.view_layer.update()
