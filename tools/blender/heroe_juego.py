@@ -59,6 +59,8 @@ def hacer_low():
         solid = 0
         for m in list(tmp.modifiers):
             if m.type == 'SOLIDIFY':
+                if 'SF_Nueva' not in tmp.vertex_groups:
+                    tmp.vertex_groups.new(name='SF_Nueva')
                 m.shell_vertex_group = 'SF_Nueva'   # para saber después qué cara es la de adentro
                 solid = 1 if m.offset >= 0 else -1
             if m.type == 'SUBSURF':
