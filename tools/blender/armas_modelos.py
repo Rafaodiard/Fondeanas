@@ -194,9 +194,10 @@ def escopeta():
     cut = cortador(A, 'cajon', cajas=[((0.021, 0.088, 0.066), (0.012, 0.068, 0.026), 0.004, 'x'),
                                       ((0, 0.104, 0.004), (0.026, 0.080, 0.02), 0.006, 'z'),
                                       ((0, 0.060, 0.099), (0.006, 0.20, 0.006), 0.0025, 'z')])
-    prisma(A, 'cajon', [(-0.052, 0.022), (-0.052, 0.078, 0.014), (-0.032, 0.098, 0.008), (0.168, 0.098, 0.004),
-                        (0.172, 0.090), (0.172, 0.010, 0.004), (0.060, 0.006), (0.0, 0.006), (-0.030, 0.012, 0.01)],
-           -0.0205, 0.0205, 'Pavonado', bisel=0.0022, cortes=[cut])
+    prisma(A, 'cajon', [(-0.052, 0.022), (-0.052, 0.074, 0.02), (-0.020, 0.100, 0.014), (0.150, 0.100, 0.012),
+                        (0.172, 0.088, 0.006), (0.172, 0.010, 0.004), (0.060, 0.006), (0.0, 0.006), (-0.030, 0.012, 0.01)],
+           -0.0215, 0.0215, 'Pavonado', bisel=0.0025, cortes=[cut])
+    caja(A, 'cajon_lomo', (0, 0.060, 0.1015), (0.016, 0.19, 0.004), 'AceroOscuro', r=0.0, eje='y', bisel=0.0008)
     caja(A, 'cajon_panel', (0.0205, 0.020, 0.052), (0.0022, 0.050, 0.050), 'Pavonado', r=0.006, bisel=0.0008)
     for y, zz in ((-0.034, 0.030), (0.150, 0.024), (0.020, 0.018)):
         tornillo(A, 'pasadorD%d' % int(y * 1000), (0.0205, y, zz), 'x', 0.0034, 0.0012)
@@ -205,32 +206,35 @@ def escopeta():
     gatillo_y_guarda(A, 'Pavonado')
     empunadura(A, 'empunadura', 'Madera', panel='Goma')
     # cañón con choque, tubo almacén con tapa y abrazadera, guardamanos térmico perforado y punto de mira
-    torno(A, 'canon', [(0.165, 0.0), (0.165, 0.0155), (0.185, 0.0155), (0.188, 0.0138), (0.775, 0.0138),
-                       (0.778, 0.0158), (0.800, 0.0158), (0.800, 0.0105), (0.786, 0.0105), (0.786, 0.0)], 'Pavonado',
+    torno(A, 'canon', [(0.165, 0.0), (0.165, 0.0175), (0.185, 0.0175), (0.188, 0.0160), (0.690, 0.0160),
+                       (0.693, 0.0182), (0.715, 0.0182), (0.715, 0.0122), (0.700, 0.0122), (0.700, 0.0)], 'Pavonado',
           centro=(0, z), segs=28)
-    torno(A, 'almacen', [(0.165, 0.0), (0.165, 0.0125), (0.700, 0.0125), (0.700, 0.0)], 'Pavonado', centro=(0, 0.030),
+    torno(A, 'almacen', [(0.165, 0.0), (0.165, 0.0140), (0.620, 0.0140), (0.620, 0.0)], 'Pavonado', centro=(0, 0.028),
           segs=24)
-    torno(A, 'almacen_tapa', [(0.698, 0.0), (0.698, 0.0140), (0.713, 0.0140), (0.719, 0.0110), (0.719, 0.0)],
-          'AceroOscuro', centro=(0, 0.030), segs=24)
-    caja(A, 'abrazadera', (0, 0.680, 0.049), (0.026, 0.016, 0.054), 'Pavonado', r=0.007, eje='y')
-    tornillo(A, 'abrazadera_t', (0.013, 0.680, 0.049), 'x', 0.0035, 0.0012)
+    torno(A, 'almacen_tapa', [(0.618, 0.0), (0.618, 0.0155), (0.636, 0.0155), (0.643, 0.0122), (0.643, 0.0)],
+          'AceroOscuro', centro=(0, 0.028), segs=24)
+    caja(A, 'abrazadera', (0, 0.600, 0.048), (0.030, 0.018, 0.060), 'Pavonado', r=0.008, eje='y')
+    tornillo(A, 'abrazadera_t', (0.015, 0.600, 0.048), 'x', 0.0038, 0.0012)
     escudo = cortador(A, 'escudo',
-                      cajas=[((0, 0.330 + 0.052 * i, z + 0.019), (0.008, 0.032, 0.012), 0.004, 'z') for i in range(7)],
-                      cilindros=[((0, 0.356 + 0.052 * i, z + 0.007), 0.0045, 0.06, 'x') for i in range(6)])
-    prisma(A, 'escudo', arco(0, z, 0.0168, 0.0192, -28, 208, 18), 0.300, 0.700, 'Pavonado', eje='y', n=0,
-           bisel=0.0007, cortes=[escudo])
-    torno(A, 'punto', [(0.788, 0.0), (0.788, 0.0024), (0.792, 0.0031), (0.796, 0.0024), (0.796, 0.0)], 'Laton',
-          centro=(0, z + 0.0172), segs=10, bisel=0.0)
+                      cajas=[((0, 0.400 + 0.050 * i, z + 0.022), (0.009, 0.030, 0.014), 0.0045, 'z') for i in range(6)],
+                      cilindros=[((0, 0.425 + 0.050 * i, z + 0.008), 0.0052, 0.07, 'x') for i in range(5)])
+    prisma(A, 'escudo', arco(0, z, 0.0195, 0.0222, -30, 210, 20), 0.375, 0.680, 'Pavonado', eje='y', n=0,
+           bisel=0.0008, cortes=[escudo])
+    for y in (0.380, 0.672):
+        prisma(A, 'escudo_aro%d' % int(y * 1000), arco(0, z, 0.0175, 0.0232, -32, 212, 20), y - 0.005, y + 0.005,
+               'AceroOscuro', eje='y', n=0, bisel=0.0006)
+    torno(A, 'punto', [(0.703, 0.0), (0.703, 0.0026), (0.707, 0.0034), (0.711, 0.0026), (0.711, 0.0)], 'Laton',
+          centro=(0, z + 0.0196), segs=10, bisel=0.0)
     # bomba de madera con estrías, tapas de acero, filete de rareza y barras de acción (todo se mueve junto)
-    sec_b = [(-0.022, 0.006, 0.010), (0.022, 0.006, 0.010), (0.0275, 0.032, 0.012), (0.0215, 0.058, 0.008),
-             (-0.0215, 0.058, 0.008), (-0.0275, 0.032, 0.012)]
-    estr = cortador(A, 'bomba', cajas=espejo_x([((0.0285, 0.222 + 0.0155 * i, 0.032), (0.008, 0.0055, 0.030), 0.002, 'x')
-                                                for i in range(8)]))
-    prisma(A, 'bomba', sec_b, 0.202, 0.358, 'Madera', eje='y', bisel=0.0025, segs=3, cortes=[estr], grupo='bomba')
-    for y0, y1, nm in ((0.196, 0.203, 'bomba_tapaT'), (0.357, 0.364, 'bomba_tapaD')):
-        prisma(A, nm, [(x * 0.94, 0.032 + (zz - 0.032) * 0.94, r) for x, zz, r in sec_b], y0, y1, 'Pavonado', eje='y',
+    sec_b = [(-0.024, 0.002, 0.012), (0.024, 0.002, 0.012), (0.0305, 0.030, 0.014), (0.0245, 0.058, 0.009),
+             (-0.0245, 0.058, 0.009), (-0.0305, 0.030, 0.014)]
+    estr = cortador(A, 'bomba', cajas=espejo_x([((0.0315, 0.224 + 0.0165 * i, 0.030), (0.008, 0.0062, 0.032), 0.0025,
+                                                 'x') for i in range(8)]))
+    prisma(A, 'bomba', sec_b, 0.200, 0.370, 'Madera', eje='y', bisel=0.003, segs=3, cortes=[estr], grupo='bomba')
+    for y0, y1, nm in ((0.193, 0.201, 'bomba_tapaT'), (0.369, 0.377, 'bomba_tapaD')):
+        prisma(A, nm, [(x * 0.94, 0.030 + (zz - 0.030) * 0.94, r) for x, zz, r in sec_b], y0, y1, 'Pavonado', eje='y',
                bisel=0.0012, grupo='bomba')
-    prisma(A, 'bomba_filete', [(x * 1.012, 0.032 + (zz - 0.032) * 1.012, r) for x, zz, r in sec_b], 0.343, 0.349,
+    prisma(A, 'bomba_filete', [(x * 1.012, 0.030 + (zz - 0.030) * 1.012, r) for x, zz, r in sec_b], 0.354, 0.360,
            'Rareza', eje='y', bisel=0.0, grupo='bomba')
     for sx in (1, -1):
         caja(A, 'barra%d' % sx, (sx * 0.0155, 0.182, 0.033), (0.004, 0.044, 0.006), 'Pavonado', r=0.002,
@@ -244,18 +248,18 @@ def escopeta():
         torno(A, 'base%d' % i, [(0.018, 0.0), (0.018, 0.0094), (0.031, 0.0094), (0.031, 0.0)], 'Laton', eje='z',
               centro=(-0.0305, y), segs=14, bisel=0.0)
     # culata de madera con cantonera y filete de rareza
-    prisma(A, 'culata', [(-0.048, 0.092, 0.006), (-0.215, 0.097, 0.012), (-0.215, -0.062, 0.012),
-                         (-0.188, -0.066, 0.01), (-0.105, 0.006, 0.05), (-0.062, 0.014, 0.012), (-0.048, 0.026)],
-           -0.0200, 0.0200, 'Madera', bisel=0.003, segs=3)
+    prisma(A, 'culata', [(-0.048, 0.094, 0.006), (-0.110, 0.084, 0.05), (-0.215, 0.092, 0.012), (-0.215, -0.058, 0.012),
+                         (-0.190, -0.063, 0.01), (-0.120, -0.008, 0.06), (-0.062, 0.014, 0.012), (-0.048, 0.026)],
+           -0.0205, 0.0205, 'Madera', bisel=0.003, segs=3)
     prisma(A, 'cantonera', [(-0.2145, 0.095, 0.003), (-0.233, 0.093, 0.006), (-0.233, -0.060, 0.006),
                             (-0.2145, -0.064, 0.003)], -0.0215, 0.0215, 'Goma', bisel=0.0015)
     for sx in (1, -1):
-        prisma(A, 'culata_filete%d' % sx, [(-0.070, 0.078), (-0.200, 0.083), (-0.200, 0.0875), (-0.070, 0.0825)],
-               sx * 0.0195, sx * 0.0209, 'Rareza', n=0, bisel=0.0)
+        prisma(A, 'culata_filete%d' % sx, [(-0.120, 0.071), (-0.200, 0.078), (-0.200, 0.0825), (-0.120, 0.0755)],
+               sx * 0.0200, sx * 0.0214, 'Rareza', n=0, bisel=0.0)
     tornillo(A, 'anclaje', (0.0, -0.165, -0.0445), 'z', 0.0045, 0.0015, signo=-1)
-    A.punto('boca', (0, 0.800, z))
-    A.punto('apoyo', (0, 0.28, 0.006))
-    return A, finalizar(A, {'bomba': (0, 0.28, 0.032)})
+    A.punto('boca', (0, 0.715, z))
+    A.punto('apoyo', (0, 0.28, 0.002))
+    return A, finalizar(A, {'bomba': (0, 0.28, 0.030)})
 
 
 def francotirador():
@@ -294,13 +298,13 @@ def francotirador():
         torno(A, 'pie%d' % sx, [(0.236, 0.0), (0.236, 0.0062), (0.256, 0.0062), (0.256, 0.0)], 'Goma',
               centro=(sx * 0.010, 0.019), segs=12, bisel=0.0)
     # cañón estriado largo y freno de boca
-    estrias = cortador(A, 'canon', cajas=[((sx * 0.0128, 0.75, z), (0.004, 0.44, 0.0045), 0.002, 'y') for sx in (1, -1)] +
-                       [((0, 0.75, z + sz * 0.0128), (0.0045, 0.44, 0.004), 0.002, 'y') for sz in (1, -1)])
-    torno(A, 'canon', [(0.170, 0.0), (0.170, 0.0165), (0.200, 0.0165), (0.205, 0.0145), (1.080, 0.0122),
-                       (1.080, 0.0)], 'Pavonado', centro=(0, z), segs=28, cortes=[estrias])
-    freno = cortador(A, 'freno', cajas=[((0, 1.098 + 0.020 * i, z), (0.06, 0.010, 0.0095), 0.004, 'x') for i in range(3)])
-    torno(A, 'freno', [(1.076, 0.0), (1.076, 0.0175), (1.086, 0.0205), (1.160, 0.0205), (1.168, 0.0170),
-                       (1.168, 0.0075), (1.150, 0.0075), (1.150, 0.0)], 'AceroOscuro', centro=(0, z), segs=28,
+    estrias = cortador(A, 'canon', cajas=[((sx * 0.0152, 0.70, z), (0.0045, 0.40, 0.005), 0.002, 'y') for sx in (1, -1)] +
+                       [((0, 0.70, z + sz * 0.0152), (0.005, 0.40, 0.0045), 0.002, 'y') for sz in (1, -1)])
+    torno(A, 'canon', [(0.170, 0.0), (0.170, 0.0185), (0.200, 0.0185), (0.205, 0.0168), (1.010, 0.0145),
+                       (1.010, 0.0)], 'Pavonado', centro=(0, z), segs=28, cortes=[estrias])
+    freno = cortador(A, 'freno', cajas=[((0, 1.030 + 0.021 * i, z), (0.07, 0.011, 0.011), 0.0045, 'x') for i in range(3)])
+    torno(A, 'freno', [(1.006, 0.0), (1.006, 0.0195), (1.016, 0.0230), (1.094, 0.0230), (1.102, 0.0195),
+                       (1.102, 0.0085), (1.084, 0.0085), (1.084, 0.0)], 'AceroOscuro', centro=(0, z), segs=28,
           cortes=[freno])
     # culata esqueleto con apoyo de mejilla y cantonera
     hueco = cortador(A, 'culata', cajas=[((0, -0.152, 0.012), (0.06, 0.068, 0.040), 0.016, 'x')])
@@ -312,28 +316,28 @@ def francotirador():
     prisma(A, 'cantonera', [(-0.2235, 0.092, 0.003), (-0.236, 0.090, 0.006), (-0.236, -0.068, 0.006),
                             (-0.2235, -0.072, 0.003)], -0.022, 0.022, 'Goma', bisel=0.0015)
     # mira telescópica con torretas, anillos, lentes y anillo de rareza
-    M = 0.142
-    torno(A, 'mira_tubo', [(-0.042, 0.0), (-0.042, 0.0165), (0.200, 0.0165), (0.200, 0.0)], 'Polimero',
+    M = 0.150
+    torno(A, 'mira_tubo', [(-0.050, 0.0), (-0.050, 0.0195), (0.215, 0.0195), (0.215, 0.0)], 'Polimero',
           centro=(0, M), segs=28, bisel=0.0)
-    torno(A, 'mira_objetivo', [(0.195, 0.0), (0.195, 0.0170), (0.232, 0.0275), (0.285, 0.0285), (0.292, 0.0268),
-                               (0.292, 0.0236), (0.286, 0.0236), (0.286, 0.0)], 'Polimero', centro=(0, M), segs=32)
-    torno(A, 'mira_lente', [(0.2862, 0.0), (0.2862, 0.0236), (0.2868, 0.0236), (0.2868, 0.0)], 'Lente', centro=(0, M),
+    torno(A, 'mira_objetivo', [(0.210, 0.0), (0.210, 0.0200), (0.255, 0.0335), (0.318, 0.0345), (0.326, 0.0325),
+                               (0.326, 0.0290), (0.318, 0.0290), (0.318, 0.0)], 'Polimero', centro=(0, M), segs=32)
+    torno(A, 'mira_lente', [(0.3182, 0.0), (0.3182, 0.0290), (0.3188, 0.0290), (0.3188, 0.0)], 'Lente', centro=(0, M),
           segs=32, bisel=0.0)
-    torno(A, 'mira_ocular', [(-0.113, 0.0), (-0.113, 0.0198), (-0.106, 0.0216), (-0.066, 0.0216), (-0.046, 0.0170),
-                             (-0.040, 0.0170), (-0.040, 0.0)], 'Polimero', centro=(0, M), segs=28)
-    torno(A, 'mira_lente2', [(-0.1138, 0.0), (-0.1138, 0.0165), (-0.1132, 0.0165), (-0.1132, 0.0)], 'Lente',
+    torno(A, 'mira_ocular', [(-0.128, 0.0), (-0.128, 0.0232), (-0.120, 0.0252), (-0.078, 0.0252), (-0.056, 0.0200),
+                             (-0.048, 0.0200), (-0.048, 0.0)], 'Polimero', centro=(0, M), segs=28)
+    torno(A, 'mira_lente2', [(-0.1288, 0.0), (-0.1288, 0.0195), (-0.1282, 0.0195), (-0.1282, 0.0)], 'Lente',
           centro=(0, M), segs=28, bisel=0.0)
-    torno(A, 'mira_aro', [(0.172, 0.0), (0.172, 0.0172), (0.180, 0.0172), (0.180, 0.0)], 'Rareza', centro=(0, M),
+    torno(A, 'mira_aro', [(0.186, 0.0), (0.186, 0.0202), (0.195, 0.0202), (0.195, 0.0)], 'Rareza', centro=(0, M),
           segs=28, bisel=0.0)
-    caja(A, 'mira_torreta_base', (0, 0.080, M), (0.036, 0.036, 0.036), 'Polimero', r=0.012)
-    torno(A, 'mira_torreta', [(M + 0.017, 0.0), (M + 0.017, 0.0115), (M + 0.034, 0.0115), (M + 0.037, 0.0095),
-                              (M + 0.037, 0.0)], 'Grafito', eje='z', centro=(0, 0.080), segs=20)
-    torno(A, 'mira_deriva', [(0.017, 0.0), (0.017, 0.0105), (0.032, 0.0105), (0.035, 0.0085), (0.035, 0.0)],
-          'Grafito', eje='x', centro=(0.080, M), segs=20)
-    for y in (0.000, 0.125):
-        torno(A, 'anillo%d' % int(y * 1000), [(y - 0.008, 0.0), (y - 0.008, 0.0195), (y + 0.008, 0.0195),
-                                              (y + 0.008, 0.0)], 'Pavonado', centro=(0, M), segs=28)
-        caja(A, 'anillo_pie%d' % int(y * 1000), (0, y, 0.110), (0.022, 0.016, 0.034), 'Pavonado', r=0.003, eje='y')
+    caja(A, 'mira_torreta_base', (0, 0.082, M), (0.042, 0.042, 0.042), 'Polimero', r=0.014)
+    torno(A, 'mira_torreta', [(M + 0.020, 0.0), (M + 0.020, 0.0135), (M + 0.040, 0.0135), (M + 0.044, 0.0112),
+                              (M + 0.044, 0.0)], 'Grafito', eje='z', centro=(0, 0.082), segs=22)
+    torno(A, 'mira_deriva', [(0.020, 0.0), (0.020, 0.0125), (0.038, 0.0125), (0.042, 0.0102), (0.042, 0.0)],
+          'Grafito', eje='x', centro=(0.082, M), segs=22)
+    for y in (0.000, 0.140):
+        torno(A, 'anillo%d' % int(y * 1000), [(y - 0.009, 0.0), (y - 0.009, 0.0225), (y + 0.009, 0.0225),
+                                              (y + 0.009, 0.0)], 'Pavonado', centro=(0, M), segs=28)
+        caja(A, 'anillo_pie%d' % int(y * 1000), (0, y, 0.112), (0.024, 0.018, 0.040), 'Pavonado', r=0.003, eje='y')
     # cerrojo: cola, manija y bola
     torno(A, 'cerrojo', [(-0.090, 0.0), (-0.090, 0.0120), (-0.082, 0.0148), (-0.060, 0.0148), (-0.060, 0.0)], 'Acero',
           centro=(0, z), segs=24, grupo='cerrojo')
@@ -343,8 +347,8 @@ def francotirador():
                       (0.0088, 0.0050), (0.0098, 0.0)], 'Polimero', eje='x', centro=(-0.052, z - 0.027), segs=16,
           bisel=0.0, grupo='cerrojo')
     A.piezas[-1][0].location.x = 0.050
-    A.punto('boca', (0, 1.168, z))
-    A.punto('mira', (0, -0.113, M))
+    A.punto('boca', (0, 1.102, z))
+    A.punto('mira', (0, -0.128, M))
     A.punto('apoyo', (0, 0.26, 0.028))
     return A, finalizar(A, {'cerrojo': (0, -0.070, z), 'cargador': (0, 0.081, -0.02)})
 
@@ -363,7 +367,7 @@ def pistola():
          achatar=1.8)
     prisma(A, 'gatillo', [(0.026, 0.004), (0.033, 0.004), (0.036, -0.012, 0.005), (0.032, -0.024, 0.003),
                           (0.027, -0.022), (0.029, -0.010, 0.004)], -0.003, 0.003, 'Acero', n=4, bisel=0.0007)
-    empunadura(A, 'empunadura', 'Polimero', panel='Goma', ancho=0.0145, escala=0.98)
+    empunadura(A, 'empunadura', 'Polimero', panel='Goma', ancho=0.0145, escala=0.88)
     prisma(A, 'martillo', [(-0.046, 0.050), (-0.040, 0.048), (-0.040, 0.066), (-0.050, 0.072, 0.003),
                            (-0.054, 0.068, 0.002)], -0.0045, 0.0045, 'Pavonado', n=4, bisel=0.0008)
     caja(A, 'retenD', (0.0140, 0.010, 0.026), (0.003, 0.016, 0.006), 'Pavonado', r=0.002)
@@ -392,10 +396,10 @@ def pistola():
     for ob, g in A.piezas[-2:]:
         A.piezas[A.piezas.index((ob, g))] = (ob, 'corredera')
     # cargador: base visible abajo de la empuñadura y cuerpo escondido adentro (cae en la recarga)
-    prisma(A, 'cargador', [(-0.015, -0.100), (-0.050, -0.103), (-0.032, 0.008), (-0.002, 0.008)], -0.0105, 0.0105,
+    prisma(A, 'cargador', [(-0.014, -0.090), (-0.045, -0.093), (-0.029, 0.008), (-0.002, 0.008)], -0.0105, 0.0105,
            'AceroOscuro', n=0, bisel=0.0008, grupo='cargador')
-    prisma(A, 'cargador_base', [(-0.010, -0.100), (-0.060, -0.104), (-0.062, -0.112, 0.003), (-0.008, -0.108, 0.003)],
-           -0.0120, 0.0120, 'AceroOscuro', bisel=0.0012, grupo='cargador')
+    prisma(A, 'cargador_base', [(-0.008, -0.090), (-0.055, -0.094), (-0.057, -0.102, 0.003), (-0.006, -0.098, 0.003)],
+           -0.0122, 0.0122, 'AceroOscuro', bisel=0.0012, grupo='cargador')
     A.punto('boca', (0, 0.179, zb))
     A.punto('mira', (0, -0.030, 0.080))
     return A, finalizar(A, {'corredera': (0, 0.060, 0.055), 'cargador': (0, -0.033, -0.05)})
@@ -445,8 +449,11 @@ def subfusil():
     riel(A, 'riel', -0.050, 0.322, 0.100)
     # mira réflex abierta
     caja(A, 'mira_base', (0, 0.040, 0.1135), (0.024, 0.044, 0.010), 'Polimero', r=0.002)
-    prisma(A, 'mira', [(0.024, 0.118), (0.058, 0.118), (0.054, 0.152, 0.004), (0.046, 0.154, 0.002)], -0.0145, 0.0145,
-           'Polimero', bisel=0.0012, cortes=[cortador(A, 'mira', cajas=[((0, 0.045, 0.137), (0.022, 0.1, 0.022), 0.006, 'y')])])
+    prisma(A, 'mira', [(0.026, 0.118), (0.060, 0.118), (0.060, 0.150, 0.008), (0.054, 0.158, 0.006),
+                       (0.030, 0.158, 0.006), (0.026, 0.150, 0.004)], -0.0145, 0.0145,
+           'Polimero', bisel=0.0012, cortes=[cortador(A, 'mira', cajas=[((0, 0.045, 0.138), (0.022, 0.1, 0.024), 0.006, 'y')])])
+    torno(A, 'mira_perilla', [(0.0145, 0.0), (0.0145, 0.005), (0.0185, 0.005), (0.0185, 0.0)], 'Grafito', eje='x',
+          centro=(0.042, 0.124), segs=12, bisel=0.0)
     caja(A, 'mira_lente', (0, 0.051, 0.137), (0.023, 0.0015, 0.023), 'Lente', r=0.006, eje='y', bisel=0.0)
     torno(A, 'mira_punto', [(0.0498, 0.0), (0.0498, 0.0017), (0.0502, 0.0017), (0.0502, 0.0)], 'Rareza',
           centro=(0, 0.137), segs=10, bisel=0.0)
@@ -521,29 +528,30 @@ def lanzacohetes():
 
 def pico():
     A = Arma('pico')
-    H = 0.700
+    H = 0.600
     # mango de madera con cinta en espiral, pomo de acero y virola
-    torno(A, 'mango', [(-0.110, 0.0), (-0.110, 0.0150), (0.0, 0.0165), (0.30, 0.0160), (0.60, 0.0172), (H + 0.03, 0.0172),
-                       (H + 0.03, 0.0)], 'Madera', eje='z', segs=18, bisel=0.0)
-    torno(A, 'pomo', [(-0.150, 0.0), (-0.150, 0.016), (-0.146, 0.022), (-0.128, 0.024), (-0.116, 0.019), (-0.108, 0.017),
-                      (-0.108, 0.0)], 'Pavonado', eje='z', segs=22)
-    vueltas, n = 15, 18
-    cam = [(0.0176 * math.cos(2 * math.pi * k / n), 0.0176 * math.sin(2 * math.pi * k / n), -0.100 + 0.210 * k / (vueltas * n))
+    torno(A, 'mango', [(-0.110, 0.0), (-0.110, 0.0185), (0.0, 0.0200), (0.30, 0.0195), (0.50, 0.0210), (H + 0.03, 0.0210),
+                       (H + 0.03, 0.0)], 'MaderaClara', eje='z', segs=20, bisel=0.0)
+    torno(A, 'pomo', [(-0.155, 0.0), (-0.155, 0.019), (-0.150, 0.027), (-0.130, 0.029), (-0.117, 0.023), (-0.108, 0.021),
+                      (-0.108, 0.0)], 'Pavonado', eje='z', segs=24)
+    vueltas, n = 14, 20
+    cam = [(0.0212 * math.cos(2 * math.pi * k / n), 0.0212 * math.sin(2 * math.pi * k / n), -0.100 + 0.215 * k / (vueltas * n))
            for k in range(vueltas * n + 1)]
-    barrido(A, 'cinta', cam, [rect(0.0062, 0.0011)] * len(cam), 'Cinta', bisel=0.0, arriba=(0, 0, 1))
-    torno(A, 'virola', [(H - 0.090, 0.0), (H - 0.090, 0.0195), (H - 0.078, 0.0208), (H - 0.050, 0.0208), (H - 0.050, 0.0)],
-          'Pavonado', eje='z', segs=22)
+    barrido(A, 'cinta', cam, [rect(0.0068, 0.0012)] * len(cam), 'Cinta', bisel=0.0, arriba=(0, 0, 1))
+    torno(A, 'virola', [(H - 0.100, 0.0), (H - 0.100, 0.0235), (H - 0.086, 0.0250), (H - 0.056, 0.0250), (H - 0.056, 0.0)],
+          'Pavonado', eje='z', segs=24)
     # cabeza: bloque, púa curva hacia adelante (+Y) y azuela hacia atrás
-    caja(A, 'cabeza', (0, 0, H), (0.044, 0.064, 0.094), 'Pavonado', r=0.011)
-    caja(A, 'cabeza_banda', (0, 0, H - 0.036), (0.0455, 0.0655, 0.010), 'Pintura', r=0.011, bisel=0.0008)
+    caja(A, 'cabeza', (0, 0, H), (0.058, 0.084, 0.118), 'Pavonado', r=0.014)
+    caja(A, 'cabeza_banda', (0, 0, H - 0.044), (0.0595, 0.0855, 0.012), 'Pintura', r=0.014, bisel=0.0008)
     for sx in (1, -1):
-        tornillo(A, 'remache%d' % sx, (sx * 0.022, 0.0, H + 0.014), 'x', 0.0055, 0.0018, signo=sx)
-    barrido(A, 'pua', [(0, 0.024, H + 0.010), (0, 0.105, H + 0.006), (0, 0.190, H - 0.010), (0, 0.262, H - 0.040),
-                       (0, 0.318, H - 0.075)],
-            [rombo(0.019, 0.028), rombo(0.016, 0.024), rombo(0.0115, 0.017), rombo(0.006, 0.009), None], 'Acero',
-            bisel=0.0015)
-    barrido(A, 'azuela', [(0, -0.024, H + 0.008), (0, -0.085, H + 0.004), (0, -0.140, H - 0.010), (0, -0.180, H - 0.030)],
-            [rect(0.019, 0.026), rect(0.020, 0.021), rect(0.023, 0.013), rect(0.025, 0.004)], 'Acero', bisel=0.0015)
+        tornillo(A, 'remache%d' % sx, (sx * 0.029, 0.0, H + 0.020), 'x', 0.0070, 0.0022, signo=sx)
+        tornillo(A, 'remacheb%d' % sx, (sx * 0.029, 0.0, H - 0.014), 'x', 0.0070, 0.0022, signo=sx)
+    barrido(A, 'pua', [(0, 0.030, H + 0.014), (0, 0.120, H + 0.010), (0, 0.215, H - 0.008), (0, 0.300, H - 0.044),
+                       (0, 0.365, H - 0.090)],
+            [rombo(0.026, 0.038), rombo(0.022, 0.032), rombo(0.016, 0.023), rombo(0.009, 0.013), None], 'Acero',
+            bisel=0.002)
+    barrido(A, 'azuela', [(0, -0.030, H + 0.012), (0, -0.100, H + 0.008), (0, -0.165, H - 0.008), (0, -0.215, H - 0.034)],
+            [rect(0.026, 0.035), rect(0.027, 0.028), rect(0.030, 0.017), rect(0.033, 0.005)], 'Acero', bisel=0.002)
     return A, finalizar(A, {})
 
 
