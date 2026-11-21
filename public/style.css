@@ -22,10 +22,48 @@ button:hover { filter: brightness(1.1); }
 #playerList .dot { width: 14px; height: 14px; border-radius: 50%; }
 
 #hud { position: fixed; inset: 0; pointer-events: none; }
-#crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); }
-#crosshair::before, #crosshair::after { content: ''; position: absolute; background: #fff; box-shadow: 0 0 2px #000; }
-#crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
-#crosshair::after { top: 10px; left: 0; height: 2px; width: 22px; }
+/* Miras: una por arma. --gap es la apertura (sigue a la dispersión real del disparo) y --len el largo de cada trazo */
+#crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; --gap: 8px; --len: 8px; pointer-events: none; }
+#crosshair i { position: absolute; display: none; box-sizing: border-box; }
+#crosshair .dot { width: 4px; height: 4px; left: -2px; top: -2px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.55); }
+#crosshair .ln { background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); }
+#crosshair .t, #crosshair .b { width: 2px; height: var(--len); left: -1px; }
+#crosshair .t { top: calc(-1 * (var(--gap) + var(--len))); }
+#crosshair .b { top: var(--gap); }
+#crosshair .l, #crosshair .r { height: 2px; width: var(--len); top: -1px; }
+#crosshair .l { left: calc(-1 * (var(--gap) + var(--len))); }
+#crosshair .r { left: var(--gap); }
+#crosshair .c { width: var(--len); height: var(--len); border: 0 solid #fff; filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); }
+#crosshair .c1 { left: calc(-1 * var(--gap)); top: calc(-1 * var(--gap)); border-left-width: 2px; border-top-width: 2px; }
+#crosshair .c2 { left: calc(var(--gap) - var(--len)); top: calc(-1 * var(--gap)); border-right-width: 2px; border-top-width: 2px; }
+#crosshair .c3 { left: calc(-1 * var(--gap)); top: calc(var(--gap) - var(--len)); border-left-width: 2px; border-bottom-width: 2px; }
+#crosshair .c4 { left: calc(var(--gap) - var(--len)); top: calc(var(--gap) - var(--len)); border-right-width: 2px; border-bottom-width: 2px; }
+#crosshair .ring { width: calc(2 * var(--gap)); height: calc(2 * var(--gap)); left: calc(-1 * var(--gap)); top: calc(-1 * var(--gap));
+  border: 2px solid rgba(255,255,255,.9); border-radius: 50%; filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); }
+/* rifle: cruz con punto */
+#crosshair.ch-rifle .dot, #crosshair.ch-rifle .ln { display: block; }
+#crosshair.ch-rifle { --len: 9px; }
+/* subfusil: cruz corta y abierta */
+#crosshair.ch-smg .ln { display: block; }
+#crosshair.ch-smg { --len: 6px; }
+/* pistola: tres trazos (sin el de arriba) y punto */
+#crosshair.ch-pistola .dot, #crosshair.ch-pistola .b, #crosshair.ch-pistola .l, #crosshair.ch-pistola .r { display: block; }
+#crosshair.ch-pistola { --len: 7px; }
+/* escopeta: cuadrado de esquinas (los perdigones salen dentro de ese cuadrado) */
+#crosshair.ch-escopeta .dot, #crosshair.ch-escopeta .c { display: block; }
+#crosshair.ch-escopeta { --len: 11px; }
+/* francotirador sin mira: círculo con punto */
+#crosshair.ch-franco .dot, #crosshair.ch-franco .ring { display: block; }
+/* lanzacohetes: círculo con marcas afuera */
+#crosshair.ch-cohete .dot, #crosshair.ch-cohete .ring, #crosshair.ch-cohete .ln { display: block; }
+#crosshair.ch-cohete { --len: 6px; }
+#crosshair.ch-cohete .t { top: calc(-1 * (var(--gap) + var(--len) + 3px)); }
+#crosshair.ch-cohete .b { top: calc(var(--gap) + 3px); }
+#crosshair.ch-cohete .l { left: calc(-1 * (var(--gap) + var(--len) + 3px)); }
+#crosshair.ch-cohete .r { left: calc(var(--gap) + 3px); }
+/* pico: círculo chico; construir y objetos: solo el punto */
+#crosshair.ch-pico .ring { display: block; border-width: 1.5px; opacity: .85; }
+#crosshair.ch-pico .dot, #crosshair.ch-construir .dot, #crosshair.ch-objeto .dot { display: block; }
 #hitmarker { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; transform: translate(-50%, -50%) rotate(45deg); opacity: 0; transition: opacity .15s; }
 #hitmarker::before, #hitmarker::after { content: ''; position: absolute; background: #fff; }
 #hitmarker::before { left: 14px; top: 0; width: 3px; height: 30px; }
