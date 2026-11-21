@@ -413,25 +413,31 @@ def botas():
     body = SF.get_co(bpy.data.objects['Cuerpo'])
     out = []
     for side, sx in (('I', 1), ('D', -1)):
-        # --- caña: elipses que envuelven la pierna con holgura
+        # --- caña: elipses que envuelven la pierna con holgura; abajo baja hasta la suela y forma el talón
         rings = []
-        for z in [0.105 + 0.235 * k / 11 for k in range(12)]:
-            sl = body[(abs(body[:, 2] - z) < 0.016) & (body[:, 0] * sx > 0.06) & (body[:, 1] > -0.045)]
+        zs = [0.006, 0.02, 0.04, 0.065, 0.09] + [0.11 + 0.23 * k / 10 for k in range(11)]
+        for z in zs:
+            ze = max(z, 0.11)
+            sl = body[(abs(body[:, 2] - ze) < 0.016) & (body[:, 0] * sx > 0.06) & (body[:, 1] > -0.045)]
             cx = (sl[:, 0].min() + sl[:, 0].max()) / 2
             cy = (sl[:, 1].min() + sl[:, 1].max()) / 2
-            k_ = 0.9 + 0.1 * ss(0.105, 0.17, z)  # abajo se mete apenas dentro del pie
-            rx = ((sl[:, 0].max() - sl[:, 0].min()) / 2 + 0.014 + 0.004 * ss(0.25, 0.32, z)) * k_
-            ry = ((sl[:, 1].max() - sl[:, 1].min()) / 2 + 0.014 + 0.004 * ss(0.25, 0.32, z)) * k_
-            rings.append(SF.superellipse((cx, cy, z), rx, ry, 2.2, (1, 0, 0), (0, 1, 0), N=40))
+            rx = (sl[:, 0].max() - sl[:, 0].min()) / 2 + 0.014 + 0.004 * ss(0.25, 0.32, z)
+            ry = (sl[:, 1].max() - sl[:, 1].min()) / 2 + 0.014 + 0.004 * ss(0.25, 0.32, z)
+            u = ss(0.11, 0.03, z)  # contrafuerte: la espalda de la caña se abre hacia atrás hasta cubrir el talón
+            back = (cy + ry) + (0.131 - (cy + ry)) * u
+            front = cy - ry
+            cy, ry = (back + front) / 2, (back - front) / 2
+            rx = rx + (0.05 - rx) * u
+            rings.append(SF.superellipse((cx, cy, z), rx, ry, 2.2 + 0.5 * u, (1, 0, 0), (0, 1, 0), N=40))
         cana = SF.loft_mesh('_Cana' + side, rings, closed_ends=True)
-        # --- pie: secciones del talón (que continúa la caña) a la punta, base plana y puntera ancha
-        H = Vector((sx * 0.19, 0.128, 0))
+        # --- pie: secciones desde el centro del talón (queda adentro de la caña) a la punta; puntera ancha
+        H = Vector((sx * 0.19, 0.075, 0))
         T = Vector((sx * 0.255, -0.178, 0))
         ax = (T - H).normalized()
         lat = Vector((-ax.y, ax.x, 0)) * (1 if sx > 0 else -1)
-        prof = [(0.0, 0.074, 0.115), (0.06, 0.09, 0.12), (0.22, 0.098, 0.115), (0.42, 0.106, 0.096),
-                (0.60, 0.114, 0.080), (0.76, 0.117, 0.067), (0.87, 0.112, 0.061), (0.94, 0.098, 0.056),
-                (0.985, 0.072, 0.048), (1.0, 0.044, 0.038)]
+        prof = [(0.0, 0.080, 0.10), (0.12, 0.092, 0.112), (0.3, 0.100, 0.108), (0.5, 0.106, 0.09),
+                (0.66, 0.114, 0.076), (0.8, 0.116, 0.066), (0.9, 0.110, 0.060), (0.96, 0.096, 0.055),
+                (0.99, 0.07, 0.047), (1.0, 0.044, 0.038)]
         secs = []
         L = (T - H).length
         for t, w, h in prof:
@@ -442,7 +448,7 @@ def botas():
         SF.voxel_close(b, r=0.028, size=0.0024, smooth_iter=10)
         b.data.materials.clear()
         b.data.materials.append(cuero)
-        _suela(b, side, H, T, suela_m)
+        _suela(b, side, Vector((sx * 0.19, 0.131, 0)), T, suela_m)
         # --- cordones cruzados sobre el empeine
         bvh = SF.surface_bvh(b)
         front = Vector((0.26 * sx, -0.97, 0)).normalized()
