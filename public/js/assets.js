@@ -1,12 +1,15 @@
 // Carga de los modelos GLB hechos en Blender (public/models). Si alguno falla, el juego usa los modelos procedurales.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 export const ASSETS = {};
+export const ANIMS = {};
 const FILES = ['personaje', 'bus', 'planeador', 'cofre', 'armas', 'objetos', 'casa', 'pino', 'arbol', 'roca'];
 
 export async function loadAssets(onProgress) {
   const loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
   let done = 0;
   await Promise.all(FILES.map(async (name) => {
     try {
@@ -14,6 +17,7 @@ export async function loadAssets(onProgress) {
       gltf.scene.updateMatrixWorld(true);
       gltf.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       ASSETS[name] = gltf.scene;
+      ANIMS[name] = gltf.animations || [];
     } catch (e) {
       console.warn(`No se pudo cargar ${name}.glb, uso el modelo procedural`, e);
     }
