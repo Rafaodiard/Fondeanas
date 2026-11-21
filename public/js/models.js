@@ -1,6 +1,7 @@
 // Modelos low-poly procedurales (provisorios hasta reemplazarlos por GLB hechos en Blender).
 import * as THREE from 'three';
 import { cloneAsset } from './assets.js';
+import { hasRig, createRigCharacter, animateRig, placeGlider } from './rig.js';
 
 const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.8, ...extra });
 
@@ -13,6 +14,14 @@ function box(w, h, d, mat, x = 0, y = 0, z = 0) {
 
 // Personaje articulado: el grupo raíz está en los pies, mira hacia -Z.
 export function createCharacter(color) {
+  if (hasRig()) {
+    const root = createRigCharacter(color);
+    const glider = createGlider(color);
+    glider.visible = false;
+    placeGlider(root, glider);
+    setHeld(root, 'pico');
+    return root;
+  }
   const glb = cloneAsset('personaje', null, { Ropa: color });
   if (glb) {
     const root = new THREE.Group();
@@ -90,8 +99,9 @@ export function createGlider(color) {
 }
 
 // Animación procedural según estado y velocidad.
-export function animateCharacter(char, state, speed, dt, aiming) {
+export function animateCharacter(char, state, speed, dt, aiming, extra) {
   const u = char.userData;
+  if (u.rig) return animateRig(char, state, speed, dt, aiming, extra);
   u.phase += dt * (2 + speed * 1.6);
   const swing = Math.min(1, speed / 6) * 0.8;
   u.glider.visible = state === 'glider';
@@ -242,6 +252,7 @@ export function setHeld(char, what, color = '#b8bcc4') {
   const key = `${what}:${color}`;
   if (u.held === key) return;
   u.held = key;
+  if (u.rig) return setHeldRig(u, what, color);
   u.gun.clear();
   if (what === 'pico') u.gun.add(createPickaxe());
   else if (WEAPON_SHAPES[what]) u.gun.add(createWeaponModel(what, color));
@@ -294,4 +305,28 @@ export function createItemMesh(item, color) {
   g.add(ring);
   g.userData.spin = spin;
   return g;
+}
+
+// En el esqueleto el arma cuelga del hueso Arma.R: origen en el puño, cañón hacia -Z y arriba +Y
+// (igual que los modelos de armas.glb). El pico tiene el mango hacia +Y y la punta hacia -Z.
+const BOCA = { pistola: 0.32, subfusil: 0.52, rifle: 0.76, escopeta: 0.8, francotirador: 1.2, lanzacohetes: 0.86 };
+
+function setHeldRig(u, what, color) {
+  for (const c of [...u.gun.children]) if (c !== u.muzzle) u.gun.remove(c);
+  u.heldKind = what || null;
+  u.muzzle.position.set(0, 0.09, -0.3);
+  if (what === 'pico') {
+    const glb = cloneAsset('armas', 'pico');
+    const p = new THREE.Group();
+    if (glb) { glb.rotation.x = Math.PI / 2; p.add(glb); } else { const q = createPickaxe(); q.rotation.x = Math.PI; p.add(q); }
+    u.gun.add(p);
+  } else if (WEAPON_SHAPES[what]) {
+    u.gun.add(createWeaponModel(what, color, true));
+    u.muzzle.position.set(0, what === 'lanzacohetes' ? 0.12 : 0.09, -(BOCA[what] || 0.6));
+  } else if (what) {
+    u.heldKind = 'item';
+    const it = box(0.16, 0.16, 0.16, std(color, { emissive: color, emissiveIntensity: 0.3 }), 0, 0.02, -0.06);
+    u.gun.add(it);
+  }
+  u.gun.traverse((o) => { if (o.isMesh) o.castShadow = true; });
 }

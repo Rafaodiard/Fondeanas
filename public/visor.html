@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Salto Final · Visor del personaje</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #1d2128; color: #e8e8e8; font: 14px system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; }
+  #panel { position: fixed; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.55); padding: 10px 12px; border-radius: 10px; max-width: 300px; }
+  #panel h1 { font-size: 15px; margin: 0 0 8px; }
+  #panel label { display: block; margin: 6px 0 2px; color: #aab; font-size: 12px; }
+  #panel select, #panel input { width: 100%; }
+  #info { margin-top: 8px; color: #aab; font-size: 12px; }
+</style>
+<script type="importmap">
+  { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="panel">
+  <h1>Visor del personaje</h1>
+  <label>Estado</label>
+  <select id="estado">
+    <option value="ground">En el piso</option>
+    <option value="salto">Saltando</option>
+    <option value="falling">Caída libre</option>
+    <option value="glider">Planeador</option>
+    <option value="baile">Baile</option>
+  </select>
+  <label>Velocidad: <span id="vtxt">0</span> m/s</label>
+  <input id="vel" type="range" min="0" max="9.5" step="0.1" value="0">
+  <label>En la mano</label>
+  <select id="mano">
+    <option value="pico">Pico</option>
+    <option value="rifle">Rifle</option>
+    <option value="subfusil">Subfusil</option>
+    <option value="escopeta">Escopeta</option>
+    <option value="francotirador">Francotirador</option>
+    <option value="pistola">Pistola</option>
+    <option value="lanzacohetes">Lanzacohetes</option>
+    <option value="item">Objeto</option>
+    <option value="">Nada (construcción)</option>
+  </select>
+  <label><input id="apunta" type="checkbox" style="width:auto"> Apuntando</label>
+  <label>Mirar arriba/abajo</label>
+  <input id="pitch" type="range" min="-1.2" max="1.2" step="0.05" value="0">
+  <label>Color de la ropa</label>
+  <input id="color" type="color" value="#b33a3a">
+  <div id="info">Clic: golpe de pico · arrastrar: girar la cámara</div>
+</div>
+<canvas id="c"></canvas>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { setRigEnv } from './js/rig.js';
+import { loadAssets } from './js/assets.js';
+import { createCharacter, animateCharacter, setHeld } from './js/models.js';
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.shadowMap.enabled = true;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#8fb3cf');
+scene.fog = new THREE.Fog('#8fb3cf', 20, 60);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 200);
+camera.position.set(2.6, 1.8, -3.4);
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 1.0, 0);
+scene.add(new THREE.HemisphereLight('#dfeeff', '#4a5a3a', 1.2));
+const sun = new THREE.DirectionalLight('#fff3dd', 2.2);
+sun.position.set(4, 8, -5);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4 });
+scene.add(sun);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({ color: '#6f8f55', roughness: 1 }));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+const grid = new THREE.GridHelper(80, 80, '#557040', '#5f7d4a');
+grid.position.y = 0.002;
+scene.add(grid);
+
+function resize() {
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+
+await loadAssets();
+setRigEnv(renderer);
+const $ = (id) => document.getElementById(id);
+let pj = createCharacter($('color').value);
+scene.add(pj);
+const S = { estado: 'ground', vel: 0, mano: 'pico', apunta: false, pitch: 0, t: 0, vy: 0, dist: 0 };
+window.VISOR = { S, get pj() { return pj; }, THREE, scene, camera, renderer, controls, golpe: () => { pj.userData.swing = 1; } };
+
+$('estado').onchange = (e) => { S.estado = e.target.value; S.t = 0; };
+$('vel').oninput = (e) => { S.vel = +e.target.value; $('vtxt').textContent = S.vel.toFixed(1); };
+$('mano').onchange = (e) => { S.mano = e.target.value; setHeld(pj, S.mano || null, '#4fa3ff'); };
+$('apunta').onchange = (e) => { S.apunta = e.target.checked; };
+$('pitch').oninput = (e) => { S.pitch = +e.target.value; };
+$('color').oninput = (e) => {
+  const held = S.mano;
+  scene.remove(pj);
+  pj = createCharacter(e.target.value);
+  scene.add(pj);
+  setHeld(pj, held || null, '#4fa3ff');
+};
+canvas.addEventListener('dblclick', () => { pj.userData.swing = 1; });
+addEventListener('keydown', (e) => { if (e.code === 'Space') pj.userData.swing = 1; });
+
+const clock = new THREE.Clock();
+function frame() {
+  const dt = Math.min(0.05, clock.getDelta());
+  S.t += dt;
+  let state = S.estado, air = false;
+  if (state === 'salto') {
+    const T = 2 * 8.5 / 25;                 // misma física que el juego
+    const t = S.t % (T + 0.4);
+    S.vy = t < T ? 8.5 - 25 * t : 0;
+    air = t < T;
+    pj.position.y = t < T ? 8.5 * t - 12.5 * t * t : 0;
+    state = 'ground';
+  } else pj.position.y = state === 'falling' || state === 'glider' ? 0.5 : 0;
+  // el piso se mueve debajo para que se note si los pies patinan
+  S.dist += S.vel * dt;
+  floor.position.z = grid.position.z = (S.dist % 1);
+  animateCharacter(pj, state === 'baile' ? 'ground' : state, S.vel, dt, S.apunta && !!S.mano && S.mano !== 'pico' && S.mano !== 'item',
+    { air, vy: S.vy, pitch: S.pitch, dance: state === 'baile' });
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+frame();
+</script>
+</body>
+</html>

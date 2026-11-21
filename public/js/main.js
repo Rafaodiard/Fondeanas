@@ -7,6 +7,7 @@ import {
   itemLabel, itemColor, weaponReload, structKey,
 } from './items.js';
 import { sfx } from './audio.js';
+import { setRigEnv } from './rig.js';
 
 const GRAVITY = 25, WALK = 6, SPRINT = 9.5, AIM_WALK = 3.5, JUMP = 8.5, SWIM_Y = -1.3;
 const FREEFALL_V = 42, FREEFALL_H = 20, GLIDER_V = 8, GLIDER_H = 17, AUTO_GLIDER = 70;
@@ -44,6 +45,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
+setRigEnv(renderer);
 
 const scene = new THREE.Scene();
 const SKY = new THREE.Color('#7cc8ff');
@@ -181,7 +183,7 @@ function handle(m) {
       const o = others.get(m.id);
       if (!o) break;
       o.target.fromArray(m.p);
-      o.rotTarget = m.r; o.state = m.s; o.aiming = m.a;
+      o.rotTarget = m.r; o.state = m.s; o.aiming = m.a; o.dance = !!m.b;
       if (m.h) setHeld(o.mesh, m.h[0], m.h[1]);
       if (!o.seen) { o.mesh.position.copy(o.target); o.seen = true; }
       break;
@@ -545,6 +547,7 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'KeyR') startReload();
   if (e.code === 'KeyE') doInteract();
   if (e.code === 'KeyG') dropHeld();
+  if (e.code === 'KeyB' && me.state === 'ground') me.dance = !me.dance;
   if (e.code === 'KeyZ') setBuild('pared');
   if (e.code === 'KeyX') setBuild('piso');
   if (e.code === 'KeyC') setBuild('rampa');
@@ -808,7 +811,9 @@ function tryShoot(it, def) {
   if (it.mag <= 0) { startReload(); return; }
   me.lastShot = t;
   it.mag--;
-  const muzzle = me.mesh.userData.gun.getWorldPosition(new THREE.Vector3());
+  const muzzle = (me.mesh.userData.muzzle || me.mesh.userData.gun).getWorldPosition(new THREE.Vector3());
+  me.mesh.userData.recoil = 1;
+  me.dance = false;
   const camDir = camera.getWorldDirection(new THREE.Vector3());
   const near = camera.position.distanceTo(me.pos) + 0.5;
   const moving = Math.hypot(me.vel.x, me.vel.z) > 1;
@@ -1012,8 +1017,10 @@ function updateMe(dt) {
   me.mesh.rotation.y = me.yaw;
   const hs = Math.hypot(me.vel.x, me.vel.z);
   const it = heldItem();
-  animateCharacter(me.mesh, me.state, hs, dt, (me.aiming || mouseDown) && it?.kind === 'weapon');
-  if (me.state === 'ground') me.mesh.userData.headG.rotation.x = me.pitch * 0.5;
+  if (me.dance && (hs > 0.5 || me.state !== 'ground' || mouseDown)) me.dance = false;
+  animateCharacter(me.mesh, me.state, hs, dt, (me.aiming || mouseDown) && it?.kind === 'weapon',
+    { air: !me.onGround, vy: me.vel.y, pitch: me.pitch, dance: me.dance });
+  if (me.state === 'ground' && me.mesh.userData.headG) me.mesh.userData.headG.rotation.x = me.pitch * 0.5;
 }
 
 function updateOthers(dt) {
@@ -1028,7 +1035,9 @@ function updateOthers(dt) {
     o.mesh.rotation.y += dr * Math.min(1, dt * 12);
     const sp = Math.hypot(o.mesh.position.x - o.prev.x, o.mesh.position.z - o.prev.z) / Math.max(dt, 1e-3);
     o.speed += (sp - o.speed) * Math.min(1, dt * 8);
-    animateCharacter(o.mesh, o.state, o.speed, dt, o.aiming);
+    const vy = (o.mesh.position.y - o.prev.y) / Math.max(dt, 1e-3);
+    o.vy = (o.vy || 0) + (vy - (o.vy || 0)) * Math.min(1, dt * 10);
+    animateCharacter(o.mesh, o.state, o.speed, dt, o.aiming, { air: Math.abs(o.vy) > 1.6, vy: o.vy, pitch: 0, dance: o.dance });
   }
 }
 
@@ -1155,7 +1164,7 @@ function frame() {
       sendTimer = 1 / 15;
       const it = heldItem();
       const h = me.build ? [null] : !it ? ['pico'] : it.kind === 'weapon' ? [it.w, RARITIES[it.rarity].color] : ['item', CONSUMABLES[it.c].color];
-      sendMsg({ t: 'state', p: [+me.pos.x.toFixed(2), +me.pos.y.toFixed(2), +me.pos.z.toFixed(2)], r: +me.yaw.toFixed(3), s: me.state, a: (me.aiming || mouseDown) && it?.kind === 'weapon', h });
+      sendMsg({ t: 'state', p: [+me.pos.x.toFixed(2), +me.pos.y.toFixed(2), +me.pos.z.toFixed(2)], r: +me.yaw.toFixed(3), s: me.state, a: (me.aiming || mouseDown) && it?.kind === 'weapon', h, b: !!me.dance });
     }
   }
   updateEffects(dt);

@@ -311,7 +311,7 @@ function handleGame(room, player, msg) {
       if (!Array.isArray(p) || p.length !== 3 || !p.every(Number.isFinite)) break;
       player.pos = p;
       if (['falling', 'glider', 'ground'].includes(msg.s)) player.state = msg.s;
-      broadcast(room, { t: 'state', id: player.id, p, r: Number(msg.r) || 0, s: player.state, a: !!msg.a, h: msg.h, sw: !!msg.sw }, player.id);
+      broadcast(room, { t: 'state', id: player.id, p, r: Number(msg.r) || 0, s: player.state, a: !!msg.a, h: msg.h, sw: !!msg.sw, b: !!msg.b }, player.id);
       break;
     }
     case 'pickup': {
