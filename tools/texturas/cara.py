@@ -41,7 +41,7 @@ def brow(side):
         t = i / n
         a = 7 + 33 * t
         zc = 1.7545 + 0.0055 * math.sin(math.pi * min(1, t * 1.25)) - 0.004 * t ** 2
-        th = 0.0068 * (1 - t) + 0.0024 * t
+        th = 0.0088 * (1 - t) + 0.0036 * t
         top.append((side * a, zc + th * 0.55))
         bot.append((side * a, zc - th * 0.45))
     return top + bot[::-1]
@@ -51,7 +51,7 @@ def main(out):
     # --- cejas, con pelitos: sumo trazos finos inclinados encima de la forma base
     br = blank()
     for s in (1, -1):
-        br = poly(br, brow(s), 200)
+        br = poly(br, brow(s), 235)
     d = ImageDraw.Draw(br)
     rng = np.random.default_rng(7)
     for s in (1, -1):

@@ -175,7 +175,7 @@ def piel():
     # labios
     col = g.mix(g.math('MULTIPLY', A['Green'], 0.8), col, (0.42, 0.12, 0.09))
     # barba de dos días
-    col = g.mix(g.math('MULTIPLY', A['Blue'], 0.55), col, (0.10, 0.075, 0.065))
+    col = g.mix(g.math('MULTIPLY', A['Blue'], 0.8), col, (0.075, 0.055, 0.05))
     # cejas
     col = g.mix(g.math('MULTIPLY', A['Red'], 0.95), col, (0.028, 0.016, 0.01))
     # cicatriz
@@ -238,12 +238,12 @@ def ojos():
     # iris con vetas radiales
     th = g.math('ARCTAN2', x, z)
     vet = g.noise(g.comb(g.math('MULTIPLY', th, 6.0), g.math('MULTIPLY', ang, 3.0)), 3.0, 4.0, 0.6, '2D')
-    iris = g.mix(g.rng(ang, 0.12, 0.42), (0.20, 0.11, 0.035), (0.10, 0.16, 0.09))
-    iris = g.mix(g.rng(vet, 0.35, 0.75, 0, 0.6), iris, (0.32, 0.22, 0.08))
-    iris = g.mix(g.rng(ang, 0.40, 0.50), iris, (0.02, 0.025, 0.02))     # anillo límbico
+    iris = g.mix(g.rng(ang, 0.12, 0.40), (0.10, 0.05, 0.016), (0.055, 0.04, 0.02))
+    iris = g.mix(g.rng(vet, 0.35, 0.75, 0, 0.5), iris, (0.17, 0.09, 0.03))
+    iris = g.mix(g.rng(ang, 0.36, 0.45), iris, (0.012, 0.01, 0.008))     # anillo límbico
     pup = g.mix(g.rng(ang, 0.15, 0.18), (0.004, 0.004, 0.004), iris)
     escl = g.mix(g.rng(ang, 0.9, 1.6), (0.80, 0.74, 0.70), (0.66, 0.44, 0.40))
-    col = g.mix(g.rng(ang, 0.50, 0.54), pup, escl)
+    col = g.mix(g.rng(ang, 0.45, 0.49), pup, escl)
     g.set(col, 0.06)
     m.diffuse_color = (0.8, 0.75, 0.7, 1)
 
@@ -257,16 +257,18 @@ def pelo():
     w2 = g.noise(g.comb(g.math('MULTIPLY', g.sep(P)[0], 220.0), g.math('MULTIPLY', g.sep(P)[1], 18.0), g.math('MULTIPLY', g.sep(P)[2], 60.0)), 1.0, 3.0, 0.6)
     base = (0.040, 0.021, 0.011)
     col = g.mix(g.rng(w2, 0.3, 0.75), _scale(base, 0.7), (0.085, 0.048, 0.025))
-    col = g.mix(g.rng(w1, 0.6, 1.0, 0, 0.35), col, (0.11, 0.065, 0.035))
-    g.set(col, 0.45)
+    col = g.mix(g.rng(w1, 0.6, 1.0, 0, 0.25), col, (0.075, 0.042, 0.022))
+    g.set(col, 0.6)
     g.bump(g.math('ADD', w1, g.math('MULTIPLY', w2, 0.5)), 0.35, 0.0015)
     m.diffuse_color = base + (1,)
 
     m = bpy.data.materials['M_PeloCorto']
     g = G(m)
     n = g.noise(g.pos(), 900.0, 2.0, 0.5)
-    col = g.mix(g.rng(n, 0.35, 0.65), (0.30, 0.15, 0.09), (0.025, 0.015, 0.01))
-    col = g.mix(0.75, (0.45, 0.22, 0.13), col)
+    z = g.sep(g.pos())[2]
+    col = g.mix(g.rng(n, 0.35, 0.65), (0.06, 0.04, 0.03), (0.022, 0.014, 0.01))
+    # degradé (fade): abajo deja ver más piel
+    col = g.mix(g.rng(z, 1.66, 1.775, 0.6, 0.0), col, (0.34, 0.17, 0.10))
     g.set(col, 0.75)
     g.bump(n, 0.25, 0.001)
 
@@ -347,6 +349,8 @@ def bufanda():
 
 
 def todo():
+    bpy.data.materials['M_Chaleco'].diffuse_color = (0.20, 0.035, 0.03, 1)
+    bpy.data.materials['M_Pantalon'].diffuse_color = (0.12, 0.13, 0.065, 1)
     piel()
     ojos()
     pelo()
