@@ -61,6 +61,7 @@ export class World {
     this.pois = [];
     this.structs = new Map(); // construcciones de los jugadores
     this.structMeshes = [];
+    this.camMeshes = []; // casas enteras, para que la cámara no las atraviese
     this.buildHeights();
     this.layout();
   }
@@ -309,6 +310,7 @@ export class World {
     const hiddenMat = new THREE.MeshBasicMaterial({ visible: false });
     for (const h of this.houses) {
       const group = new THREE.Group();
+      this.camMeshes.push(group);
       const { cx, cz, w, d, base, minBase } = h;
       const foundH = base - minBase;
       const found = new THREE.Mesh(new THREE.BoxGeometry(w, foundH - 0.3, d), floorMat);

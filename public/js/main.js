@@ -111,7 +111,7 @@ const me = {
 };
 let bus = null;
 const keys = {};
-let mouseDown = false, mouseClicked = false, locked = false;
+let mouseDown = false, mouseClicked = false, locked = false, rmbDown = false;
 const tracers = [];
 const effects = [];
 const dmgNums = [];
@@ -508,11 +508,11 @@ document.addEventListener('mousemove', (e) => {
 document.addEventListener('mousedown', (e) => {
   if (!locked) return;
   if (e.button === 0) { mouseDown = true; mouseClicked = true; }
-  if (e.button === 2) me.aiming = true;
+  if (e.button === 2) { rmbDown = true; me.aiming = canAim(); }
 });
 document.addEventListener('mouseup', (e) => {
   if (e.button === 0) mouseDown = false;
-  if (e.button === 2) me.aiming = false;
+  if (e.button === 2) { rmbDown = false; me.aiming = false; }
 });
 document.addEventListener('wheel', (e) => {
   if (!locked || me.build) return;
@@ -555,7 +555,12 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'KeyV') { me.mat = MAT_ORDER[(MAT_ORDER.indexOf(me.mat) + 1) % 3]; ghostKey = ''; updateSlots(); }
 });
 document.addEventListener('keyup', (e) => { keys[e.code] = false; });
-window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseDown = false; me.aiming = false; });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseDown = false; rmbDown = false; me.aiming = false; });
+// Solo se apunta con un arma en la mano (con el pico, objetos o construyendo, el clic derecho no hace zoom).
+function canAim() {
+  const it = heldItem();
+  return me.state === 'ground' && !me.build && it?.kind === 'weapon';
+}
 
 function selectSlot(i) {
   if (i === me.sel && !me.build) return;
@@ -785,14 +790,19 @@ function tryUseHeld() {
   tryShoot(it, def);
 }
 
+// Profundidad de la cabeza del jugador vista desde la cámara: lo que está más cerca que eso queda detrás de él.
+function headDepth(camDir) {
+  return _v.set(me.pos.x, me.pos.y + 1.68, me.pos.z).sub(camera.position).dot(camDir);
+}
+
 function trySwing() {
   const t = performance.now() / 1000;
   if (t - me.lastSwing < PICKAXE.cooldown) return;
   me.lastSwing = t;
   me.mesh.userData.swing = 1;
   const camDir = camera.getWorldDirection(new THREE.Vector3());
-  const near = camera.position.distanceTo(me.pos) - 0.3;
-  const res = castRay(camera.position, camDir, near + PICKAXE.range + 1, Math.max(0, near - 1));
+  const near = headDepth(camDir);
+  const res = castRay(camera.position, camDir, near + PICKAXE.range + 0.7, Math.max(0, near - 0.8));
   if (res.dist >= near + PICKAXE.range + 1) { sfx.whiff(); sendMsg({ t: 'swing' }); return; }
   const at = camera.position.clone().addScaledVector(camDir, res.dist);
   if (res.pid) sendMsg({ t: 'swing', pid: res.pid });
@@ -814,8 +824,9 @@ function tryShoot(it, def) {
   const muzzle = (me.mesh.userData.muzzle || me.mesh.userData.gun).getWorldPosition(new THREE.Vector3());
   me.mesh.userData.recoil = 1;
   me.dance = false;
+  crossKick = Math.min(30, crossKick + (def.pellets > 1 ? 16 : def.auto ? 4 : 7));
   const camDir = camera.getWorldDirection(new THREE.Vector3());
-  const near = camera.position.distanceTo(me.pos) + 0.5;
+  const near = Math.max(0.1, headDepth(camDir) + 0.3);
   const moving = Math.hypot(me.vel.x, me.vel.z) > 1;
   const spread = (me.aiming ? def.aimSpread : def.spread) * (me.onGround ? 1 : 2) * (moving && !me.aiming ? 1.4 : 1);
   const tally = new Map();
@@ -955,6 +966,7 @@ function updateBus(t) {
 }
 
 function updateMe(dt) {
+  me.aiming = rmbDown && canAim();
   const fwd = new THREE.Vector3(-Math.sin(me.yaw), 0, -Math.cos(me.yaw));
   const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
   const input = new THREE.Vector3();
@@ -1051,42 +1063,91 @@ function updateItems(t) {
 }
 
 const camTarget = new THREE.Vector3();
+const camRay = new THREE.Raycaster();
+const _cd = new THREE.Vector3();
+let camArm = null; // largo actual del brazo de la cámara: entra de golpe si choca y sale suave al despejarse
+let camD = null, camS = 0, camU = 0; // distancia, corrimiento al hombro y altura, suavizados
 function updateCamera(dt, t) {
   if (!world) return;
   if (me.state === 'lobby' || !room || room.phase === 'lobby') {
     const a = t / 20000;
     camera.position.set(Math.cos(a) * 520, 220, Math.sin(a) * 520);
     camera.lookAt(0, 20, 0);
+    camArm = null; camD = null;
     return;
   }
-  let focus, dist, side = 0, up;
+  let focus, dist, side = 0, up, collide = false;
   const it = heldItem();
   const scoped = me.aiming && me.state === 'ground' && it?.kind === 'weapon' && WEAPONS[it.w].scope && it.w === 'francotirador';
   if (me.state === 'bus') { focus = bus.position; dist = 28; up = 4; }
   else if (me.state === 'dead' || me.state === 'ended') {
     const o = me.spectate && others.get(me.spectate);
-    if (o && o.mesh.visible) { focus = o.mesh.position.clone().add(new THREE.Vector3(0, 1.6, 0)); dist = 6; up = 0; }
+    if (o && o.mesh.visible) { focus = o.mesh.position.clone().add(new THREE.Vector3(0, 1.6, 0)); dist = 4.5; up = 0.3; side = 0.7; collide = true; }
     else { focus = me.pos.clone().add(new THREE.Vector3(0, 2, 0)); dist = 14; up = 2; }
   } else if (me.state === 'falling' || me.state === 'glider') {
-    focus = me.pos.clone().add(new THREE.Vector3(0, 1.5, 0)); dist = 9; up = 0.5;
+    focus = me.pos.clone().add(new THREE.Vector3(0, 1.5, 0)); dist = 7.5; up = 0.5; collide = true;
   } else {
-    focus = me.pos.clone().add(new THREE.Vector3(0, 1.75, 0));
-    dist = scoped ? 0.2 : me.aiming ? 2.6 : me.build ? 6 : 5.2; side = scoped ? 0 : me.aiming ? 0.85 : 1.1; up = scoped ? 0 : 0.35;
+    // cámara al hombro, cerca del personaje (como en los battle royale en tercera persona)
+    focus = me.pos.clone().add(new THREE.Vector3(0, 1.68, 0));
+    dist = scoped ? 0.2 : me.aiming ? 1.9 : me.build ? 4.6 : 3.6;
+    side = scoped ? 0 : me.aiming ? 0.72 : me.build ? 0.9 : 0.8;
+    up = scoped ? 0 : me.aiming ? 0.12 : 0.28;
+    collide = !scoped;
   }
   const dir = new THREE.Vector3(-Math.sin(me.yaw) * Math.cos(me.pitch), Math.sin(me.pitch), -Math.cos(me.yaw) * Math.cos(me.pitch));
   const right = new THREE.Vector3(Math.cos(me.yaw), 0, -Math.sin(me.yaw));
-  camTarget.copy(focus).addScaledVector(dir, -dist).addScaledVector(right, side);
-  camTarget.y += up;
+  if (camD === null) { camD = dist; camS = side; camU = up; }
+  const k = scoped ? 1 : 1 - Math.exp(-dt * 14);
+  camD += (dist - camD) * k; camS += (side - camS) * k; camU += (up - camU) * k;
+  camTarget.copy(focus).addScaledVector(dir, -camD).addScaledVector(right, camS);
+  camTarget.y += camU;
+  if (collide) {
+    // brazo con colisión: si entre la cabeza y la cámara hay una casa o una construcción, la cámara se acerca
+    _cd.subVectors(camTarget, focus);
+    const want = _cd.length();
+    _cd.divideScalar(want);
+    camRay.set(focus, _cd);
+    camRay.near = 0;
+    camRay.far = want + 0.35;
+    let len = want;
+    const hits = camRay.intersectObjects(world.camMeshes.concat(world.structMeshes), true);
+    if (hits.length) len = Math.min(len, Math.max(0.2, hits[0].distance - 0.35));
+    const tt = world.rayTerrain(focus, _cd, want + 0.35);
+    if (tt < Infinity) len = Math.min(len, Math.max(0.2, tt - 0.35));
+    camArm = camArm === null || len < camArm ? len : camArm + (len - camArm) * (1 - Math.exp(-dt * 6));
+    camTarget.copy(focus).addScaledVector(_cd, camArm);
+  } else camArm = null;
   const minY = world.terrainHeight(camTarget.x, camTarget.z) + 0.4;
   if (camTarget.y < minY) camTarget.y = minY;
-  camera.position.lerp(camTarget, me.state === 'ground' ? 1 - Math.exp(-dt * 25) : 1 - Math.exp(-dt * 8));
+  camera.position.copy(camTarget);
   camera.lookAt(camera.position.clone().add(dir));
-  const fovTarget = scoped ? 18 : me.aiming && me.state === 'ground' && it?.kind === 'weapon' ? 50 : me.state === 'falling' ? 80 : 70;
+  const fovTarget = scoped ? 18 : me.aiming ? 52 : me.state === 'falling' ? 80 : 70;
   camera.fov += (fovTarget - camera.fov) * Math.min(1, dt * 12);
   camera.updateProjectionMatrix();
   ui.scope.classList.toggle('hidden', !scoped);
-  ui.crosshair.classList.toggle('hidden', scoped);
-  if (me.mesh) me.mesh.visible = me.mesh.visible && !scoped;
+  updateCrosshair(dt, scoped);
+  // con la cámara pegada a la cabeza (contra una pared) el personaje se oculta para no verlo por dentro
+  if (me.mesh) me.mesh.visible = me.mesh.visible && !scoped && !(camArm !== null && camArm < 0.9 && me.state === 'ground');
+}
+
+// Mira según lo que hay en la mano; la apertura sigue a la dispersión real del disparo (en píxeles de pantalla)
+const CROSS = { rifle: 'rifle', subfusil: 'smg', pistola: 'pistola', escopeta: 'escopeta', francotirador: 'franco', lanzacohetes: 'cohete' };
+let crossType = '', crossGap = 8, crossKick = 0;
+function updateCrosshair(dt, scoped) {
+  const it = heldItem();
+  let type = me.state !== 'ground' || scoped ? 'nada' : me.build ? 'construir' : !it ? 'pico' : it.kind === 'weapon' ? CROSS[it.w] || 'rifle' : 'objeto';
+  if (type !== crossType) { ui.crosshair.className = 'ch-' + type; crossType = type; }
+  let gap = 5;
+  if (it?.kind === 'weapon' && !me.build) {
+    const def = WEAPONS[it.w];
+    const moving = Math.hypot(me.vel.x, me.vel.z) > 1;
+    const spread = (me.aiming ? def.aimSpread : def.spread) * (me.onGround ? 1 : 2) * (moving && !me.aiming ? 1.4 : 1);
+    gap = spread / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * (innerHeight / 2);
+    gap = Math.max(def.pellets > 1 ? 12 : def.rocket ? 13 : def.scope ? 10 : 3, gap);
+  } else if (type === 'pico') gap = 6;
+  crossKick *= Math.exp(-dt * 9);
+  crossGap += (gap + crossKick - crossGap) * Math.min(1, dt * 18);
+  ui.crosshair.style.setProperty('--gap', crossGap.toFixed(1) + 'px');
 }
 
 function updateStorm(t) {
