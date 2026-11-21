@@ -56,7 +56,11 @@ def hacer_low():
         tmp.data = o.data.copy()
         tmp.name = '_tmp_' + o.name
         col.objects.link(tmp)
+        solid = 0
         for m in list(tmp.modifiers):
+            if m.type == 'SOLIDIFY':
+                m.shell_vertex_group = 'SF_Nueva'   # para saber después qué cara es la de adentro
+                solid = 1 if m.offset >= 0 else -1
             if m.type == 'SUBSURF':
                 tmp.modifiers.remove(m)
             elif m.type == 'MULTIRES':
@@ -83,6 +87,7 @@ def hacer_low():
         lo.matrix_world = o.matrix_world.copy()
         col.objects.link(lo)
         lo['fuente'] = o.name
+        lo['solid'] = solid
         bpy.data.objects.remove(tmp, do_unlink=True)
         for p in me.polygons:
             p.use_smooth = True
@@ -167,7 +172,22 @@ def _es_cabeza(ob, isla):
     return sum(zs) / len(zs) > CABEZA_Z
 
 
-def uvs(margen=0.006):
+def _es_interior(ob, isla):
+    # la cara de adentro de la tela (no se ve): con grosor hacia afuera es la original, si no la nueva
+    g = ob.vertex_groups.get('SF_Nueva')
+    if g is None:
+        return False
+    nueva = 0
+    tot = 0
+    for f in isla:
+        for v in f.verts:
+            tot += 1
+            nueva += 1 if any(e.group == g.index for e in ob.data.vertices[v.index].groups) else 0
+    frac = nueva / max(tot, 1)
+    return frac < 0.05 if ob['solid'] > 0 else frac > 0.95
+
+
+def uvs(margen=0.0015):
     objs = lows()
     cuerpo = [o for o in objs if o['fuente'] == 'Cuerpo']
     resto = [o for o in objs if o['fuente'] != 'Cuerpo']
@@ -188,8 +208,11 @@ def uvs(margen=0.006):
             _escalar_uv(o, k)
     for o in cuerpo:
         _escalar_uv(o, CABEZA_K, _es_cabeza)
+    for o in objs:
+        if o.get('solid'):
+            _escalar_uv(o, 0.3, _es_interior)
     _editar(objs)
-    bpy.ops.uv.pack_islands(rotate=True, margin=margen, shape_method='CONCAVE')
+    bpy.ops.uv.pack_islands(rotate=True, margin_method='ADD', margin=margen, shape_method='CONCAVE')
     bpy.ops.object.mode_set(mode='OBJECT')
     return len(objs)
 
