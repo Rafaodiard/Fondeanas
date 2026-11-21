@@ -21,7 +21,7 @@ OBJETIVO = {
     'RodilleraCorreaD0': 350, 'RodilleraCorreaD1': 350, 'HebillaArnes0': 300, 'HebillaArnes1': 300, 'Hebilla': 300,
 }
 METAL = ('HebillaArnes0', 'HebillaArnes1', 'Hebilla', 'ArgollaArnes', 'AntiparraAro0', 'AntiparraAro1')
-ROPA = ('Chaleco', 'RibeteChaleco')
+ROPA = ('Chaleco',)
 # escala relativa de textura (densidad) por pieza: la cara y los ojos se ven de cerca
 DENSIDAD = {'OjoI': 1.6, 'OjoD': 1.6, 'PeloArriba': 1.2, 'AntiparraLente0': 1.3, 'AntiparraLente1': 1.3}
 CABEZA_Z = 1.55   # islas del cuerpo por encima de esta altura van con más resolución
