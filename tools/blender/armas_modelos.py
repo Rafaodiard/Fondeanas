@@ -55,6 +55,13 @@ def rifle():
     torno(A, 'reten', [(0.0195, 0.0), (0.0195, 0.0048), (0.0232, 0.0048), (0.0240, 0.0035), (0.0240, 0.0)],
           'Acero', eje='x', centro=(0.060, 0.022), segs=14)
     caja(A, 'retencerrojo', (-0.0225, 0.040, 0.020), (0.004, 0.024, 0.010), 'Polimero', r=0.003)
+    # paneles moldeados (bajo relieve) a los dos lados del cajón inferior y estrías en el frente del brocal
+    caja(A, 'inferior_panelD', (0.0205, 0.100, 0.018), (0.0022, 0.064, 0.032), 'Polimero', r=0.005, bisel=0.0008)
+    caja(A, 'inferior_panelI', (-0.0205, 0.100, 0.018), (0.0022, 0.064, 0.032), 'Polimero', r=0.005, bisel=0.0008)
+    estr = cortador(A, 'brocal_estrias', cajas=[((0, 0.1435, -0.004 - 0.0055 * i), (0.05, 0.004, 0.0024), 0.0, 'x')
+                                               for i in range(6)])
+    prisma(A, 'brocal_frente', [(0.139, 0.010), (0.1445, 0.010), (0.1445, -0.034), (0.139, -0.034)], -0.0175, 0.0175,
+           'Polimero', n=0, bisel=0.0006, cortes=[estr])
     for y, zz in ((-0.042, 0.030), (0.137, 0.032), (0.012, 0.036)):
         tornillo(A, 'pasadorD%d' % int(y * 1000), (0.0205, y, zz), 'x', 0.0034, 0.0012)
         tornillo(A, 'pasadorI%d' % int(y * 1000), (-0.0205, y, zz), 'x', 0.0034, 0.0012, signo=-1)
@@ -66,6 +73,16 @@ def rifle():
     prisma(A, 'superior', [(-0.0245, 0.046), (0.0245, 0.046), (0.0245, 0.087, 0.002), (0.0175, 0.1, 0.002),
                            (-0.0175, 0.1, 0.002), (-0.0245, 0.087, 0.002)], -0.058, 0.205, 'Grafito', eje='y',
            bisel=0.0022, cortes=[corte_sup])
+    # asistente de cierre, tapa guardapolvo abierta y cortes de aligerado en el frente del cajón
+    torno(A, 'asistente', [(0.020, 0.0), (0.020, 0.0085), (0.0285, 0.0085), (0.0300, 0.0070), (0.0300, 0.0)],
+          'Grafito', eje='x', centro=(-0.030, 0.082), segs=18)
+    torno(A, 'asistente_boton', [(0.029, 0.0), (0.029, 0.0055), (0.0318, 0.0050), (0.0318, 0.0)], 'AceroOscuro',
+          eje='x', centro=(-0.030, 0.082), segs=14)
+    prisma(A, 'tapa_polvo', [(0.0250, 0.0590), (0.0262, 0.0599), (0.0365, 0.0452), (0.0353, 0.0443)], 0.025, 0.086,
+           'Pavonado', eje='y', n=0, bisel=0.0004)
+    for s2 in (1, -1):
+        prisma(A, 'aligerado%d' % s2, [(0.150, 0.054, 0.003), (0.196, 0.054, 0.003), (0.196, 0.080, 0.003)],
+               s2 * 0.0236, s2 * 0.0252, 'Pavonado', n=4, bisel=0.0004)
     # cerrojo visto por la ventana y manija de carga (se mueven juntos al montar el arma)
     caja(A, 'cerrojo', (0.0170, 0.055, 0.072), (0.010, 0.060, 0.019), 'Acero', r=0.003, grupo='cerrojo')
     torno(A, 'cerrojo_perno', [(0.019, 0.0), (0.019, 0.0045), (0.0225, 0.0045), (0.0225, 0.0)], 'AceroOscuro',
@@ -106,8 +123,12 @@ def rifle():
     # --- mira holográfica sobre el riel, con retícula de rareza
     caja(A, 'mira_base', (0, 0.043, 0.1135), (0.030, 0.082, 0.010), 'Polimero', r=0.002)
     ventana = cortador(A, 'mira', cajas=[((0, 0.047, 0.1415), (0.0265, 0.1, 0.030), 0.0045, 'y')])
-    prisma(A, 'mira', [(-0.0172, 0.118, 0.003), (0.0172, 0.118, 0.003), (0.0172, 0.162, 0.006),
-                       (-0.0172, 0.162, 0.006)], 0.022, 0.078, 'Polimero', eje='y', bisel=0.0018, cortes=[ventana])
+    prisma(A, 'mira', [(0.018, 0.118, 0.002), (0.080, 0.118, 0.002), (0.072, 0.163, 0.006), (0.030, 0.165, 0.006)],
+           -0.0172, 0.0172, 'Polimero', bisel=0.0018, cortes=[ventana])
+    for s2 in (1, -1):
+        torno(A, 'mira_perilla%d' % s2, [(s2 * 0.0172, 0.0), (s2 * 0.0172, 0.0058), (s2 * 0.0215, 0.0058),
+                                         (s2 * 0.0225, 0.0045), (s2 * 0.0225, 0.0)], 'Grafito', eje='x',
+              centro=(0.036, 0.128), segs=14, bisel=0.0)
     caja(A, 'mira_caja', (0, 0.012, 0.128), (0.031, 0.022, 0.022), 'Polimero', r=0.004)
     caja(A, 'mira_lente', (0, 0.071, 0.1415), (0.0272, 0.0016, 0.0305), 'Lente', r=0.004, eje='y', bisel=0.0)
     torno(A, 'mira_punto', [(0.0698, 0.0), (0.0698, 0.0019), (0.0702, 0.0019), (0.0702, 0.0)], 'Rareza',
