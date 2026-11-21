@@ -169,3 +169,28 @@ def reglas(m):
             VG['Spine2' if nombre in TORSO and nombre not in CADERA else 'Hips'].add([v.index], 1.0, 'REPLACE')
         cambios += 1
     return {'cambios': cambios}
+
+
+def zocalo():
+    # Hueso del arma en la mano derecha (no deforma): Y = hacia donde apunta el cañón (sigue a los nudillos),
+    # Z = arriba del arma (lado del índice), origen en el centro del puño. En glTF queda -Z cañón, +Y arriba.
+    arm = bpy.data.objects[ARM]
+    _sel([arm], arm)
+    bpy.ops.object.mode_set(mode='EDIT')
+    try:
+        eb = arm.data.edit_bones
+        h = eb['Hand.R']
+        M = h.matrix.to_3x3()
+        X, Y, Z = M.col[0], M.col[1], M.col[2]
+        o = eb.get('Arma.R') or eb.new('Arma.R')
+        c = h.head + Y * 0.085 - Z * 0.035
+        o.head = c
+        o.tail = c + Y * 0.08
+        o.align_roll(-X)
+        o.parent = h
+        o.use_connect = False
+        o.use_deform = False
+    finally:
+        bpy.ops.object.mode_set(mode='OBJECT')
+    b = arm.data.bones['Arma.R']
+    return {'head': [round(x, 4) for x in b.head_local], 'z': [round(x, 3) for x in b.matrix_local.col[2][:3]]}

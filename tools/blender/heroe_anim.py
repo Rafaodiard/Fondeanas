@@ -160,19 +160,41 @@ class Pose:
         self.fk()
         return self
 
-    def dedos(self, lado, curl=0.0, pulgar=0.0, abre=0.0):
-        # cierra los dedos (curl en grados por falange) y el pulgar
+    def dedos(self, lado, curl=0.0, pulgar=0.0, abre=0.0, indice=None, menique=None):
+        # cierra los dedos (grados por falange, positivo hacia la palma) y el pulgar; abre los separa en abanico.
+        # En este esqueleto la palma es el -Z local de la mano y de los dedos, así que cerrar es girar en -X.
+        s = 1.0 if lado == 'R' else -1.0       # el lado del índice es -X en la derecha y +X en la izquierda
+        abanico = {'Index': 1.0, 'Middle': 0.35, 'Ring': -0.35, 'Pinky': -1.0}
         for f in ('Index', 'Middle', 'Ring', 'Pinky'):
+            c = curl
+            if f == 'Index' and indice is not None:
+                c = indice
+            if f == 'Pinky' and menique is not None:
+                c = menique
             for i in (1, 2, 3):
                 n = '%s%d.%s' % (f, i, lado)
-                if n in self.base:
-                    self.base[n] = q_eje((1, 0, 0), curl * (0.8 if i == 1 else 1.0))
+                if n not in self.base:
+                    continue
+                q = q_eje((1, 0, 0), -c * (0.8 if i == 1 else 1.0))
+                if i == 1 and abre:
+                    q = q_eje((0, 0, 1), s * abre * abanico[f]) @ q
+                self.base[n] = q
         for i in (1, 2, 3):
             n = 'Thumb%d.%s' % (i, lado)
             if n in self.base:
-                self.base[n] = q_eje((1, 0, 0), pulgar * (0.5 if i == 1 else 1.0))
+                self.base[n] = q_eje((1, 0, 0), -pulgar * (0.5 if i == 1 else 1.0))
         self.fk()
         return self
+
+    def orientar(self, n, delta):
+        # orientación absoluta: la del reposo girada por 'delta' (matriz 3x3 en espacio del personaje)
+        self._set_world_rot(n, delta @ self.rest_world(n))
+        self.fk()
+        return self
+
+    def delta(self, n):
+        # cuánto giró el hueso respecto de su reposo (matriz 4x4 que lleva puntos del reposo a la pose)
+        return self.M[n] @ self.bones[n].matrix_local.inverted()
 
 
 # ---------------------------------------------------------------------------
