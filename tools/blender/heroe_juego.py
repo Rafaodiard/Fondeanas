@@ -541,7 +541,7 @@ def normales(aplicar=True):
         bm.faces.ensure_lookup_table()
         mw = o.matrix_world
         cerrado = all(e.is_manifold for e in bm.edges)
-        if cerrado:
+        if True:   # tubos abiertos en las puntas también se resuelven bien por volumen con signo
             vol = sum((mw @ f.calc_center_median()).dot((mw.to_3x3() @ f.normal)) * f.calc_area() for f in bm.faces)
             voltear = vol < 0
             score = vol
