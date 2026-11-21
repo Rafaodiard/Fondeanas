@@ -512,9 +512,10 @@ def estudio():
         nt.links.new(bg.outputs[0], mix.inputs[1])
         nt.links.new(bg2.outputs[0], mix.inputs[2])
         nt.links.new(mix.outputs[0], out.inputs[0])
-    nt.nodes['Fondo'].inputs[1].default_value = 1.0
-    for n, e, loc, rot, size in (('_LuzClave', 300, (0.9, -0.9, 1.0), (0.9, 0.0, 0.75), 0.6),
-                                 ('_LuzBorde', 250, (-0.8, 1.2, 0.6), (-1.0, 0.0, 3.6), 0.5)):
+    nt.nodes['Fondo'].inputs[1].default_value = 0.8
+    for n, e, loc, rot, size in (('_LuzClave', 70, (1.2, -0.6, 1.3), (0.75, 0.0, 2.05), 1.0),
+                                 ('_LuzBorde', 60, (-1.0, 1.4, 0.9), (-1.0, 0.0, 3.6), 0.8),
+                                 ('_LuzRelleno', 30, (-1.4, -0.4, 0.3), (1.35, 0.0, -1.85), 1.5)):
         ob = bpy.data.objects.get(n)
         if not ob:
             ld = bpy.data.lights.new(n, 'AREA')
