@@ -42,10 +42,12 @@ def cuerpo_pesos():
     _sel([c, arm], arm)
     bpy.ops.object.parent_set(type='ARMATURE_AUTO')
     faltan = [b.name for b in arm.data.bones if b.use_deform and b.name not in c.vertex_groups]
-    vacios = []
-    for g in c.vertex_groups:
-        if not any(g.index in [e.group for e in v.groups if e.weight > 0.01] for v in c.data.vertices[::7]):
-            vacios.append(g.name)
+    usados = set()
+    for v in c.data.vertices:
+        for e in v.groups:
+            if e.weight > 0.01:
+                usados.add(e.group)
+    vacios = [g.name for g in c.vertex_groups if g.index not in usados]
     return {'grupos': len(c.vertex_groups), 'faltan': faltan, 'vacios': vacios}
 
 
