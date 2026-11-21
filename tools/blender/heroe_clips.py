@@ -843,3 +843,47 @@ def ver(nombre, frames, vista=(math.radians(80), 0, math.radians(30)), centro=(0
                                              path=SF.OUT + r'\_anim.jpg')
     out['pad'] = 'x' * 150000
     return out
+
+
+# ---------------------------------------------------------------------------
+# Arma de prueba (cajas) colgada del hueso Arma.R, para mirar las poses.
+PROXIES = {
+    'rifle': [((0, 0.0, -0.025), (0.03, 0.045, 0.10)), ((0, 0.05, 0.065), (0.05, 0.30, 0.07)),
+              ((0, 0.34, 0.07), (0.05, 0.30, 0.05)), ((0, -0.16, 0.05), (0.045, 0.16, 0.09)),
+              ((0, 0.13, 0.0), (0.03, 0.06, 0.12)), ((0, 0.07, 0.125), (0.03, 0.10, 0.04)),
+              ((0, 0.56, 0.075), (0.02, 0.16, 0.02))],
+    'pistola': [((0, 0.0, -0.02), (0.03, 0.045, 0.10)), ((0, 0.06, 0.065), (0.03, 0.20, 0.035))],
+    'pico': [((0, 0.0, 0.24), (0.035, 0.035, 0.75)), ((0, 0.0, 0.56), (0.05, 0.06, 0.07)),
+             ((0, 0.14, 0.53), (0.03, 0.26, 0.04)), ((0, -0.08, 0.56), (0.035, 0.12, 0.05))],
+    'tubo': [((0, 0.0, -0.025), (0.03, 0.045, 0.10)), ((0, 0.20, 0.13), (0.13, 0.95, 0.13)),
+             ((0, APOYO, 0.0), (0.03, 0.04, 0.10))],
+}
+
+
+def proxy(tipo='rifle'):
+    import bmesh
+    arm = bpy.data.objects[ARM]
+    ob = bpy.data.objects.get('_ProxyArma')
+    if ob:
+        bpy.data.objects.remove(ob, do_unlink=True)
+    if not tipo:
+        return
+    me = bpy.data.meshes.new('_ProxyArma')
+    bm = bmesh.new()
+    for c, s in PROXIES[tipo]:
+        r = bmesh.ops.create_cube(bm, size=1.0)
+        for v in r['verts']:
+            v.co = Vector((v.co.x * s[0] + c[0], v.co.y * s[1] + c[1], v.co.z * s[2] + c[2]))
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new('_ProxyArma', me)
+    bpy.data.collections['HeroeFinal'].objects.link(ob)
+    mat = bpy.data.materials.get('_ProxyMat') or bpy.data.materials.new('_ProxyMat')
+    mat.diffuse_color = (0.12, 0.12, 0.13, 1)
+    me.materials.append(mat)
+    ob.parent = arm
+    ob.parent_type = 'BONE'
+    ob.parent_bone = 'Arma.R'
+    ob.matrix_parent_inverse = Matrix.Identity(4)
+    ob.location = (0, -arm.data.bones['Arma.R'].length, 0)
+    return ob
