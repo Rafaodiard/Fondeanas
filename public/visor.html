@@ -43,11 +43,12 @@
     <option value="">Nada (construcción)</option>
   </select>
   <label><input id="apunta" type="checkbox" style="width:auto"> Apuntando</label>
+  <div style="display:flex; gap:6px; margin-top:6px"><button id="recargar">Recargar (R)</button><button id="disparar">Disparar (F)</button></div>
   <label>Mirar arriba/abajo</label>
   <input id="pitch" type="range" min="-1.2" max="1.2" step="0.05" value="0">
   <label>Color de la ropa</label>
   <input id="color" type="color" value="#b33a3a">
-  <div id="info">Clic: golpe de pico · arrastrar: girar la cámara</div>
+  <div id="info">Doble clic o espacio: golpe de pico · arrastrar: girar la cámara</div>
 </div>
 <canvas id="c"></canvas>
 <script type="module">
@@ -55,7 +56,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { setRigEnv } from './js/rig.js';
 import { loadAssets } from './js/assets.js';
-import { createCharacter, animateCharacter, setHeld } from './js/models.js';
+import { createCharacter, animateCharacter, setHeld, weaponAction, weaponShot } from './js/models.js';
+import { WEAPONS } from './js/items.js';
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
@@ -99,7 +101,11 @@ const $ = (id) => document.getElementById(id);
 let pj = createCharacter($('color').value);
 scene.add(pj);
 const S = { estado: 'ground', vel: 0, mano: 'pico', apunta: false, pitch: 0, t: 0, vy: 0, dist: 0 };
-window.VISOR = { S, get pj() { return pj; }, THREE, scene, camera, renderer, controls, golpe: () => { pj.userData.swing = 1; } };
+const recargar = () => { if (WEAPONS[S.mano]) weaponAction(pj, 'reload', WEAPONS[S.mano].reload); };
+const disparar = () => { if (WEAPONS[S.mano]) { pj.userData.recoil = 1; weaponShot(pj, S.mano, S.apunta); } };
+window.VISOR = { S, get pj() { return pj; }, THREE, scene, camera, renderer, controls, golpe: () => { pj.userData.swing = 1; }, recargar, disparar };
+$('recargar').onclick = recargar;
+$('disparar').onclick = disparar;
 
 $('estado').onchange = (e) => { S.estado = e.target.value; S.t = 0; };
 $('vel').oninput = (e) => { S.vel = +e.target.value; $('vtxt').textContent = S.vel.toFixed(1); };
@@ -114,7 +120,11 @@ $('color').oninput = (e) => {
   setHeld(pj, held || null, '#4fa3ff');
 };
 canvas.addEventListener('dblclick', () => { pj.userData.swing = 1; });
-addEventListener('keydown', (e) => { if (e.code === 'Space') pj.userData.swing = 1; });
+addEventListener('keydown', (e) => {
+  if (e.code === 'Space') pj.userData.swing = 1;
+  if (e.code === 'KeyR') recargar();
+  if (e.code === 'KeyF') disparar();
+});
 
 const clock = new THREE.Clock();
 function frame() {
