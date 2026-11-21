@@ -190,7 +190,7 @@ def acabado(ob, bisel=0.002, segs=2, angulo=32, cortes=(), wn=True):
     if bisel > 0:
         b = ob.modifiers.new('Bisel', 'BEVEL')
         b.width = bisel
-        b.segments = segs
+        b.segments = 1 if bisel <= 0.0012 else segs
         b.limit_method = 'ANGLE'
         b.angle_limit = math.radians(angulo)
         b.harden_normals = True
@@ -247,7 +247,7 @@ def caja(A, nombre, c, t, mat, r=0.0, eje='x', **kw):
 
 
 def torno(A, nombre, perfil, mat, eje='y', centro=(0.0, 0.0), segs=28, fase=0.0, bisel=0.0012, angulo=32, cortes=(),
-          grupo='cuerpo', col=None, tapas=True):
+          grupo='cuerpo', col=None, tapas=True, cerrado=False):
     # perfil: [(h, r)] a lo largo del eje; r = 0 cierra en punta. centro: posición del eje en el plano normal.
     bm = bmesh.new()
     anillos = []
@@ -258,7 +258,12 @@ def torno(A, nombre, perfil, mat, eje='y', centro=(0.0, 0.0), segs=28, fase=0.0,
             anillos.append([bm.verts.new(_a3(eje, centro[0] + r * math.cos(fase + 2 * math.pi * k / segs),
                                               centro[1] + r * math.sin(fase + 2 * math.pi * k / segs), h))
                             for k in range(segs)])
-    for A1, B1 in zip(anillos, anillos[1:]):
+    pares = list(zip(anillos, anillos[1:]))
+    if cerrado:
+        # perfil cerrado (caños con pared): el último anillo se une con el primero
+        pares.append((anillos[-1], anillos[0]))
+        tapas = False
+    for A1, B1 in pares:
         if len(A1) == 1 and len(B1) == 1:
             continue
         if len(A1) == 1:
@@ -320,6 +325,62 @@ def tubo(A, nombre, puntos, radio, mat, segs=12, bisel=0.0, grupo='cuerpo', col=
     if A and col is None:
         A.add(ob, grupo)
     return ob
+
+
+def barrido(A, nombre, camino, secciones, mat, bisel=0.0012, grupo='cuerpo', col=None, punta=True, arriba=(1, 0, 0)):
+    # camino: puntos 3D; secciones: por punto, lista de (u, v) del contorno en el marco local (u = lado, v = normal)
+    # 'arriba' fija la orientación del lado u. Si punta, el último punto se cierra en un vértice.
+    P = [Vector(p) for p in camino]
+    up = Vector(arriba)
+    bm = bmesh.new()
+    anillos = []
+    for i, p in enumerate(P):
+        t = (P[min(i + 1, len(P) - 1)] - P[max(i - 1, 0)]).normalized()
+        n1 = (up - t * up.dot(t)).normalized()
+        n2 = t.cross(n1).normalized()
+        sec = secciones[i]
+        if sec is None:
+            anillos.append([bm.verts.new(p)])
+        else:
+            anillos.append([bm.verts.new(p + u * n1 + v * n2) for u, v in sec])
+    n = max(len(a) for a in anillos)
+    for A1, B1 in zip(anillos, anillos[1:]):
+        if len(B1) == 1:
+            for k in range(n):
+                bm.faces.new((A1[k], A1[(k + 1) % n], B1[0]))
+        elif len(A1) == 1:
+            for k in range(n):
+                bm.faces.new((A1[0], B1[(k + 1) % n], B1[k]))
+        else:
+            for k in range(n):
+                bm.faces.new((A1[k], A1[(k + 1) % n], B1[(k + 1) % n], B1[k]))
+    for a in (anillos[0], anillos[-1]):
+        if len(a) > 2:
+            bm.faces.new(a)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    ob = _obj(nombre, bm, mat, col or A.col)
+    acabado(ob, bisel, 2, 30)
+    if A and col is None:
+        A.add(ob, grupo)
+    return ob
+
+
+def rombo(a, b):
+    # sección en rombo de semiancho a (lado) y semialto b
+    return [(a, 0.0), (0.0, b), (-a, 0.0), (0.0, -b)]
+
+
+def rect(a, b, r=0.0, n=3):
+    return [tuple(p) for p in redondear([(-a, -b, r), (a, -b, r), (a, b, r), (-a, b, r)], n)]
+
+
+def arco(cx, cz, r0, r1, a0, a1, n=16):
+    # sección de un caño partido (de a0 a a1 grados) con radios interior r0 y exterior r1, en el plano (x, z)
+    ext = [(cx + r1 * math.cos(math.radians(a0 + (a1 - a0) * k / n)), cz + r1 * math.sin(math.radians(a0 + (a1 - a0) * k / n)))
+           for k in range(n + 1)]
+    inn = [(cx + r0 * math.cos(math.radians(a1 - (a1 - a0) * k / n)), cz + r0 * math.sin(math.radians(a1 - (a1 - a0) * k / n)))
+           for k in range(n + 1)]
+    return ext + inn
 
 
 # Cortadores (no se exportan): cajas, cilindros y series repetidas, todos en un solo objeto
