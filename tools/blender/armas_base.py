@@ -548,12 +548,13 @@ VISTAS = {
 
 
 def foto(A_nombre, vistas=('lado', 'tres4'), centro=(0, 0.25, 0.0), escala=1.1, res=(900, 520), solo=True,
-         dist=2.2):
+         dist=2.2, final=False):
     sc = estudio()
-    # mostrar solo la colección de la arma pedida
+    # mostrar solo el arma pedida: sus piezas (src_) o el resultado horneado (exp_)
+    pref = 'exp_' if final else 'src_'
     for c in sc.collection.children:
-        if c.name.startswith('src_'):
-            c.hide_render = solo and c.name != 'src_' + A_nombre
+        if c.name.startswith('src_') or c.name.startswith('exp_'):
+            c.hide_render = c.name != pref + A_nombre if solo else not c.name.startswith(pref)
     cam = bpy.data.objects.get('_CamArmas')
     if not cam:
         cd = bpy.data.cameras.new('_CamArmas')
