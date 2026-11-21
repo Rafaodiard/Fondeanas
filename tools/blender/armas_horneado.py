@@ -259,10 +259,12 @@ def hornear(nombre, res=1024, muestras=16):
     sc.render.bake.margin = 6
     _seleccionar(obs)
     try:
+        unicos = {m.name: m for lista in originales.values() for m in lista if m}
         for paso, img in (('color', color), ('orm', orm)):
+            temp = {n: _mat_horneo(m, img, paso) for n, m in unicos.items()}
             for o in obs:
                 for s, m in zip(o.material_slots, originales[o.name]):
-                    s.material = _mat_horneo(m, img, paso)
+                    s.material = temp[m.name]
             bpy.ops.object.bake(type='EMIT', margin=6, use_clear=True)
     finally:
         sc.render.engine = motor
