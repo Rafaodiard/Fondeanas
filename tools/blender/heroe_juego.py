@@ -499,6 +499,7 @@ def unir():
         col = bpy.data.collections.new('HeroeFinal')
         bpy.context.scene.collection.children.link(col)
     copias = []
+    nombres = [o['fuente'] for o in lows()]
     for o in lows():
         c = o.copy()
         c.data = o.data.copy()
@@ -510,6 +511,8 @@ def unir():
             p.material_index = 0
         for g in list(c.vertex_groups):
             c.vertex_groups.remove(g)
+        at = c.data.attributes.new('pieza', 'INT', 'POINT')
+        at.data.foreach_set('value', [nombres.index(f)] * len(c.data.vertices))
         copias.append(c)
     bpy.ops.object.mode_set(mode='OBJECT') if bpy.context.object and bpy.context.object.mode != 'OBJECT' else None
     for x in bpy.context.view_layer.objects:
@@ -523,6 +526,7 @@ def unir():
     j.data.name = 'HeroeJuego'
     for k in list(j.keys()):
         del j[k]
+    j['piezas'] = nombres
     return {'tris': sum(len(p.vertices) - 2 for p in j.data.polygons), 'mats': [m.name for m in j.data.materials]}
 
 

@@ -73,6 +73,7 @@ def transferir():
     # rígidos: la cabeza manda en pelo, antiparras y ojos (si no el pelo "se estira" con el cuello)
     head = m.vertex_groups.get('Head')
     bm_rigid_head(m, head)
+    reglas(m)
     _sel([m], m)
     bpy.ops.object.mode_set(mode='WEIGHT_PAINT')
     bpy.ops.object.vertex_group_smooth(group_select_mode='ALL', factor=0.5, repeat=2)
@@ -112,3 +113,48 @@ def pose_prueba(pose):
     for name, rot in pose.items():
         arm.pose.bones[name].rotation_euler = rot
     bpy.context.view_layer.update()
+
+
+# Piezas que no deben seguir a brazos o piernas (si no el chaleco "se levanta" con el brazo o la cadera)
+TORSO = ('Chaleco', 'RibeteChaleco', 'Arnes0', 'Arnes1', 'HebillaArnes0', 'HebillaArnes1', 'ArgollaArnes', 'Cargador0',
+         'CargadorTapa0', 'Cargador1', 'CargadorTapa1', 'BolsaRadio', 'Antena', 'Bufanda', 'BufandaVuelta',
+         'BufandaNudo', 'BufandaCola')
+CADERA = ('Chaleco', 'RibeteChaleco', 'Cinturon', 'Hebilla', 'Presillas', 'Cargador0', 'CargadorTapa0', 'Cargador1',
+          'CargadorTapa1', 'Arnes0', 'Arnes1')
+RIGIDO = {'FundaCuerpo': 'UpperLeg.R', 'FundaEmpunadura': 'UpperLeg.R', 'FundaPlaca': 'UpperLeg.R',
+          'BolsilloCargoI': 'UpperLeg.L', 'TapaCargoI': 'UpperLeg.L'}
+BRAZO = ('Shoulder', 'UpperArm', 'LowerArm', 'Hand', 'Thumb', 'Index', 'Middle', 'Ring', 'Pinky')
+PIERNA = ('UpperLeg', 'LowerLeg', 'Foot', 'Toe')
+
+
+def reglas(m):
+    piezas = list(m.get('piezas', []))
+    if not piezas or 'pieza' not in m.data.attributes:
+        return {}
+    pz = [0] * len(m.data.vertices)
+    m.data.attributes['pieza'].data.foreach_get('value', pz)
+    gname = {g.index: g.name for g in m.vertex_groups}
+    VG = m.vertex_groups
+    cambios = 0
+    for v in m.data.vertices:
+        nombre = piezas[pz[v.index]]
+        quitar = []
+        if nombre in TORSO:
+            quitar += [e.group for e in v.groups if gname[e.group].startswith(BRAZO[1:])]
+        if nombre in CADERA:
+            quitar += [e.group for e in v.groups if gname[e.group].startswith(PIERNA)]
+        if nombre in RIGIDO:
+            for e in list(v.groups):
+                VG[e.group].remove([v.index])
+            VG[RIGIDO[nombre]].add([v.index], 1.0, 'REPLACE')
+            cambios += 1
+            continue
+        if not quitar:
+            continue
+        resto = sum(e.weight for e in v.groups if e.group not in quitar)
+        for gi in set(quitar):
+            VG[gi].remove([v.index])
+        if resto < 1e-3:
+            VG['Spine2' if nombre in TORSO and nombre not in CADERA else 'Hips'].add([v.index], 1.0, 'REPLACE')
+        cambios += 1
+    return {'cambios': cambios}
