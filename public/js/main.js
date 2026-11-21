@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { World, makeStructMesh, MODEL } from './world.js';
 import { loadAssets, cloneAsset, bakedParts } from './assets.js';
-import { createCharacter, animateCharacter, createBus, createNameTag, createItemMesh, setHeld } from './models.js';
+import { createCharacter, animateCharacter, createBus, createNameTag, createItemMesh, setHeld, weaponAction, stopWeaponAction, weaponShot } from './models.js';
 import {
   WEAPONS, CONSUMABLES, AMMO, MATERIALS, MAT_ORDER, RARITIES, BUILD_COST, PICKAXE, SLOTS, GRID, DIRS,
   itemLabel, itemColor, weaponReload, structKey,
@@ -185,10 +185,17 @@ function handle(m) {
       o.target.fromArray(m.p);
       o.rotTarget = m.r; o.state = m.s; o.aiming = m.a; o.dance = !!m.b;
       if (m.h) setHeld(o.mesh, m.h[0], m.h[1]);
+      // recarga de los demás: empieza cuando aparece el tiempo restante y se corta si desaparece antes
+      const rl = m.rl || 0;
+      if (rl > 0 && !(o.rl > 0)) weaponAction(o.mesh, 'reload', rl);
+      else if (!rl && o.rl > 0.35) stopWeaponAction(o.mesh);
+      o.rl = rl;
       if (!o.seen) { o.mesh.position.copy(o.target); o.seen = true; }
       break;
     }
     case 'shot': {
+      const so = others.get(m.id);
+      if (so) { so.mesh.userData.recoil = 1; weaponShot(so.mesh, m.w, so.aiming); }
       const from = new THREE.Vector3().fromArray(m.from), to = new THREE.Vector3().fromArray(m.to);
       if (WEAPONS[m.w]?.rocket) addRocket(from, to); else addTracer(from, to, m.w);
       sfx.shot(m.w, from.distanceTo(me.pos));
@@ -562,7 +569,7 @@ function selectSlot(i) {
   me.sel = i;
   me.build = null; clearGhost();
   if (me.use) cancelUse();
-  if (me.reloadSlot >= 0 && me.reloadSlot !== i) { me.reloading = 0; me.reloadSlot = -1; }
+  if (me.reloadSlot >= 0 && me.reloadSlot !== i) { me.reloading = 0; me.reloadSlot = -1; stopWeaponAction(me.mesh); }
   sfx.click();
   updateSlots();
   // Recarga automática al sacar un arma vacía.
@@ -603,6 +610,7 @@ function startReload() {
   if (it.mag >= def.mag || !(me.ammo[def.ammo] > 0)) return;
   me.reloading = weaponReload(it);
   me.reloadSlot = me.sel;
+  weaponAction(me.mesh, 'reload', me.reloading);
   sendMsg({ t: 'reload', slot: me.sel });
   sfx.reload();
   updateSlots();
@@ -813,6 +821,7 @@ function tryShoot(it, def) {
   it.mag--;
   const muzzle = (me.mesh.userData.muzzle || me.mesh.userData.gun).getWorldPosition(new THREE.Vector3());
   me.mesh.userData.recoil = 1;
+  weaponShot(me.mesh, it.w, me.aiming);
   me.dance = false;
   const camDir = camera.getWorldDirection(new THREE.Vector3());
   const near = camera.position.distanceTo(me.pos) + 0.5;
@@ -1164,7 +1173,7 @@ function frame() {
       sendTimer = 1 / 15;
       const it = heldItem();
       const h = me.build ? [null] : !it ? ['pico'] : it.kind === 'weapon' ? [it.w, RARITIES[it.rarity].color] : ['item', CONSUMABLES[it.c].color];
-      sendMsg({ t: 'state', p: [+me.pos.x.toFixed(2), +me.pos.y.toFixed(2), +me.pos.z.toFixed(2)], r: +me.yaw.toFixed(3), s: me.state, a: (me.aiming || mouseDown) && it?.kind === 'weapon', h, b: !!me.dance });
+      sendMsg({ t: 'state', p: [+me.pos.x.toFixed(2), +me.pos.y.toFixed(2), +me.pos.z.toFixed(2)], r: +me.yaw.toFixed(3), s: me.state, a: (me.aiming || mouseDown) && it?.kind === 'weapon', h, b: !!me.dance, rl: me.reloading > 0 ? +me.reloading.toFixed(2) : 0 });
     }
   }
   updateEffects(dt);

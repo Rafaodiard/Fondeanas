@@ -6,7 +6,8 @@
 import bpy, bmesh, math, base64, os
 from mathutils import Vector, Matrix
 
-OUT = r'C:\Users\rafae\SaltoFinal_modelos'
+# carpeta de trabajo: la PC de Rafael por defecto; SF_OUT la cambia (p. ej. Blender sin ventana en la nube)
+OUT = os.environ.get('SF_OUT', r'C:\Users\rafae\SaltoFinal_modelos')
 ESCENA = 'Armas'
 
 
@@ -17,10 +18,16 @@ def V(*a):
 # ---------------------------------------------------------------------------
 # Escena y colecciones
 def escena():
+    wins = bpy.context.window_manager.windows
+    win = bpy.context.window or (wins[0] if len(wins) else None)
+    if win is None:
+        # sin interfaz (bpy como módulo): se renderiza la escena del contexto, así que se usa esa
+        sc = bpy.context.scene
+        sc.name = ESCENA
+        return sc
     sc = bpy.data.scenes.get(ESCENA)
     if not sc:
         sc = bpy.data.scenes.new(ESCENA)
-    win = bpy.context.window or bpy.context.window_manager.windows[0]
     if win.scene != sc:
         win.scene = sc
     return sc
@@ -587,6 +594,13 @@ def estudio():
         ob.location = loc
         ob.rotation_euler = rot
     sc.render.engine = 'BLENDER_EEVEE'
+    if os.environ.get('SF_MOTOR') == 'CYCLES':
+        # sin GPU (nube): Cycles en CPU con eliminador de ruido
+        sc.render.engine = 'CYCLES'
+        sc.cycles.device = 'CPU'
+        sc.cycles.samples = int(os.environ.get('SF_MUESTRAS', '48'))
+        sc.cycles.use_denoising = True
+        sc.cycles.max_bounces = 6
     sc.view_settings.view_transform = 'AgX'
     sc.view_settings.look = 'AgX - Medium High Contrast'
     try:

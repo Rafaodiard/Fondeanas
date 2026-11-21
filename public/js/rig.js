@@ -12,6 +12,11 @@ const LOCO = [['Quieto', 0, 0], ['Caminar', 1.6, 0.907], ['Trote', 3.5, 2.479], 
 const PIERNAS = /^(Hips|Spine|UpperLeg[LR]|LowerLeg[LR]|Foot[LR]|Toe[LR])$/;
 const POSE_ARMA = { pico: 'SostenerPico', rifle: 'Rifle', subfusil: 'Rifle', escopeta: 'Rifle', francotirador: 'Rifle', pistola: 'Pistola', lanzacohetes: 'Lanzacohetes', item: 'Objeto' };
 const APUNTA = { Rifle: 'RifleApunta', Pistola: 'PistolaApunta', Lanzacohetes: 'Lanzacohetes' };
+// Acciones de arma (animaciones_armas.glb): pisan la pose del torso y mueven las piezas del arma con el mismo clip.
+const RECARGA = { rifle: 'RecargaRifle', subfusil: 'RecargaSubfusil', pistola: 'RecargaPistola', escopeta: 'RecargaEscopeta', francotirador: 'RecargaFranco', lanzacohetes: 'RecargaCohete' };
+const BOMBEO = { escopeta: ['BombeoEscopeta', 'BombeoEscopetaApunta'] };
+const ACCIONES = new Set([...Object.values(RECARGA), ...Object.values(BOMBEO).flat()]);
+const PIEZAS = ['cargador', 'cerrojo', 'bomba', 'corredera', 'cohete', 'cartucho', 'bala'];
 const SALTO_APICE = 13 / 30;
 const ALTO_BARRA = 2.122; // altura de las manos en el planeador
 
@@ -158,7 +163,14 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
   if (u.swing > 0) { u.swing = 0; u.golpeT = 0; }
   u.golpeT += dt;
   const golpe = A.Golpe && u.golpeT < A.Golpe.dur && state === 'ground' && u.heldKind === 'pico';
+  const acc = u.accion;
+  if (acc) {
+    acc.t += dt;
+    if (acc.t >= acc.len || state !== 'ground' || dance) u.accion = null;
+  }
+  const accion = u.accion && A[u.accion.name] ? u.accion : null;
   if (golpe) over.Golpe = 1;
+  else if (accion) over[accion.name] = 1;
   else if (state === 'ground' && !dance && u.heldKind && POSE_ARMA[u.heldKind]) {
     let n = POSE_ARMA[u.heldKind];
     if (aiming && APUNTA[n]) n = APUNTA[n];
@@ -173,7 +185,7 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
     const a = A[n];
     const tp = base[n] || 0;
     const tt = (base[n] || 0) * (1 - O) + (over[n] || 0);
-    const k = n === 'Golpe' || (golpe && tt === 0) ? 22 : n === 'Salto' || base.Salto ? 14 : 10;
+    const k = n === 'Golpe' || (golpe && tt === 0) ? 22 : n === 'Salto' || base.Salto || ACCIONES.has(n) ? 14 : 10;
     a.wp = smooth(a.wp, tp, k, dt);
     a.wt = smooth(a.wt, tt, k, dt);
     if (a.wp < 1e-3 && tp === 0) a.wp = 0;
@@ -186,7 +198,11 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
       const vy = x.vy || 0;
       time = vy > 0 ? (1 - Math.min(1, vy / 8.5)) * SALTO_APICE : SALTO_APICE + Math.min(1, -vy / 12) * (a.dur - SALTO_APICE - 0.01);
     } else if (n === 'Golpe') time = Math.min(u.golpeT, a.dur - 0.001);
-    else {
+    else if (ACCIONES.has(n)) {
+      // la acción avanza con su propio largo (el tiempo de recarga del arma); al terminar queda en el último cuadro
+      if (accion && accion.name === n) a.clock = Math.min(accion.t / accion.len, 0.999) * a.dur;
+      time = a.clock;
+    } else {
       if (a.wp > 0 || a.wt > 0) a.clock += dt;
       time = a.clock % a.dur;
     }
@@ -195,6 +211,27 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
     a.t.setEffectiveWeight(a.wt);
   }
   u.mixer.update(0);
+
+  // ---- piezas del arma: el mismo clip en el modelo del arma, en el mismo punto del tiempo
+  const W = u.weapon;
+  if (W) {
+    const wa = accion && W.acts[accion.name];
+    if (wa) {
+      if (W.cur !== wa) { W.cur?.stop(); wa.reset().play(); wa.timeScale = 0; W.cur = wa; }
+      wa.time = Math.min(accion.t / accion.len, 0.999) * wa.getClip().duration;
+      W.mixer.update(0);
+    } else if (W.cur) { W.cur.stop(); W.cur = null; }
+    // corredera de la pistola: atrás y adelante en cada tiro
+    if (W.kick > 0) {
+      W.kick = Math.max(0, W.kick - dt * 11);
+      const p = W.parts.corredera;
+      if (p && !W.cur) {
+        const k = W.kick;
+        p.position.copy(W.rest.corredera);
+        p.position.z += 0.034 * (k > 0.75 ? (1 - k) / 0.25 : k / 0.75);
+      }
+    }
+  }
 
   // ---- extras: planeador, arma visible
   if (u.glider) u.glider.visible = state === 'glider';
@@ -206,7 +243,8 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
   _right.set(1, 0, 0).applyQuaternion(char.quaternion);
   const pitch = x.pitch || 0;
   const B = u.B;
-  const armed = !!over.Rifle || !!over.RifleApunta || !!over.Pistola || !!over.PistolaApunta || !!over.Lanzacohetes;
+  const armed = !!over.Rifle || !!over.RifleApunta || !!over.Pistola || !!over.PistolaApunta || !!over.Lanzacohetes ||
+    (accion && accion.kind === 'fire');
   if (armed) {
     // el cañón tiene que ir adonde mira la cámara: corrige el giro y la inclinación que trae la animación
     const fuerza = aiming ? 1 : 0.55;
@@ -234,4 +272,48 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
     rotWorld(B.spine2, _right, u.recoil * 0.06);
     u.recoil = Math.max(0, u.recoil - dt * 9);
   }
+}
+
+// Modelo de arma colgado de la mano: piezas móviles, su posición de reposo y un mezclador para sus clips.
+export function weaponRig(root, what) {
+  const pre = what + '_';
+  const parts = {}, rest = {};
+  for (const n of PIEZAS) {
+    const o = root.getObjectByName(pre + n);
+    if (o) { parts[n] = o; rest[n] = o.position.clone(); }
+  }
+  const mixer = new THREE.AnimationMixer(root);
+  const acts = {};
+  for (const c of ANIMS.armas || []) {
+    if (ACCIONES.has(c.name) && c.tracks.some((t) => t.name.startsWith(pre))) acts[c.name] = mixer.clipAction(c);
+  }
+  return { root, what, parts, rest, mixer, acts, cur: null, kick: 0 };
+}
+
+// Empieza una acción del arma en la mano: 'reload' (dura lo que tarda la recarga) o 'fire' (después de un tiro).
+export function rigAction(char, kind, duration = 0, aiming = false) {
+  const u = char.userData;
+  if (!u.rig) return;
+  const w = u.heldKind;
+  const name = kind === 'reload' ? RECARGA[w] : BOMBEO[w]?.[aiming ? 1 : 0];
+  if (!name || !u.acts[name]) { if (kind === 'reload') u.accion = null; return; }
+  if (kind === 'fire' && u.accion?.kind === 'reload') return;
+  u.accion = { name, kind, t: 0, len: duration > 0 ? duration : u.acts[name].dur };
+  if (kind === 'reload' && u.weapon?.parts.cohete) u.weapon.parts.cohete.visible = true;
+}
+
+export function rigStopAction(char) {
+  const u = char.userData;
+  if (u.accion?.kind === 'reload') u.accion = null;
+}
+
+// Un tiro: la corredera de la pistola, el bombeo de la escopeta y el cohete que sale del tubo.
+export function rigShot(char, what, aiming = false) {
+  const u = char.userData;
+  if (!u.rig || u.heldKind !== what) return;
+  if (u.accion?.kind === 'reload') u.accion = null;    // tirar corta lo que quedaba de la recarga
+  const W = u.weapon;
+  if (W?.parts.corredera) W.kick = 1;
+  if (W?.parts.cohete) W.parts.cohete.visible = false;
+  if (BOMBEO[what]) rigAction(char, 'fire', 0, aiming);
 }

@@ -5,7 +5,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 export const ASSETS = {};
 export const ANIMS = {};
-const FILES = ['personaje', 'bus', 'planeador', 'cofre', 'armas', 'objetos', 'casa', 'pino', 'arbol', 'roca'];
+const FILES = ['personaje', 'animaciones_armas', 'bus', 'planeador', 'cofre', 'armas', 'objetos', 'casa', 'pino', 'arbol', 'roca'];
 
 export async function loadAssets(onProgress) {
   const loader = new GLTFLoader();
@@ -23,6 +23,8 @@ export async function loadAssets(onProgress) {
     }
     onProgress?.(++done / FILES.length);
   }));
+  // recargas y bombeo del héroe: se suman a sus clips (las pistas se enganchan por nombre de hueso)
+  if (ANIMS.personaje && ANIMS.animaciones_armas?.length) ANIMS.personaje.push(...ANIMS.animaciones_armas);
   return ASSETS;
 }
 

@@ -34,6 +34,7 @@ class Pose:
                 rec(b)
         self.base = {n: Quaternion() for n in self.orden}
         self.loc = Vector()          # traslación de la cadera (espacio del personaje)
+        self.locs = {}               # traslación propia de otros huesos (p. ej. Arma.R cuando la mano suelta el arma)
         self.rest_rel = {}
         for n in self.orden:
             b = self.bones[n]
@@ -45,6 +46,8 @@ class Pose:
         for n in self.orden:
             b = self.bones[n]
             basis = self.base[n].to_matrix().to_4x4()
+            if n in self.locs:
+                basis = Matrix.Translation(self.locs[n]) @ basis
             if b.parent is None:
                 m = Matrix.Translation(self.loc) @ self.rest_rel[n] @ basis
             else:
@@ -239,6 +242,9 @@ def grabar(nombre, poses, loop=True, huesos=None):
             prev[n] = q
             pb.rotation_quaternion = q
             pb.keyframe_insert('rotation_quaternion', frame=fr, group=n)
+            if n in p.locs:
+                pb.location = p.locs[n]
+                pb.keyframe_insert('location', frame=fr, group=n)
         root = p.orden[0]
         pb = arm.pose.bones[root]
         pb.location = p.bones[root].matrix_local.to_3x3().inverted() @ p.loc

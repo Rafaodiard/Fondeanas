@@ -16,6 +16,8 @@ DESGASTE = {
     'Cinta': ((0.12, 0.11, 0.10), 0.5, 0.2), 'Cobre': ((0.95, 0.60, 0.40), 0.5, 0.5),
     'Ojiva': ((0.30, 0.32, 0.22), 0.6, 0.4), 'Pintura': ((0.85, 0.20, 0.12), 0.55, 0.4),
 }
+# veta de la madera: anillos alrededor del eje de la pieza (culata y bomba a lo largo del cañón, mango del pico vertical)
+VETA = {'Madera': ('Y', 34.0), 'MaderaClara': ('Z', 36.0)}
 
 
 def _sk(node, nombre, tipo='RGBA', salida=False):
@@ -136,6 +138,28 @@ def _mat_horneo(m, img, paso):
         mix = N('ShaderNodeMix')
         mix.data_type = 'RGBA'
         _sk(mix, 'A').default_value = (*p['c'], 1)
+        if m.name in VETA:
+            eje, escala = VETA[m.name]
+            ola = N('ShaderNodeTexWave')
+            ola.wave_type = 'RINGS'
+            ola.rings_direction = eje
+            ola.wave_profile = 'SAW'
+            ola.inputs['Scale'].default_value = escala
+            ola.inputs['Distortion'].default_value = 5.0
+            ola.inputs['Detail'].default_value = 4.0
+            ola.inputs['Detail Scale'].default_value = 1.2
+            L(coord.outputs['Object'], ola.inputs['Vector'])
+            vr = N('ShaderNodeMapRange')
+            vr.inputs['To Min'].default_value = 0.78
+            vr.inputs['To Max'].default_value = 1.10
+            L(ola.outputs['Fac'], vr.inputs['Value'])
+            veta = N('ShaderNodeMix')
+            veta.data_type = 'RGBA'
+            veta.blend_type = 'MULTIPLY'
+            _sk(veta, 'Factor', 'VALUE').default_value = 1.0
+            _sk(veta, 'A').default_value = (*p['c'], 1)
+            L(vr.outputs['Result'], _sk(veta, 'B'))
+            L(_sk(veta, 'Result', salida=True), _sk(mix, 'A'))
         _sk(mix, 'B').default_value = (*gasto, 1)
         fac = N('ShaderNodeMath')
         fac.operation = 'MULTIPLY'

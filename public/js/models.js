@@ -1,7 +1,9 @@
 // Modelos low-poly procedurales (provisorios hasta reemplazarlos por GLB hechos en Blender).
 import * as THREE from 'three';
 import { cloneAsset } from './assets.js';
-import { hasRig, createRigCharacter, animateRig, placeGlider } from './rig.js';
+import { hasRig, createRigCharacter, animateRig, placeGlider, weaponRig, rigAction, rigStopAction, rigShot } from './rig.js';
+
+export { rigAction as weaponAction, rigStopAction as stopWeaponAction, rigShot as weaponShot };
 
 const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.8, ...extra });
 
@@ -273,7 +275,11 @@ export function createItemMesh(item, color) {
   if (item.kind === 'weapon') {
     const w = createWeaponModel(item.w, color, true);
     if (!w.userData.glb) w.rotation.z = Math.PI / 2;
-    else w.position.z = 0.4;
+    else {
+      // centrado sobre el haz: el origen del modelo es el puño, no el medio del arma
+      const b = new THREE.Box3().setFromObject(w);
+      w.position.set(-(b.min.x + b.max.x) / 2, -(b.min.y + b.max.y) / 2, -(b.min.z + b.max.z) / 2);
+    }
     spin.add(w);
   } else if (prop) {
     spin.add(prop);
@@ -308,21 +314,29 @@ export function createItemMesh(item, color) {
 }
 
 // En el esqueleto el arma cuelga del hueso Arma.R: origen en el puño, cañón hacia -Z y arriba +Y
-// (igual que los modelos de armas.glb). El pico tiene el mango hacia +Y y la punta hacia -Z.
+// (igual que los modelos de armas.glb). El pico usa la misma convención: mango hacia +Y y la punta hacia -Z.
+// La boca del cañón sale del vacío <arma>_boca del modelo; esta tabla queda para los modelos procedurales.
 const BOCA = { pistola: 0.32, subfusil: 0.52, rifle: 0.76, escopeta: 0.8, francotirador: 1.2, lanzacohetes: 0.86 };
 
 function setHeldRig(u, what, color) {
   for (const c of [...u.gun.children]) if (c !== u.muzzle) u.gun.remove(c);
   u.heldKind = what || null;
+  u.weapon = null;
+  u.accion = null;
   u.muzzle.position.set(0, 0.09, -0.3);
   if (what === 'pico') {
     const glb = cloneAsset('armas', 'pico');
     const p = new THREE.Group();
-    if (glb) { glb.rotation.x = Math.PI / 2; p.add(glb); } else { const q = createPickaxe(); q.rotation.x = Math.PI; p.add(q); }
+    if (glb) p.add(glb); else { const q = createPickaxe(); q.rotation.x = Math.PI; p.add(q); }
     u.gun.add(p);
   } else if (WEAPON_SHAPES[what]) {
-    u.gun.add(createWeaponModel(what, color, true));
-    u.muzzle.position.set(0, what === 'lanzacohetes' ? 0.12 : 0.09, -(BOCA[what] || 0.6));
+    const w = createWeaponModel(what, color, true);
+    u.gun.add(w);
+    const glb = w.userData.glb ? w.children[0] : null;
+    const boca = glb?.getObjectByName(`${what}_boca`);
+    if (boca) u.muzzle.position.copy(boca.position);
+    else u.muzzle.position.set(0, what === 'lanzacohetes' ? 0.12 : 0.09, -(BOCA[what] || 0.6));
+    if (glb) u.weapon = weaponRig(glb, what);
   } else if (what) {
     u.heldKind = 'item';
     const it = box(0.16, 0.16, 0.16, std(color, { emissive: color, emissiveIntensity: 0.3 }), 0, 0.02, -0.06);

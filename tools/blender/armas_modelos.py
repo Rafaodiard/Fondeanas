@@ -257,9 +257,14 @@ def escopeta():
         prisma(A, 'culata_filete%d' % sx, [(-0.120, 0.071), (-0.200, 0.078), (-0.200, 0.0825), (-0.120, 0.0755)],
                sx * 0.0200, sx * 0.0214, 'Rareza', n=0, bisel=0.0)
     tornillo(A, 'anclaje', (0.0, -0.165, -0.0445), 'z', 0.0045, 0.0015, signo=-1)
+    # cartucho suelto para la recarga (oculto: aparece en la mano y entra por la ventana de carga)
+    torno(A, 'cartucho', [(0.108, 0.0), (0.108, 0.0088), (0.152, 0.0088), (0.154, 0.0074), (0.154, 0.0)], 'Cartucho',
+          centro=(0, 0.010), segs=14, bisel=0.0, grupo='cartucho')
+    torno(A, 'cartucho_base', [(0.096, 0.0), (0.096, 0.0094), (0.109, 0.0094), (0.109, 0.0)], 'Laton',
+          centro=(0, 0.010), segs=14, bisel=0.0, grupo='cartucho')
     A.punto('boca', (0, 0.715, z))
     A.punto('apoyo', (0, 0.28, 0.002))
-    return A, finalizar(A, {'bomba': (0, 0.28, 0.030)})
+    return A, finalizar(A, {'bomba': (0, 0.28, 0.030), 'cartucho': (0, 0.124, 0.010)})
 
 
 def francotirador():
@@ -347,10 +352,16 @@ def francotirador():
                       (0.0088, 0.0050), (0.0098, 0.0)], 'Polimero', eje='x', centro=(-0.052, z - 0.027), segs=16,
           bisel=0.0, grupo='cerrojo')
     A.piezas[-1][0].location.x = 0.050
+    # bala suelta para la recarga (oculta: se mete a mano por la ventana con el cerrojo abierto)
+    torno(A, 'bala', [(0.000, 0.0), (0.000, 0.0064), (0.004, 0.0064), (0.005, 0.0057), (0.007, 0.0062), (0.044, 0.0060),
+                      (0.050, 0.0044), (0.058, 0.0042), (0.058, 0.0)], 'Laton', centro=(0, z + 0.006), segs=14,
+          bisel=0.0, grupo='bala')
+    torno(A, 'bala_punta', [(0.057, 0.0), (0.057, 0.0040), (0.066, 0.0040), (0.078, 0.0022), (0.083, 0.0)], 'Cobre',
+          centro=(0, z + 0.006), segs=14, bisel=0.0, grupo='bala')
     A.punto('boca', (0, 1.102, z))
     A.punto('mira', (0, -0.128, M))
     A.punto('apoyo', (0, 0.26, 0.028))
-    return A, finalizar(A, {'cerrojo': (0, -0.070, z), 'cargador': (0, 0.081, -0.02)})
+    return A, finalizar(A, {'cerrojo': (0, -0.070, z), 'cargador': (0, 0.081, -0.02), 'bala': (0, 0.040, z + 0.006)})
 
 
 def pistola():
