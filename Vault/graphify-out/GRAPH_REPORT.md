@@ -1,17 +1,15 @@
-# Graph Report - fondeanas  (2026-11-24)
+# Graph Report - Fondeanas  (2026-11-24)
 
 ## Corpus Check
-- 27 files · ~59,088 words
-- Verdict: corpus is large enough that graph structure adds value.
-- Unclassified: 14 file(s) not represented in the graph (top: .glb 11, (none) 2, .css 1)
+- cluster-only mode — file stats not available
 
 ## Summary
-- 675 nodes · 1737 edges · 23 communities (22 shown, 1 thin omitted)
-- Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 225 edges (avg confidence: 0.85)
+- 675 nodes · 1738 edges · 23 communities (22 shown, 1 thin omitted)
+- Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 226 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a67db90c`
+- Built from commit: `9981e6fe`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -79,7 +77,7 @@ Nodes (38): reposo(), arma_en_manos(), base(), brazo(), brazos_sueltos(), clamp(
 
 ### Community 2 - "Servidor y datos compartidos"
 Cohesion: 0.08
-Nodes (50): AMMO, BUILD_COST, CHEST_WEIGHTS, CONSUMABLES, DIRS, FLOOR_WEIGHTS, MAT_ORDER, MAX_MATS (+42 more)
+Nodes (51): AMMO, BUILD_COST, CHEST_WEIGHTS, CONSUMABLES, DIRS, FLOOR_WEIGHTS, MAT_ORDER, MAX_MATS (+43 more)
 
 ### Community 3 - "Recargas de armas"
 Cohesion: 0.11
@@ -103,7 +101,7 @@ Nodes (14): GRID, MATERIALS, houseTints, makeNoise(), makeStructMesh(), mergeCon
 
 ### Community 8 - "Cliente: escena y estado"
 Cohesion: 0.05
-Nodes (33): btns, camera, camRay, camTarget, canvas, CAUSES, _cd, clock (+25 more)
+Nodes (36): btns, camera, camRay, camTarget, canvas, CAUSES, _cd, clock (+28 more)
 
 ### Community 9 - "Materiales del héroe"
 Cohesion: 0.24
@@ -118,28 +116,28 @@ Cohesion: 0.14
 Nodes (24): coleccion_low(), _dilatar(), _editar(), _es_cabeza(), _es_interior(), _escalar_uv(), fuentes(), _guardar() (+16 more)
 
 ### Community 12 - "Cliente: bucle y controles"
-Cohesion: 0.13
-Nodes (25): structKey(), buildTarget(), canAim(), doInteract(), drawMinimap(), dropHeld(), frame(), heldItem() (+17 more)
+Cohesion: 0.12
+Nodes (20): structKey(), buildTarget(), doInteract(), drawMinimap(), dropHeld(), enter(), frame(), jumpFromBus() (+12 more)
 
 ### Community 13 - "Cliente: red y mensajes"
-Cohesion: 0.13
-Nodes (22): addChat(), addDmgNum(), connect(), ensureWorld(), enter(), escapeHtml(), explosionFx(), handle() (+14 more)
+Cohesion: 0.15
+Nodes (21): addChat(), addDmgNum(), addItem(), connect(), ensureWorld(), escapeHtml(), explosionFx(), handle() (+13 more)
 
 ### Community 14 - "package.json"
 Cohesion: 0.13
 Nodes (15): author, dependencies, ws@^8.18.0, description, engines, node, keywords, license (+7 more)
 
 ### Community 15 - "Cliente: disparo y efectos"
-Cohesion: 0.21
-Nodes (12): addRocket(), addTracer(), castRay(), headDepth(), rayVsSphere(), sparks(), startReload(), structOf() (+4 more)
+Cohesion: 0.28
+Nodes (9): addRocket(), addTracer(), castRay(), headDepth(), rayVsSphere(), sparks(), structOf(), tryShoot() (+1 more)
 
 ### Community 16 - "Rig del héroe"
 Cohesion: 0.33
 Nodes (7): bm_rigid_head(), cuerpo_pesos(), reglas(), _sel(), transferir(), _transferir(), zocalo()
 
 ### Community 17 - "Cliente: inventario y HUD"
-Cohesion: 0.29
-Nodes (10): itemColor(), itemLabel(), addItem(), feed(), findInteract(), onInventory(), setupMatch(), updateHp() (+2 more)
+Cohesion: 0.33
+Nodes (7): itemColor(), itemLabel(), feed(), findInteract(), onInventory(), updateHud(), updatePrompt()
 
 ### Community 18 - "Horneado de armas"
 Cohesion: 0.42
@@ -154,8 +152,8 @@ Cohesion: 0.29
 Nodes (6): Capturas, Controles, Cómo jugar en tu compu, Estructura, Mecánicas, Salto Final
 
 ### Community 21 - "Cliente: slots"
-Cohesion: 0.50
-Nodes (5): cancelUse(), clearGhost(), selectSlot(), setBuild(), rigStopAction()
+Cohesion: 0.25
+Nodes (14): canAim(), cancelUse(), clearGhost(), heldItem(), selectSlot(), setBuild(), startReload(), startUse() (+6 more)
 
 ## Knowledge Gaps
 - **1 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
@@ -174,6 +172,6 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `escena()` connect `Modelado de armas` to `Horneado de armas`?**
   _High betweenness centrality (0.016) - this node is a cross-community bridge._
 - **Should `Servidor y datos compartidos` be split into smaller, more focused modules?**
-  _Cohesion score 0.08051948051948052 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07832080200501253 - nodes in this community are weakly interconnected._
 - **Should `Recargas de armas` be split into smaller, more focused modules?**
   _Cohesion score 0.1111111111111111 - nodes in this community are weakly interconnected._

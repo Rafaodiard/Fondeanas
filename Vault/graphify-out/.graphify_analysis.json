@@ -140,6 +140,7 @@
       "public_js_items_weapondamage",
       "public_js_items_weaponreload",
       "public_js_items_weapons",
+      "public_js_main_room",
       "ref_fs",
       "ref_http",
       "ref_path",
@@ -453,10 +454,11 @@
       "public_js_main_others",
       "public_js_main_playing",
       "public_js_main_raycaster",
+      "public_js_main_removeother",
       "public_js_main_renderer",
       "public_js_main_resize",
-      "public_js_main_room",
       "public_js_main_scene",
+      "public_js_main_setroom",
       "public_js_main_sky",
       "public_js_main_sparkgeo",
       "public_js_main_storageget",
@@ -471,7 +473,8 @@
       "public_js_main_updatestorm",
       "public_js_main_urlcode",
       "public_js_main_v",
-      "public_js_main_world"
+      "public_js_main_world",
+      "public_js_models_createnametag"
     ],
     "9": [
       "tools_blender_heroe_materiales",
@@ -575,26 +578,21 @@
     "12": [
       "public_js_items_structkey",
       "public_js_main_buildtarget",
-      "public_js_main_canaim",
       "public_js_main_dointeract",
       "public_js_main_drawminimap",
       "public_js_main_dropheld",
+      "public_js_main_enter",
       "public_js_main_frame",
-      "public_js_main_helditem",
       "public_js_main_jumpfrombus",
       "public_js_main_now",
       "public_js_main_onspace",
       "public_js_main_openglider",
       "public_js_main_sendmsg",
-      "public_js_main_startuse",
-      "public_js_main_tryuseheld",
+      "public_js_main_storageset",
       "public_js_main_updatebuild",
       "public_js_main_updatebus",
-      "public_js_main_updatecamera",
-      "public_js_main_updatecrosshair",
       "public_js_main_updateeffects",
       "public_js_main_updateitems",
-      "public_js_main_updateme",
       "public_js_main_updateothers",
       "public_js_main_updateuse",
       "public_js_models_animatecharacter"
@@ -602,9 +600,9 @@
     "13": [
       "public_js_main_addchat",
       "public_js_main_adddmgnum",
+      "public_js_main_additem",
       "public_js_main_connect",
       "public_js_main_ensureworld",
-      "public_js_main_enter",
       "public_js_main_escapehtml",
       "public_js_main_explosionfx",
       "public_js_main_handle",
@@ -613,15 +611,14 @@
       "public_js_main_ondeath",
       "public_js_main_onmatchend",
       "public_js_main_removeitem",
-      "public_js_main_removeother",
-      "public_js_main_setroom",
+      "public_js_main_setupmatch",
       "public_js_main_showcenter",
       "public_js_main_showlobby",
       "public_js_main_startspectating",
-      "public_js_main_storageset",
-      "public_js_main_updatehud",
+      "public_js_main_updatehp",
       "public_js_main_v3",
-      "public_js_models_createnametag"
+      "public_js_rig_rigaction",
+      "public_js_rig_rigshot"
     ],
     "14": [
       "package",
@@ -648,12 +645,9 @@
       "public_js_main_headdepth",
       "public_js_main_rayvssphere",
       "public_js_main_sparks",
-      "public_js_main_startreload",
       "public_js_main_structof",
       "public_js_main_tryshoot",
-      "public_js_main_tryswing",
-      "public_js_rig_rigaction",
-      "public_js_rig_rigshot"
+      "public_js_main_tryswing"
     ],
     "16": [
       "mathutils",
@@ -670,14 +664,11 @@
     "17": [
       "public_js_items_itemcolor",
       "public_js_items_itemlabel",
-      "public_js_main_additem",
       "public_js_main_feed",
       "public_js_main_findinteract",
       "public_js_main_oninventory",
-      "public_js_main_setupmatch",
-      "public_js_main_updatehp",
-      "public_js_main_updateprompt",
-      "public_js_main_updateslots"
+      "public_js_main_updatehud",
+      "public_js_main_updateprompt"
     ],
     "18": [
       "tools_blender_armas_horneado",
@@ -710,10 +701,19 @@
       "readme_salto_final"
     ],
     "21": [
+      "public_js_main_canaim",
       "public_js_main_canceluse",
       "public_js_main_clearghost",
+      "public_js_main_helditem",
       "public_js_main_selectslot",
       "public_js_main_setbuild",
+      "public_js_main_startreload",
+      "public_js_main_startuse",
+      "public_js_main_tryuseheld",
+      "public_js_main_updatecamera",
+      "public_js_main_updatecrosshair",
+      "public_js_main_updateme",
+      "public_js_main_updateslots",
       "public_js_rig_rigstopaction"
     ],
     "22": [
@@ -725,26 +725,26 @@
   "cohesion": {
     "0": 0.06721215663354763,
     "1": 0.12343358395989974,
-    "2": 0.08051948051948052,
+    "2": 0.07832080200501253,
     "3": 0.1111111111111111,
     "4": 0.1297134238310709,
     "5": 0.07712765957446809,
     "6": 0.09065679925994449,
     "7": 0.08637873754152824,
-    "8": 0.05263157894736842,
+    "8": 0.0524390243902439,
     "9": 0.23529411764705882,
     "10": 0.12121212121212122,
     "11": 0.14461538461538462,
-    "12": 0.12666666666666668,
-    "13": 0.12987012987012986,
+    "12": 0.11578947368421053,
+    "13": 0.1523809523809524,
     "14": 0.13333333333333333,
-    "15": 0.21212121212121213,
+    "15": 0.2777777777777778,
     "16": 0.3333333333333333,
-    "17": 0.28888888888888886,
+    "17": 0.3333333333333333,
     "18": 0.4222222222222222,
     "19": 0.42857142857142855,
     "20": 0.2857142857142857,
-    "21": 0.5,
+    "21": 0.25274725274725274,
     "22": 1.0
   },
   "gods": [
@@ -885,7 +885,7 @@
     {
       "type": "low_cohesion",
       "question": "Should `Servidor y datos compartidos` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.08051948051948052 - nodes in this community are weakly interconnected."
+      "why": "Cohesion score 0.07832080200501253 - nodes in this community are weakly interconnected."
     },
     {
       "type": "low_cohesion",

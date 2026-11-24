@@ -1,200 +1,194 @@
 {
   "package.json": {
-    "mtime": 1795553572.7752655,
-    "seen": 1795553965.3589747,
-    "ast_hash": "5983c14bab338e3703bec020eb0be6a4",
+    "mtime": 1795230841.0043812,
+    "seen": 1795554576.4376187,
+    "ast_hash": "3e99fb670fdb502be918fd380865f121",
     "semantic_hash": ""
   },
   "public/js/assets.js": {
-    "mtime": 1795553572.779476,
-    "seen": 1795553965.3589823,
-    "ast_hash": "bf440b189e0fbebb0de8df2357b5a450",
+    "mtime": 1795553224.3735921,
+    "seen": 1795554576.4376187,
+    "ast_hash": "fbcfd3a45157c530a3a4f72b729073a6",
     "semantic_hash": ""
   },
   "public/js/audio.js": {
-    "mtime": 1795553572.7795174,
-    "seen": 1795553965.3589857,
-    "ast_hash": "ce4e916b3cebf83072d789d035444a23",
+    "mtime": 1795230841.0095618,
+    "seen": 1795554576.4376187,
+    "ast_hash": "7adb448fda95bc7710622118d1dadf85",
     "semantic_hash": ""
   },
   "public/js/items.js": {
-    "mtime": 1795553572.7795174,
-    "seen": 1795553965.3589878,
-    "ast_hash": "eba06a362e169fc9994fc1bb52f5b9e8",
+    "mtime": 1795230841.0100682,
+    "seen": 1795554576.4376187,
+    "ast_hash": "bc654301d66c374f66f1ddac8013f42e",
     "semantic_hash": ""
   },
   "public/js/main.js": {
-    "mtime": 1795553572.7795174,
-    "seen": 1795553965.358989,
-    "ast_hash": "a24db7bf5dafff08509c8e242fcd4a27",
+    "mtime": 1795553224.3750958,
+    "seen": 1795554576.4376187,
+    "ast_hash": "5d140af6540ad750d755f32b011f4299",
     "semantic_hash": ""
   },
   "public/js/models.js": {
-    "mtime": 1795554444.1437645,
-    "seen": 1795554445.7039874,
-    "ast_hash": "39b873372159dd217996492fd01d2704",
+    "mtime": 1795554533.1491158,
+    "seen": 1795554576.4376187,
+    "ast_hash": "47308b67b877c131bdf06cb9aff3bd5d",
     "semantic_hash": ""
   },
   "public/js/rig.js": {
-    "mtime": 1795553572.7795174,
-    "seen": 1795553965.358992,
-    "ast_hash": "93d659a29a08a0aefd8fc4aa785e6e68",
+    "mtime": 1795553224.3781846,
+    "seen": 1795554576.4376187,
+    "ast_hash": "04f9a96d0111fc9dce80babaa4f9d61f",
     "semantic_hash": ""
   },
   "public/js/world.js": {
-    "mtime": 1795553572.7795174,
-    "seen": 1795553965.358993,
-    "ast_hash": "bdd7bc3ec8722f77038b8b882c03a6d9",
+    "mtime": 1795232259.3782935,
+    "seen": 1795554576.4376187,
+    "ast_hash": "8f53fcdbe2a89b229e7dd5904cef7433",
     "semantic_hash": ""
   },
   "server.js": {
-    "mtime": 1795553572.8055365,
-    "seen": 1795553965.3589942,
-    "ast_hash": "7bf12207bb634fcd5271dc588da425c6",
+    "mtime": 1795553224.3981826,
+    "seen": 1795554576.4376187,
+    "ast_hash": "09db06c6392ebea3f3adbaa2ca808aae",
     "semantic_hash": ""
   },
   "tools/blender/armas_base.py": {
-    "mtime": 1795553572.8092122,
-    "seen": 1795553965.3589957,
-    "ast_hash": "5f71d1bf70b7fe7f9706bed70476482c",
+    "mtime": 1795553224.3981826,
+    "seen": 1795554576.4376187,
+    "ast_hash": "6e5ea9713d34fd198e92811ddbc7b54e",
     "semantic_hash": ""
   },
   "tools/blender/armas_export.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.3589966,
-    "ast_hash": "17d506a50cfbcf9efae8c03c860d7eb9",
+    "mtime": 1795553224.3991828,
+    "seen": 1795554576.4376187,
+    "ast_hash": "5fdd58f1ad598586e6ce60a0ef8c2636",
     "semantic_hash": ""
   },
   "tools/blender/armas_horneado.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.358998,
-    "ast_hash": "674486a0ecb58aceb0d9c632f656731c",
+    "mtime": 1795553224.4001787,
+    "seen": 1795554576.4376187,
+    "ast_hash": "97c9a342149fd696ddc0c7ca7f3fb44e",
     "semantic_hash": ""
   },
   "tools/blender/armas_modelos.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.358999,
-    "ast_hash": "d3c6211abb4104a13fb397c39b87b108",
+    "mtime": 1795553224.4001787,
+    "seen": 1795554576.4376187,
+    "ast_hash": "0d7ae18fcdf3031073999b344f7a5a8b",
     "semantic_hash": ""
   },
   "tools/blender/heroe_anim.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.3590002,
-    "ast_hash": "7fa7d9a9eab4aa2bb68c100ff4bcd619",
+    "mtime": 1795553224.4016826,
+    "seen": 1795554576.4376187,
+    "ast_hash": "bbce9168df57c4c497cae323646ae318",
     "semantic_hash": ""
   },
   "tools/blender/heroe_cabeza.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.3590016,
-    "ast_hash": "4136ab82cc784255de6215794093317e",
+    "mtime": 1795230841.0466437,
+    "seen": 1795554576.4376187,
+    "ast_hash": "4673be0a132b65352193250ed2c2b5ad",
     "semantic_hash": ""
   },
   "tools/blender/heroe_clips.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.3590033,
-    "ast_hash": "128d3991f763c3207f5684a9ffceab45",
+    "mtime": 1795230841.0476503,
+    "seen": 1795554576.4376187,
+    "ast_hash": "f72c875c0ce163966ec1b5b347c98719",
     "semantic_hash": ""
   },
   "tools/blender/heroe_export.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.3590055,
-    "ast_hash": "8dc903e7e211554aa736a2fef0adfc27",
+    "mtime": 1795230841.0476503,
+    "seen": 1795554576.4376187,
+    "ast_hash": "ec48c5362990a208d98604ec57e6e511",
     "semantic_hash": ""
   },
   "tools/blender/heroe_juego.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.3590066,
-    "ast_hash": "e0498d239b05cdff6bc820662ae1bb8e",
+    "mtime": 1795230841.0476503,
+    "seen": 1795554576.4376187,
+    "ast_hash": "ef4feadb39ccf3d67720f06f3c788c2d",
     "semantic_hash": ""
   },
   "tools/blender/heroe_materiales.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.3590078,
-    "ast_hash": "17f88bb52e1ba34bea93f83a351d0ab5",
+    "mtime": 1795230841.0491543,
+    "seen": 1795554576.4376187,
+    "ast_hash": "a50fa87fbab044ed4067292999d0016c",
     "semantic_hash": ""
   },
   "tools/blender/heroe_recargas.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.3590095,
-    "ast_hash": "253c306c10b90e7a324c7dc4e58894a9",
+    "mtime": 1795553224.4020174,
+    "seen": 1795554576.4376187,
+    "ast_hash": "3dd9aede25dd897b6fe8b32b5b3d202b",
     "semantic_hash": ""
   },
   "tools/blender/heroe_rig.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.359011,
-    "ast_hash": "35f2d9214ea2350c155345e7dd1358a5",
+    "mtime": 1795230841.0491543,
+    "seen": 1795554576.4376187,
+    "ast_hash": "487d34581bbfdc256e8e35bc3a4fb480",
     "semantic_hash": ""
   },
   "tools/blender/heroe_ropa.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.359012,
-    "ast_hash": "705976ec1d4339f9e1c64b33dd5d2524",
+    "mtime": 1795230841.050618,
+    "seen": 1795554576.4376187,
+    "ast_hash": "0b8c0beb75b697886b7efc68f03a686f",
     "semantic_hash": ""
   },
   "tools/blender/recargas_control.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.3590136,
-    "ast_hash": "c9fee9d3bb481fe702688bb95c9ab9f0",
+    "mtime": 1795553224.4030313,
+    "seen": 1795554576.4376187,
+    "ast_hash": "490c73d3c0a2c012585aff7f5b8cc086",
     "semantic_hash": ""
   },
   "tools/blender/sf_tools.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.3590147,
-    "ast_hash": "8c321db8e96fb7ce03f73823ba436b81",
+    "mtime": 1795230841.050618,
+    "seen": 1795554576.4376187,
+    "ast_hash": "a7534c061af38c532922309c0463e24a",
     "semantic_hash": ""
   },
   "tools/texturas/cara.py": {
-    "mtime": 1795553572.8093596,
-    "seen": 1795553965.359016,
-    "ast_hash": "ab6b05064221cbf725821dbcee659ffb",
+    "mtime": 1795230841.0521224,
+    "seen": 1795554576.4376187,
+    "ast_hash": "cf977b1ea6402ee96ec16308271b0872",
     "semantic_hash": ""
   },
   "tools/texturas/tatuaje.py": {
-    "mtime": 1795553572.8106208,
-    "seen": 1795553965.3590171,
-    "ast_hash": "d9993922d1160cab9ebf59b56f350a10",
+    "mtime": 1795230841.0567017,
+    "seen": 1795554576.4376187,
+    "ast_hash": "cd4c02deee9cacaf2c27fa368e9754e4",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1795554444.1432357,
-    "seen": 1795554445.7040188,
-    "ast_hash": "a7845c1db3489bde50a708d9e79d36e4",
+    "mtime": 1795554533.1068313,
+    "seen": 1795554576.4376187,
+    "ast_hash": "1f88b12737037ef9ca5c78a07bd4e84a",
     "semantic_hash": ""
   },
   "public/index.html": {
-    "mtime": 1795553572.7752655,
-    "seen": 1795553965.3590193,
-    "ast_hash": "25a596e93a6bce34bd5025b28a16e120",
+    "mtime": 1795232259.3768704,
+    "seen": 1795554576.4376187,
+    "ast_hash": "fa0879ac934bcedc393077628c615103",
     "semantic_hash": ""
   },
   "public/visor.html": {
-    "mtime": 1795553572.8055365,
-    "seen": 1795553965.3590202,
-    "ast_hash": "e8c64e107ee38a20b8c44aac5542fa41",
+    "mtime": 1795553224.397179,
+    "seen": 1795554576.4376187,
+    "ast_hash": "98fcfca2b4ac2d3d85c916c0e6ba289e",
     "semantic_hash": ""
   },
   "tools/texturas/cara_a.png": {
-    "mtime": 1795553572.8106208,
-    "seen": 1795553965.3590214,
+    "mtime": 1795230841.0544124,
+    "seen": 1795554576.4376187,
     "ast_hash": "7bd7b25e8015b01735af8305527ecd0b",
     "semantic_hash": ""
   },
   "tools/texturas/cara_b.png": {
-    "mtime": 1795553572.8106208,
-    "seen": 1795553965.3590226,
+    "mtime": 1795230841.0556724,
+    "seen": 1795554576.4376187,
     "ast_hash": "877944fbc0fa1eb53b84c8b7dde4e853",
     "semantic_hash": ""
   },
   "tools/texturas/tatuaje.png": {
-    "mtime": 1795553572.8106208,
-    "seen": 1795553965.3590236,
+    "mtime": 1795230841.0556724,
+    "seen": 1795554576.4376187,
     "ast_hash": "06422e4d2f51a677f5c42a9369d6b05d",
-    "semantic_hash": ""
-  },
-  "package-lock.json": {
-    "mtime": 1795553572.7752655,
-    "seen": 1795553965.359025,
-    "ast_hash": "c52a8ee4e565f9d0e4b132d548dd440d",
     "semantic_hash": ""
   }
 }

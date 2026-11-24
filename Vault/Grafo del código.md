@@ -9,7 +9,7 @@ El grafo está en `Vault/graphify-out/`, generado con [graphify](https://pypi.or
 - `graph.json`: los datos crudos. Se puede consultar con `graphify query "<pregunta>" --graph Vault/graphify-out/graph.json`, `graphify explain "<nodo>"` o `graphify path "A" "B"`.
 - `.graphify_labels.json`: nombres de las comunidades, puestos a mano.
 
-Última generación: commit `ba49a40` de `main`, 2026-11-24. 675 nodos, 1737 relaciones, 23 comunidades.
+Última generación: 2026-11-24, en la PC de Rafael con graphify 0.9.95 (`graphifyy` instalado con `uv tool`), sobre el código del commit `9981e6f` de la rama `claude/project-thread-gas1mg`. 675 nodos, 1738 relaciones, 23 comunidades.
 
 ## Cómo regenerarlo
 
@@ -17,8 +17,11 @@ Desde la raíz del repo:
 
 ```bash
 pip install graphifyy
-GRAPHIFY_OUT=Vault/graphify-out graphify update .
+GRAPHIFY_OUT=Vault/graphify-out graphify update . --force
 ```
+
+- graphify deja una copia de respaldo con fecha (por ejemplo `Vault/graphify-out/2026-11-24/`); se borra antes de commitear.
+- Si graphify renombra una comunidad por su nodo principal (aviso "renamed ... by their hub" y un `.graphify_labels.pending.json`), se vuelve a poner el nombre en `.graphify_labels.json`, se borra el `.pending.json` y se corre `cluster-only` (abajo).
 
 - `.graphifyignore` deja afuera `Vault/` (para que el grafo no se lea a sí mismo ni a las notas) y `docs/` (capturas).
 - La caché (`Vault/graphify-out/cache/`) está en `.gitignore`.
