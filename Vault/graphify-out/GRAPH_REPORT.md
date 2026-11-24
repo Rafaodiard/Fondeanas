@@ -1,7 +1,9 @@
 # Graph Report - fondeanas  (2026-11-24)
 
 ## Corpus Check
-- cluster-only mode — file stats not available
+- 27 files · ~59,088 words
+- Verdict: corpus is large enough that graph structure adds value.
+- Unclassified: 14 file(s) not represented in the graph (top: .glb 11, (none) 2, .css 1)
 
 ## Summary
 - 675 nodes · 1737 edges · 23 communities (22 shown, 1 thin omitted)
@@ -9,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ba49a40d`
+- Built from commit: `a67db90c`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 

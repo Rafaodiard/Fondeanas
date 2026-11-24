@@ -48,7 +48,11 @@ Abrí http://localhost:3000, poné tu nombre y tocá **Crear sala**. Tus amigos 
 - `public/js/audio.js`: efectos de sonido sintetizados.
 - `public/models/*.glb`: modelos 3D hechos en Blender (personaje, bus volador, planeador, armas y pico, casa, pino, árbol, roca, cofre y objetos del piso). El color de la ropa, las rarezas y las paredes se tiñe en el juego.
 - `public/js/assets.js`: carga los GLB. Si alguno no carga, el juego usa los modelos procedurales de `models.js`.
-- `public/js/models.js`: arma los personajes, armas y objetos a partir de los GLB (o de primitivas como respaldo). Son provisorios, hechos con código, y la idea es reemplazarlos por modelos GLB hechos en Blender.
+- `public/js/models.js`: arma los personajes, el bus, el planeador, las armas y los objetos del piso a partir de los GLB. Si un GLB no carga, usa modelos low-poly hechos con primitivas como respaldo.
+- `public/js/rig.js`: anima el personaje con su esqueleto (capas de piernas y torso, mezcla de locomoción, poses de armas, recargas y bombeo).
+- `public/visor.html`: visor del personaje para revisar sus animaciones (`/visor.html`).
+- `tools/blender/`: scripts de Blender que generan el personaje (`heroe_*.py`), las armas (`armas_*.py`) y sus animaciones. `tools/texturas/`: máscaras de la cara y el tatuaje.
+- `Vault/`: vault de Obsidian que documenta el proyecto (empezar por `Vault/Inicio.md`) y grafo del código generado con graphify en `Vault/graphify-out`.
 - `public/js/main.js`: el juego en sí (cámara en tercera persona, física, disparo, HUD, minimapa, red).
 
 ## Capturas

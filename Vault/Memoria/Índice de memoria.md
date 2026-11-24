@@ -9,3 +9,4 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 - [[Visión del juego]]: qué juego es y hasta dónde parecerse a Fortnite.
 - [[Calidad antes que velocidad]]: prioridad de calidad.
 - [[Herramientas descartadas]]: cosas que se decidió no usar.
+- [[README siempre al día]]: actualizar el README en cada PR.

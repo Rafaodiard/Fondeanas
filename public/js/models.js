@@ -1,4 +1,4 @@
-// Modelos low-poly procedurales (provisorios hasta reemplazarlos por GLB hechos en Blender).
+// Personajes, bus, planeador, armas y objetos: usa los GLB hechos en Blender y, si alguno no cargó, modelos low-poly procedurales de respaldo.
 import * as THREE from 'three';
 import { cloneAsset } from './assets.js';
 import { hasRig, createRigCharacter, animateRig, placeGlider, weaponRig, rigAction, rigStopAction, rigShot } from './rig.js';

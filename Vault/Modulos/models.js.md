@@ -14,6 +14,4 @@ Archivo: `public/js/models.js`. Arma los objetos 3D del juego. Si el GLB corresp
 - `createItemMesh(item, color)`: objeto del piso (`objetos.glb`, materiales `Tinte`/`Mat`).
 - Reexporta de [[rig.js]]: `weaponAction`, `stopWeaponAction`, `weaponShot`.
 
-> El comentario de cabecera del archivo (y el README) todavía dicen que los modelos son "provisorios hasta reemplazarlos por GLB". Hoy el código ya usa los GLB primero y las primitivas son solo el respaldo.
-
 Usa [[assets.js]] y [[rig.js]]. Lo usan [[main.js]] y [[visor.html]].
