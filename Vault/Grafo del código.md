@@ -13,7 +13,7 @@ El grafo está en `Vault/graphify-out/`, generado con [graphify](https://pypi.or
 
 ## Cómo regenerarlo
 
-Desde la raíz del repo:
+Desde la raíz del repo, en la PC de Rafael (ver [[Graphify de la PC de Rafael]]):
 
 ```bash
 pip install graphifyy

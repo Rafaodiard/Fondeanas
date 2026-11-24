@@ -10,3 +10,4 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 - [[Calidad antes que velocidad]]: prioridad de calidad.
 - [[Herramientas descartadas]]: cosas que se decidió no usar.
 - [[README siempre al día]]: actualizar el README en cada PR.
+- [[Graphify de la PC de Rafael]]: el grafo se genera en su compu.
