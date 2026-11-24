@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Salto Final · Visor del mapa</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #7cc8ff; color: #fff; font: 14px system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; }
+  #panel { position: fixed; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.55); padding: 10px 12px; border-radius: 10px; max-width: 280px; }
+  #panel h1 { font-size: 15px; margin: 0 0 8px; }
+  #panel select { width: 100%; }
+  #info { margin-top: 8px; color: #cde; font-size: 12px; line-height: 1.4; }
+</style>
+<script type="importmap">
+  { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="panel">
+  <h1>Visor del mapa</h1>
+  <select id="ir"><option value="">Ir a…</option></select>
+  <div id="info">Arrastrá para girar, rueda para acercar, WASD para moverte. Q/E bajan y suben.</div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { World, MODEL } from './js/world.js';
+import { loadAssets, cloneAsset, bakedParts } from './js/assets.js';
+
+await loadAssets();
+MODEL.clone = cloneAsset; MODEL.baked = bakedParts;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const SKY = new THREE.Color('#7cc8ff');
+scene.background = SKY;
+scene.fog = new THREE.Fog(SKY, 400, 2200);
+scene.add(new THREE.HemisphereLight('#e6f6ff', '#4f8a3a', 1.25));
+const sun = new THREE.DirectionalLight('#fff1d6', 2.4);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+Object.assign(sun.shadow.camera, { left: -120, right: 120, top: 120, bottom: -120, near: 1, far: 800 });
+sun.shadow.bias = -0.0005;
+scene.add(sun, sun.target);
+const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 5000);
+const world = new World(1, 1200);
+world.build(scene);
+const controls = new OrbitControls(camera, renderer.domElement);
+camera.position.set(0, 700, 700);
+controls.target.set(0, 0, 0);
+function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+const sel = document.getElementById('ir');
+for (const p of world.pois) sel.add(new Option(p.name, p.id));
+function goTo(id, dist = 140) {
+  const p = world.pois.find((q) => q.id === id);
+  if (!p) return;
+  const y = world.terrainHeight(p.x, p.z);
+  controls.target.set(p.x, y, p.z);
+  camera.position.set(p.x + dist * 0.6, y + dist * 0.7, p.z + dist);
+}
+sel.onchange = () => goTo(sel.value);
+const keys = {};
+addEventListener('keydown', (e) => { keys[e.code] = true; });
+addEventListener('keyup', (e) => { keys[e.code] = false; });
+let last = performance.now();
+function frame(t) {
+  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; f.normalize();
+  const r = new THREE.Vector3(-f.z, 0, f.x), mv = new THREE.Vector3();
+  if (keys.KeyW) mv.add(f); if (keys.KeyS) mv.sub(f); if (keys.KeyD) mv.add(r); if (keys.KeyA) mv.sub(r);
+  if (keys.KeyE) mv.y += 1; if (keys.KeyQ) mv.y -= 1;
+  mv.multiplyScalar(dt * 60);
+  camera.position.add(mv); controls.target.add(mv);
+  controls.update();
+  sun.position.copy(controls.target).add(new THREE.Vector3(120, 220, 80));
+  sun.target.position.copy(controls.target);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+// Para capturas automáticas.
+window.MAPA = {
+  world, camera, controls, scene, renderer, goTo,
+  view(px, py, pz, tx, ty, tz) { camera.position.set(px, py, pz); controls.target.set(tx, ty, tz); controls.update(); },
+  // vista a la altura de los ojos (x,z del mundo, rumbo en grados: 0 = norte)
+  eye(x, z, yaw = 0, up = 1.7, pitch = -5, y = null) {
+    const g = y ?? world.groundHeight(x, z, 1e9);
+    const a = (yaw * Math.PI) / 180, p = (pitch * Math.PI) / 180;
+    camera.position.set(x, g + up, z);
+    controls.target.set(x + Math.sin(a) * Math.cos(p) * 5, g + up + Math.sin(p) * 5, z - Math.cos(a) * Math.cos(p) * 5);
+    controls.update();
+  },
+  poi(id) { return world.pois.find((q) => q.id === id); },
+  minimap() { const c = world.minimapImage(600); return c.toDataURL(); },
+  ready: true,
+};
+</script>
+</body>
+</html>

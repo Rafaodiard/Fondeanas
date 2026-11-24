@@ -1007,8 +1007,8 @@ function updateMe(dt) {
     me.vel.y -= GRAVITY * dt;
     if (!me.onGround) me.minVy = Math.min(me.minVy, me.vel.y);
   }
-  me.pos.addScaledVector(me.vel, dt);
-  world.collide(me.pos);
+  // pasos chicos con piso, techo y paredes: no se atraviesan techos ni pisos aunque se caiga rápido
+  world.moveBody(me.pos, me.vel, dt);
   const lim = world.size * 0.75;
   me.pos.x = Math.max(-lim, Math.min(lim, me.pos.x));
   me.pos.z = Math.max(-lim, Math.min(lim, me.pos.z));
