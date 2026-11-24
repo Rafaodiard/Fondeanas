@@ -1,0 +1,38 @@
+# server.js
+
+Volver a [[Inicio]] · [[Arquitectura]] · [[Protocolo de red]]
+
+Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.js`).
+
+## Qué hace
+
+1. **HTTP estático**: sirve `public/` en `/` y `node_modules/three/` en `/vendor/three/` (lo usa el import map de [[index.html]]).
+2. **WebSocket** (`ws`) sobre el mismo servidor: salas, partida y chat. Ver [[Protocolo de red]].
+3. **Tick** cada 100 ms (`TICK_MS`): pasa de `bus` a `playing`, fuerza el salto cuando termina el recorrido del bus y aplica la [[Tormenta]].
+
+## Constantes
+
+| Constante | Valor |
+|---|---|
+| `PORT` | `process.env.PORT` o 3000 |
+| `ISLAND_SIZE` | 1200 |
+| `BUS_DURATION` | 22 s |
+| `BUS_HEIGHT` | 260 |
+| `MAX_PLAYERS` | 16 |
+| `TICK_MS` | 100 |
+| `PICKUP_RANGE` | 3.2 |
+
+## Funciones principales
+
+- `makeCode`, `createRoom`, `roomInfo`, `matchSnapshot` → [[Salas y partidas]]
+- `startMatch`: crea el `World` ([[world.js]]), reparte loot del piso, arma el recorrido del bus y las fases de la tormenta, resetea jugadores.
+- `stormAt` → [[Tormenta]]
+- `damagePlayer` (el escudo absorbe primero), `killPlayer` (tira todo lo que tenía), `checkWinner`.
+- `addToInventory`, `spawnItem`, `spawnAround` → [[Loot y rarezas]]
+- `handleGame`: un `case` por mensaje de juego (salto, estado, loot, cofres, recarga, disparo, pico, construcción, consumibles, caída).
+- `explode` (lanzacohetes, daño en área; el que dispara recibe la mitad) y `damageStruct` → [[Armas y disparo]], [[Construcción]]
+
+## Usa
+
+- [[world.js]] (`World`)
+- [[items.js]] (armas, consumibles, munición, materiales, `structKey`, etc.)
