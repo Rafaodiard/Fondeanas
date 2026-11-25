@@ -14,7 +14,7 @@
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- Cabeza del héroe (Blender)
+- Ropa, cabeza, rig y export del héroe
 - Clips del héroe
 - Servidor y datos compartidos
 - Recargas de armas
@@ -67,7 +67,7 @@
 
 ## Communities (23 total, 1 thin omitted)
 
-### Community 0 - "Cabeza del héroe (Blender)"
+### Community 0 - "Ropa, cabeza, rig y export del héroe"
 Cohesion: 0.05
 Nodes (53): exportar_armas(), exportar_clips(), pistas_piezas(), reposo_piezas(), _seleccion(), _ver_colecciones(), _fcurves(), grabar() (+45 more)
 
@@ -163,9 +163,9 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `World` connect `Mundo e isla` to `Cliente: escena y estado`, `Servidor y datos compartidos`, `Cliente: red y mensajes`?**
   _High betweenness centrality (0.034) - this node is a cross-community bridge._
-- **Should `Cabeza del héroe (Blender)` be split into smaller, more focused modules?**
+- **Should `Ropa, cabeza, rig y export del héroe` be split into smaller, more focused modules?**
   _Cohesion score 0.050351721584598295 - nodes in this community are weakly interconnected._
-- **Why does `Pose` connect `Animación base y export` to `Cabeza del héroe (Blender)`, `Clips del héroe`?**
+- **Why does `Pose` connect `Animación base y export` to `Ropa, cabeza, rig y export del héroe`, `Clips del héroe`?**
   _High betweenness centrality (0.025) - this node is a cross-community bridge._
 - **Should `Clips del héroe` be split into smaller, more focused modules?**
   _Cohesion score 0.12343358395989974 - nodes in this community are weakly interconnected._
