@@ -36,9 +36,9 @@
     "semantic_hash": ""
   },
   "public/js/rig.js": {
-    "mtime": 1795553224.3781846,
-    "seen": 1795554576.4376187,
-    "ast_hash": "04f9a96d0111fc9dce80babaa4f9d61f",
+    "mtime": 1795571495.0276875,
+    "seen": 1795571520.7916927,
+    "ast_hash": "907c9e20930acd5b73d1fbfc39a0ba1e",
     "semantic_hash": ""
   },
   "public/js/world.js": {
@@ -90,15 +90,15 @@
     "semantic_hash": ""
   },
   "tools/blender/heroe_clips.py": {
-    "mtime": 1795230841.0476503,
-    "seen": 1795554576.4376187,
-    "ast_hash": "f72c875c0ce163966ec1b5b347c98719",
+    "mtime": 1795571495.062032,
+    "seen": 1795571520.7916927,
+    "ast_hash": "da3ba5b434e441846aecbab4365da1ed",
     "semantic_hash": ""
   },
   "tools/blender/heroe_export.py": {
-    "mtime": 1795230841.0476503,
-    "seen": 1795554576.4376187,
-    "ast_hash": "ec48c5362990a208d98604ec57e6e511",
+    "mtime": 1795571495.0630322,
+    "seen": 1795571520.7916927,
+    "ast_hash": "d59843684d8db7727deae800df5973af",
     "semantic_hash": ""
   },
   "tools/blender/heroe_juego.py": {
@@ -114,9 +114,9 @@
     "semantic_hash": ""
   },
   "tools/blender/heroe_recargas.py": {
-    "mtime": 1795553224.4020174,
-    "seen": 1795554576.4376187,
-    "ast_hash": "3dd9aede25dd897b6fe8b32b5b3d202b",
+    "mtime": 1795571495.065033,
+    "seen": 1795571520.7916927,
+    "ast_hash": "632d4f73357eeb0f81eb463262cccfa6",
     "semantic_hash": ""
   },
   "tools/blender/heroe_rig.py": {
@@ -156,9 +156,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1795554533.1068313,
-    "seen": 1795554576.4376187,
-    "ast_hash": "1f88b12737037ef9ca5c78a07bd4e84a",
+    "mtime": 1795571495.0179663,
+    "seen": 1795571520.7916927,
+    "ast_hash": "71a1539cd6edf62acfc96c30cd46e355",
     "semantic_hash": ""
   },
   "public/index.html": {
@@ -189,6 +189,12 @@
     "mtime": 1795230841.0556724,
     "seen": 1795554576.4376187,
     "ast_hash": "06422e4d2f51a677f5c42a9369d6b05d",
+    "semantic_hash": ""
+  },
+  "tools/blender/armas_choque.py": {
+    "mtime": 1795571495.061032,
+    "seen": 1795571520.7916927,
+    "ast_hash": "40d421ff3158a27eafd77199ef4ade50",
     "semantic_hash": ""
   }
 }

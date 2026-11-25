@@ -1,10 +1,22 @@
 {
   "communities": {
     "0": [
+      "base64",
+      "bpy",
       "math",
-      "numpy",
-      "pil",
-      "sys",
+      "mathutils",
+      "tools_blender_armas_export",
+      "tools_blender_armas_export_exportar_armas",
+      "tools_blender_armas_export_exportar_clips",
+      "tools_blender_armas_export_pistas_piezas",
+      "tools_blender_armas_export_reposo_piezas",
+      "tools_blender_armas_export_seleccion",
+      "tools_blender_armas_export_ver_colecciones",
+      "tools_blender_heroe_anim",
+      "tools_blender_heroe_anim_aplicar",
+      "tools_blender_heroe_anim_fcurves",
+      "tools_blender_heroe_anim_grabar",
+      "tools_blender_heroe_anim_rad",
       "tools_blender_heroe_cabeza",
       "tools_blender_heroe_cabeza_antiparras",
       "tools_blender_heroe_cabeza_az",
@@ -17,6 +29,20 @@
       "tools_blender_heroe_cabeza_pelo_zt",
       "tools_blender_heroe_cabeza_scalp",
       "tools_blender_heroe_cabeza_tab",
+      "tools_blender_heroe_export",
+      "tools_blender_heroe_export_exportar",
+      "tools_blender_heroe_export_solo",
+      "tools_blender_heroe_export_trozo",
+      "tools_blender_heroe_recargas_animar_piezas",
+      "tools_blender_heroe_rig",
+      "tools_blender_heroe_rig_bm_rigid_head",
+      "tools_blender_heroe_rig_cuerpo_pesos",
+      "tools_blender_heroe_rig_pose_prueba",
+      "tools_blender_heroe_rig_reglas",
+      "tools_blender_heroe_rig_sel",
+      "tools_blender_heroe_rig_transferir",
+      "tools_blender_heroe_rig_transferir_3fb973",
+      "tools_blender_heroe_rig_zocalo",
       "tools_blender_heroe_ropa",
       "tools_blender_heroe_ropa_bolsillos_cargo",
       "tools_blender_heroe_ropa_botas",
@@ -48,18 +74,7 @@
       "tools_blender_heroe_ropa_suela_tpar",
       "tools_blender_heroe_ropa_suela_zb",
       "tools_blender_heroe_ropa_thumb",
-      "tools_blender_heroe_ropa_todo",
-      "tools_texturas_cara",
-      "tools_texturas_cara_blank",
-      "tools_texturas_cara_brow",
-      "tools_texturas_cara_ellipse",
-      "tools_texturas_cara_main",
-      "tools_texturas_cara_poly",
-      "tools_texturas_cara_px",
-      "tools_texturas_tatuaje",
-      "tools_texturas_tatuaje_main",
-      "tools_texturas_tatuaje_star",
-      "tools_texturas_tatuaje_wing"
+      "tools_blender_heroe_ropa_todo"
     ],
     "1": [
       "tools_blender_heroe_anim_reposo",
@@ -128,19 +143,19 @@
       "public_js_items_consumables",
       "public_js_items_dirs",
       "public_js_items_floor_weights",
-      "public_js_items_mat_order",
+      "public_js_items_grid",
+      "public_js_items_materials",
       "public_js_items_max_mats",
       "public_js_items_pickaxe",
       "public_js_items_randomammo",
       "public_js_items_randomconsumable",
       "public_js_items_randomweapon",
-      "public_js_items_rarities",
       "public_js_items_rollrarity",
       "public_js_items_slots",
+      "public_js_items_structkey",
       "public_js_items_weapondamage",
       "public_js_items_weaponreload",
       "public_js_items_weapons",
-      "public_js_main_room",
       "ref_fs",
       "ref_http",
       "ref_path",
@@ -233,12 +248,11 @@
       "tools_blender_heroe_recargas_recarga_toma",
       "tools_blender_heroe_recargas_rot",
       "tools_blender_heroe_recargas_rot_arma",
-      "tools_blender_heroe_recargas_tr"
+      "tools_blender_heroe_recargas_tr",
+      "tools_blender_heroe_recargas_vuelta"
     ],
     "4": [
-      "base64",
       "bmesh",
-      "bpy",
       "os",
       "tools_blender_armas_base",
       "tools_blender_armas_base_a3",
@@ -283,11 +297,7 @@
       "tools_blender_armas_modelos_pico",
       "tools_blender_armas_modelos_pistola",
       "tools_blender_armas_modelos_rifle",
-      "tools_blender_armas_modelos_subfusil",
-      "tools_blender_heroe_export",
-      "tools_blender_heroe_export_exportar",
-      "tools_blender_heroe_export_solo",
-      "tools_blender_heroe_export_trozo"
+      "tools_blender_armas_modelos_subfusil"
     ],
     "5": [
       "builtins",
@@ -378,6 +388,8 @@
       "public_js_rig_qa",
       "public_js_rig_qp",
       "public_js_rig_recarga",
+      "public_js_rig_retro",
+      "public_js_rig_retroceso",
       "public_js_rig_rigclips",
       "public_js_rig_right",
       "public_js_rig_rotworld",
@@ -389,8 +401,6 @@
       "ref_three"
     ],
     "7": [
-      "public_js_items_grid",
-      "public_js_items_materials",
       "public_js_world",
       "public_js_world_housetints",
       "public_js_world_makenoise",
@@ -434,6 +444,8 @@
       "public_js_world_world_updatestructs"
     ],
     "8": [
+      "public_js_items_mat_order",
+      "public_js_items_rarities",
       "public_js_main",
       "public_js_main_addclouds",
       "public_js_main_btns",
@@ -454,11 +466,10 @@
       "public_js_main_others",
       "public_js_main_playing",
       "public_js_main_raycaster",
-      "public_js_main_removeother",
       "public_js_main_renderer",
       "public_js_main_resize",
+      "public_js_main_room",
       "public_js_main_scene",
-      "public_js_main_setroom",
       "public_js_main_sky",
       "public_js_main_sparkgeo",
       "public_js_main_storageget",
@@ -473,8 +484,7 @@
       "public_js_main_updatestorm",
       "public_js_main_urlcode",
       "public_js_main_v",
-      "public_js_main_world",
-      "public_js_models_createnametag"
+      "public_js_main_world"
     ],
     "9": [
       "tools_blender_heroe_materiales",
@@ -513,17 +523,6 @@
       "tools_blender_heroe_materiales_variado"
     ],
     "10": [
-      "tools_blender_armas_export",
-      "tools_blender_armas_export_exportar_armas",
-      "tools_blender_armas_export_exportar_clips",
-      "tools_blender_armas_export_pistas_piezas",
-      "tools_blender_armas_export_reposo_piezas",
-      "tools_blender_armas_export_seleccion",
-      "tools_blender_armas_export_ver_colecciones",
-      "tools_blender_heroe_anim",
-      "tools_blender_heroe_anim_aplicar",
-      "tools_blender_heroe_anim_fcurves",
-      "tools_blender_heroe_anim_grabar",
       "tools_blender_heroe_anim_pose",
       "tools_blender_heroe_anim_pose_aim",
       "tools_blender_heroe_anim_pose_dedos",
@@ -543,9 +542,7 @@
       "tools_blender_heroe_anim_pose_rot_local",
       "tools_blender_heroe_anim_pose_set_world_rot",
       "tools_blender_heroe_anim_pose_tail",
-      "tools_blender_heroe_anim_q_eje",
-      "tools_blender_heroe_anim_rad",
-      "tools_blender_heroe_recargas_animar_piezas"
+      "tools_blender_heroe_anim_q_eje"
     ],
     "11": [
       "tools_blender_heroe_juego",
@@ -576,23 +573,25 @@
       "tools_blender_heroe_juego_uvs"
     ],
     "12": [
-      "public_js_items_structkey",
-      "public_js_main_buildtarget",
+      "public_js_main_canaim",
       "public_js_main_dointeract",
       "public_js_main_drawminimap",
       "public_js_main_dropheld",
-      "public_js_main_enter",
       "public_js_main_frame",
+      "public_js_main_helditem",
       "public_js_main_jumpfrombus",
       "public_js_main_now",
       "public_js_main_onspace",
       "public_js_main_openglider",
       "public_js_main_sendmsg",
-      "public_js_main_storageset",
-      "public_js_main_updatebuild",
+      "public_js_main_startuse",
+      "public_js_main_tryuseheld",
       "public_js_main_updatebus",
+      "public_js_main_updatecamera",
+      "public_js_main_updatecrosshair",
       "public_js_main_updateeffects",
       "public_js_main_updateitems",
+      "public_js_main_updateme",
       "public_js_main_updateothers",
       "public_js_main_updateuse",
       "public_js_models_animatecharacter"
@@ -600,9 +599,9 @@
     "13": [
       "public_js_main_addchat",
       "public_js_main_adddmgnum",
-      "public_js_main_additem",
       "public_js_main_connect",
       "public_js_main_ensureworld",
+      "public_js_main_enter",
       "public_js_main_escapehtml",
       "public_js_main_explosionfx",
       "public_js_main_handle",
@@ -611,12 +610,15 @@
       "public_js_main_ondeath",
       "public_js_main_onmatchend",
       "public_js_main_removeitem",
-      "public_js_main_setupmatch",
+      "public_js_main_removeother",
+      "public_js_main_setroom",
       "public_js_main_showcenter",
       "public_js_main_showlobby",
       "public_js_main_startspectating",
-      "public_js_main_updatehp",
+      "public_js_main_storageset",
+      "public_js_main_updatehud",
       "public_js_main_v3",
+      "public_js_models_createnametag",
       "public_js_rig_rigaction",
       "public_js_rig_rigshot"
     ],
@@ -650,24 +652,40 @@
       "public_js_main_tryswing"
     ],
     "16": [
-      "mathutils",
-      "tools_blender_heroe_rig",
-      "tools_blender_heroe_rig_bm_rigid_head",
-      "tools_blender_heroe_rig_cuerpo_pesos",
-      "tools_blender_heroe_rig_pose_prueba",
-      "tools_blender_heroe_rig_reglas",
-      "tools_blender_heroe_rig_sel",
-      "tools_blender_heroe_rig_transferir",
-      "tools_blender_heroe_rig_transferir_3fb973",
-      "tools_blender_heroe_rig_zocalo"
+      "numpy",
+      "pil",
+      "sys",
+      "tools_blender_armas_choque",
+      "tools_blender_armas_choque_casco",
+      "tools_blender_armas_choque_casco_cr",
+      "tools_blender_armas_choque_control_choque",
+      "tools_blender_armas_choque_control_choque_pts",
+      "tools_blender_armas_choque_prep",
+      "tools_blender_armas_choque_profundidad",
+      "tools_blender_armas_choque_puntos_arma",
+      "tools_blender_armas_choque_puntos_arma_rec",
+      "tools_blender_armas_choque_torso",
+      "tools_texturas_cara",
+      "tools_texturas_cara_blank",
+      "tools_texturas_cara_brow",
+      "tools_texturas_cara_ellipse",
+      "tools_texturas_cara_main",
+      "tools_texturas_cara_poly",
+      "tools_texturas_cara_px",
+      "tools_texturas_tatuaje",
+      "tools_texturas_tatuaje_main",
+      "tools_texturas_tatuaje_star",
+      "tools_texturas_tatuaje_wing"
     ],
     "17": [
       "public_js_items_itemcolor",
       "public_js_items_itemlabel",
+      "public_js_main_additem",
       "public_js_main_feed",
       "public_js_main_findinteract",
       "public_js_main_oninventory",
-      "public_js_main_updatehud",
+      "public_js_main_setupmatch",
+      "public_js_main_updatehp",
       "public_js_main_updateprompt"
     ],
     "18": [
@@ -701,18 +719,13 @@
       "readme_salto_final"
     ],
     "21": [
-      "public_js_main_canaim",
+      "public_js_main_buildtarget",
       "public_js_main_canceluse",
       "public_js_main_clearghost",
-      "public_js_main_helditem",
       "public_js_main_selectslot",
       "public_js_main_setbuild",
       "public_js_main_startreload",
-      "public_js_main_startuse",
-      "public_js_main_tryuseheld",
-      "public_js_main_updatecamera",
-      "public_js_main_updatecrosshair",
-      "public_js_main_updateme",
+      "public_js_main_updatebuild",
       "public_js_main_updateslots",
       "public_js_rig_rigstopaction"
     ],
@@ -723,28 +736,28 @@
     ]
   },
   "cohesion": {
-    "0": 0.06721215663354763,
+    "0": 0.050351721584598295,
     "1": 0.12343358395989974,
-    "2": 0.07832080200501253,
-    "3": 0.1111111111111111,
-    "4": 0.1297134238310709,
+    "2": 0.08082706766917293,
+    "3": 0.11043771043771043,
+    "4": 0.15555555555555556,
     "5": 0.07712765957446809,
-    "6": 0.09065679925994449,
-    "7": 0.08637873754152824,
-    "8": 0.0524390243902439,
+    "6": 0.08673469387755102,
+    "7": 0.09268292682926829,
+    "8": 0.05,
     "9": 0.23529411764705882,
-    "10": 0.12121212121212122,
+    "10": 0.22631578947368422,
     "11": 0.14461538461538462,
-    "12": 0.11578947368421053,
-    "13": 0.1523809523809524,
+    "12": 0.1471861471861472,
+    "13": 0.11956521739130435,
     "14": 0.13333333333333333,
     "15": 0.2777777777777778,
-    "16": 0.3333333333333333,
-    "17": 0.3333333333333333,
+    "16": 0.15942028985507245,
+    "17": 0.2777777777777778,
     "18": 0.4222222222222222,
     "19": 0.42857142857142855,
     "20": 0.2857142857142857,
-    "21": 0.25274725274725274,
+    "21": 0.3055555555555556,
     "22": 1.0
   },
   "gods": [
@@ -812,33 +825,33 @@
       "why": "connects across different repos/directories; bridges separate communities"
     },
     {
-      "source": "handleGame()",
-      "target": "structKey()",
-      "source_files": [
-        "server.js",
-        "public/js/items.js"
-      ],
-      "confidence": "EXTRACTED",
-      "relation": "calls",
-      "why": "connects across different repos/directories; bridges separate communities"
-    },
-    {
-      "source": "main()",
-      "target": "S()",
-      "source_files": [
-        "tools/texturas/tatuaje.py",
-        "tools/blender/heroe_clips.py"
-      ],
-      "confidence": "INFERRED",
-      "relation": "indirect_call",
-      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
-    },
-    {
       "source": "hacer()",
       "target": "grabar()",
       "source_files": [
         "tools/blender/heroe_clips.py",
         "tools/blender/heroe_anim.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "grabar_recarga()",
+      "target": "grabar()",
+      "source_files": [
+        "tools/blender/heroe_recargas.py",
+        "tools/blender/heroe_anim.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "exportar()",
+      "target": "todos()",
+      "source_files": [
+        "tools/blender/heroe_export.py",
+        "tools/blender/heroe_clips.py"
       ],
       "confidence": "INFERRED",
       "relation": "calls",
@@ -860,16 +873,16 @@
     {
       "type": "bridge_node",
       "question": "Why does `World` connect `Mundo e isla` to `Cliente: escena y estado`, `Servidor y datos compartidos`, `Cliente: red y mensajes`?",
-      "why": "High betweenness centrality (0.035) - this node is a cross-community bridge."
+      "why": "High betweenness centrality (0.034) - this node is a cross-community bridge."
     },
     {
       "type": "low_cohesion",
       "question": "Should `Cabeza del héroe (Blender)` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.06721215663354763 - nodes in this community are weakly interconnected."
+      "why": "Cohesion score 0.050351721584598295 - nodes in this community are weakly interconnected."
     },
     {
       "type": "bridge_node",
-      "question": "Why does `Pose` connect `Animación base y export` to `Clips del héroe`?",
+      "question": "Why does `Pose` connect `Animación base y export` to `Cabeza del héroe (Blender)`, `Clips del héroe`?",
       "why": "High betweenness centrality (0.025) - this node is a cross-community bridge."
     },
     {
@@ -885,12 +898,12 @@
     {
       "type": "low_cohesion",
       "question": "Should `Servidor y datos compartidos` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.07832080200501253 - nodes in this community are weakly interconnected."
+      "why": "Cohesion score 0.08082706766917293 - nodes in this community are weakly interconnected."
     },
     {
       "type": "low_cohesion",
       "question": "Should `Recargas de armas` be split into smaller, more focused modules?",
-      "why": "Cohesion score 0.1111111111111111 - nodes in this community are weakly interconnected."
+      "why": "Cohesion score 0.11043771043771043 - nodes in this community are weakly interconnected."
     }
   ]
 }
