@@ -26,6 +26,13 @@ Cada arma tiene además multiplicador de cabeza, cooldown, alcance, dispersión 
 
 `reload` toma munición del tipo del arma; el cargador se llena al 95 % del tiempo de recarga (que depende de la rareza). Las animaciones de recarga y bombeo están en [[rig.js]] y [[Pipeline de armas]].
 
+## Animación del arma en el personaje
+
+- Posturas para sostener y apuntar: tabla `ARMAS` de `heroe_clips.py` ([[Pipeline del héroe]]). Las recargas arrancan y terminan en esa misma postura.
+- Recargas y bombeo: `heroe_recargas.py` ([[Pipeline de armas]]), reproducidos por [[rig.js]].
+- Retroceso: cada tiro (propio, o el `shot` de otro jugador) marca `recoil = 1` en [[main.js]] y `retroceso` en [[rig.js]] lo convierte en un impulso a un resorte amortiguado. Con la tabla `RETRO` cada arma inclina el pecho (`sube`), levanta el arma en la mano (`flip`), la corre hacia atrás (`atras`) y gira un poco el torso a un lado al azar (`giro`). Apuntando el retroceso es el 70 %.
+- Control: `armas_choque.py` mide cuánto se mete el arma en el cuerpo en cada pose y cada cuadro de las recargas ([[Pipeline de armas]]).
+
 ## Apuntar
 
 Clic derecho, solo con armas (`canAim`). Con el francotirador se ve la mira telescópica (`#scope` en [[index.html]]).

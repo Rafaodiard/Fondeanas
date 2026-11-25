@@ -688,15 +688,19 @@ def arma_en_manos(p, G, d, u, tipo='largo', polo_R=V(-0.8, 0.4, -0.6), polo_L=V(
 
 ARMAS = {
     # nombre: (G, d, u, tipo, polo_R, polo_L, cabeza (incl, giro, ladeo), columna (giro, incl), hombro_R)
-    'Rifle': (V(-0.10, -0.22, 1.16), V(0.12, -1, -0.17), V(0, 0, 1), 'largo', V(-0.8, 0.4, -0.6), V(0.4, 0.0, -1.0),
-              (3.0, 0.0, 0.0), (-18.0, 3.0), 0.0),
-    'RifleApunta': (V(-0.12, -0.30, 1.43), V(0.04, -1, 0.03), V(0, 0, 1), 'largo', V(-1.0, 0.2, -0.15), V(0.3, 0.1, -1.0),
-                    (15.0, -4.0, 12.0), (-20.0, 4.0), 8.0),
+    # cadera: el arma a la derecha del torso y la culata por fuera del costado, debajo del brazo (no adentro del
+    # chaleco); el torso girado 30° a la derecha deja el hombro izquierdo adelante para llegar al guardamanos
+    'Rifle': (V(-0.21, -0.27, 1.13), V(0.25, -1, -0.10), V(0, 0, 1), 'largo', V(-0.8, 0.4, -0.6), V(0.4, 0.0, -1.0),
+              (3.0, 0.0, 0.0), (-30.0, 3.0), 0.0),
+    # apuntando: culata apoyada en el hueco del hombro; el torso se inclina adelante para llevar el hombro al arma
+    'RifleApunta': (V(-0.15, -0.40, 1.39), V(0.04, -1, 0.03), V(0, 0, 1), 'largo', V(-1.0, 0.2, -0.15),
+                    V(0.3, 0.1, -1.0), (15.0, -4.0, 12.0), (-32.0, 14.0), 8.0),
     'Pistola': (V(-0.06, -0.30, 1.13), V(0.03, -1, -0.25), V(0, 0, 1), 'pistola', V(-0.6, 0.3, -1.0), V(0.6, 0.3, -1.0),
                 (4.0, 0.0, 0.0), (0.0, 3.0), 0.0),
     'PistolaApunta': (V(-0.04, -0.47, 1.53), V(0.06, -1, 0.0), V(0, 0, 1), 'pistola', V(-0.6, 0.2, -1.0),
                       V(0.6, 0.2, -1.0), (5.0, 0.0, 2.0), (0.0, 4.0), 3.0),
-    'Lanzacohetes': (V(-0.19, -0.17, 1.43), V(0.03, -1, 0.03), V(0, 0, 1), 'vertical', V(-0.9, 0.3, -0.5),
+    # el tubo apoyado arriba del hombro (antes se hundía en el deltoides)
+    'Lanzacohetes': (V(-0.22, -0.20, 1.47), V(0.03, -1, 0.03), V(0, 0, 1), 'vertical', V(-0.9, 0.3, -0.5),
                      V(0.4, 0.1, -1.0), (7.0, -3.0, 6.0), (-12.0, 3.0), 5.0),
     'Objeto': (V(-0.12, -0.26, 1.13), V(0.15, -1, 0.2), V(0, 0.2, 1), 'ninguno', V(-0.6, 0.4, -1.0), V(0.4, 0.4, -1.0),
                (8.0, 0.0, 0.0), (0.0, 2.0), 0.0),
