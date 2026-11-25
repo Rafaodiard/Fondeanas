@@ -9,7 +9,7 @@ El grafo está en `Vault/graphify-out/`, generado con [graphify](https://pypi.or
 - `graph.json`: los datos crudos. Se puede consultar con `graphify query "<pregunta>" --graph Vault/graphify-out/graph.json`, `graphify explain "<nodo>"` o `graphify path "A" "B"`.
 - `.graphify_labels.json`: nombres de las comunidades, puestos a mano.
 
-Última generación: 2026-11-24, en la PC de Rafael con graphify 0.9.95 (`graphifyy` instalado con `uv tool`), sobre el código del commit `762039e` de la rama `pulido-armas`. 688 nodos, 1770 relaciones, 23 comunidades.
+Última generación: 2026-11-25, en la PC de Rafael con graphify 0.9.95 (`graphifyy` instalado con `uv tool`), sobre el código del commit `75f269f` de la rama `claude/project-thread-vbeczu` (el mapa nuevo con el pulido de armas ya mergeado). 865 nodos, 2200 relaciones, 32 comunidades (el reporte omite 2 por chicas: *Control de recargas* y *Planos: piezas básicas*).
 
 ## Cómo regenerarlo
 
@@ -29,11 +29,13 @@ GRAPHIFY_OUT=Vault/graphify-out graphify update . --force
 
 ## Qué muestra
 
-Los nodos más conectados son `World` ([[world.js]]), `handle()` ([[main.js]], los mensajes del servidor) y `handleGame()` ([[server.js]]), más varias funciones de los scripts de Blender (`Pose`, `pose_baile`, `Agarre`...).
+Los nodos más conectados son `Plano` ([[planos.js]], el armador de estructuras), `World` ([[world.js]]), `G` (materiales del héroe), `handle()` ([[main.js]], los mensajes del servidor) y `handleGame()` ([[server.js]]), más varias funciones de los scripts de Blender (`Pose`, `Agarre`...).
 
 Comunidades principales:
 
 - Juego: *Servidor y datos compartidos* ([[server.js]] + [[items.js]]), *Mundo e isla* ([[world.js]]), *Rig y carga de modelos* ([[rig.js]], [[assets.js]], [[models.js]]), varias del cliente ([[main.js]]: escena y estado, red y mensajes, bucle y controles, disparo y efectos, inventario y HUD, slots), *Audio* ([[audio.js]]).
-- Arte: *Ropa, cabeza, rig y export del héroe* (también `armas_export.py`), *Materiales del héroe*, *Malla del juego del héroe*, *Clips del héroe*, *Animación base y export* ([[Pipeline del héroe]]); *Modelado de armas*, *Horneado de armas*, *Recargas de armas*, *Control de recargas* ([[Pipeline de armas]]); *Choque de armas y texturas de cara* (`armas_choque.py` con los scripts de [[Texturas]]); *Herramientas de modelado* ([[sf_tools.py]]).
+- Mapa ([[Mapa de la isla]]): *Datos de la isla y estructuras* ([[isla.js]]), *Planos de estructuras*, *Planos: casas y muebles*, *Planos: muelle y galpón*, *Planos: jardín y locales*, *Planos: piezas básicas* ([[planos.js]]), *Terreno y armado del mapa* (materiales, detalle del terreno y agua), *Mallas del mapa* ([[mallas.js]]), *Colisión y sólidos* ([[colision.js]]), *Pruebas del mapa* ([[Pruebas del mapa]]).
+- Arte: *Ropa, cabeza y texturas de cara del héroe* (con los scripts de [[Texturas]]), *Materiales del héroe*, *Clips del héroe*, *Rig y animación base del héroe*, *Malla del juego y export (héroe y armas)* ([[Pipeline del héroe]]); *Modelado de armas*, *Horneado de armas*, *Recargas de armas*, *Control de recargas*, *Choque de armas* ([[Pipeline de armas]]); *Herramientas de modelado* ([[sf_tools.py]]).
+- *README*: las secciones del README.
 
-El grafo confirma que el servidor y el cliente solo se tocan a través de [[world.js]] e [[items.js]] (ver [[Arquitectura]]).
+El grafo confirma que el servidor y el cliente solo se tocan a través de [[world.js]] (que trae [[isla.js]], [[planos.js]], [[colision.js]] y [[mallas.js]]) e [[items.js]] (ver [[Arquitectura]]).
