@@ -1,3 +1,4 @@
 node_modules/
 Vault/graphify-out/cache/
 Vault/.obsidian/workspace*.json
+__pycache__/
