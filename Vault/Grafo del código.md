@@ -9,7 +9,7 @@ El grafo está en `Vault/graphify-out/`, generado con [graphify](https://pypi.or
 - `graph.json`: los datos crudos. Se puede consultar con `graphify query "<pregunta>" --graph Vault/graphify-out/graph.json`, `graphify explain "<nodo>"` o `graphify path "A" "B"`.
 - `.graphify_labels.json`: nombres de las comunidades, puestos a mano.
 
-Última generación: 2026-11-24, en la PC de Rafael con graphify 0.9.95 (`graphifyy` instalado con `uv tool`), sobre el código del commit `9981e6f` de la rama `claude/project-thread-gas1mg`. 675 nodos, 1738 relaciones, 23 comunidades.
+Última generación: 2026-11-24, en la PC de Rafael con graphify 0.9.95 (`graphifyy` instalado con `uv tool`), sobre el código del commit `762039e` de la rama `pulido-armas`. 688 nodos, 1770 relaciones, 23 comunidades.
 
 ## Cómo regenerarlo
 
@@ -34,6 +34,6 @@ Los nodos más conectados son `World` ([[world.js]]), `handle()` ([[main.js]], l
 Comunidades principales:
 
 - Juego: *Servidor y datos compartidos* ([[server.js]] + [[items.js]]), *Mundo e isla* ([[world.js]]), *Rig y carga de modelos* ([[rig.js]], [[assets.js]], [[models.js]]), varias del cliente ([[main.js]]: escena y estado, red y mensajes, bucle y controles, disparo y efectos, inventario y HUD, slots), *Audio* ([[audio.js]]).
-- Arte: *Cabeza del héroe*, *Materiales del héroe*, *Malla del juego del héroe*, *Rig del héroe*, *Clips del héroe*, *Animación base y export* ([[Pipeline del héroe]]); *Modelado de armas*, *Horneado de armas*, *Recargas de armas*, *Control de recargas* ([[Pipeline de armas]]); *Herramientas de modelado* ([[sf_tools.py]]).
+- Arte: *Ropa, cabeza, rig y export del héroe* (también `armas_export.py`), *Materiales del héroe*, *Malla del juego del héroe*, *Clips del héroe*, *Animación base y export* ([[Pipeline del héroe]]); *Modelado de armas*, *Horneado de armas*, *Recargas de armas*, *Control de recargas* ([[Pipeline de armas]]); *Choque de armas y texturas de cara* (`armas_choque.py` con los scripts de [[Texturas]]); *Herramientas de modelado* ([[sf_tools.py]]).
 
 El grafo confirma que el servidor y el cliente solo se tocan a través de [[world.js]] e [[items.js]] (ver [[Arquitectura]]).
