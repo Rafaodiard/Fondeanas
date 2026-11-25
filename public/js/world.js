@@ -2,7 +2,7 @@
 // Todos los clientes de una sala generan exactamente el mismo mundo.
 import * as THREE from 'three';
 import { GRID, MATERIALS } from './items.js';
-import { PLANOS, Plano } from './planos.js';
+import { PLANOS, Plano, piezasDe, vecinasDe, sinApoyo } from './planos.js';
 import { PUEBLOS, RUTAS, RIO, SUELTOS, TELEFERICO } from './isla.js';
 import { Solidos } from './colision.js';
 import { Lote, materialesMapa, terrainDetail } from './mallas.js';
@@ -52,6 +52,8 @@ const ROT_DIR = {
   '+z': ['+z', '+x', '-z', '-x'], '-z': ['-z', '-x', '+z', '+x'],
 };
 const SIN_APLANAR = new Set(['jardin', 'seto', 'cerca', 'farol', 'banco', 'tacho', 'hidrante', 'buzon', 'cantero', 'cartel', 'auto', 'campo']);
+// Estructuras que no se rompen: de los postes y las torres cuelgan cables, los carteles tienen el texto aparte.
+const NO_ROMPE = new Set(['poste', 'torreTeleferico', 'cartel', 'indicador', 'malecon']);
 const CALLE_COLOR = { asfalto: '#4b4e54', vereda: '#cfc6b4', tierra: '#a8865a', arena: '#e2cb95', nieve: '#e9eff6' };
 
 // (x,z) local -> mundo, con rotación de a cuartos de vuelta (igual que rotation.y de Three.js).
@@ -78,7 +80,8 @@ export class World {
     this.pois = [];
     this.structs = new Map(); // construcciones de los jugadores
     this.structMeshes = [];
-    this.placed = []; // estructuras ubicadas {P, r, x, y, z, fp}
+    this.placed = []; // estructuras ubicadas {P, r, x, y, z, fp, piezas, ids}
+    this.piezas = []; // piezas rompibles de las estructuras del mapa (mismo orden en el servidor y en el cliente)
     this.ribbons = []; // calles y rutas {pts, w, m}
     this.chestSpots = [];
     this.lootSpots = [];
@@ -162,7 +165,13 @@ export class World {
       for (const [name, opts, lx, lz, r, extra] of t.items) this.place(name, opts, t.x + lx, t.z + lz, r, extra || {}, t);
     }
     for (const [name, opts, x, z, r, extra] of SUELTOS) this.place(name, opts, x, z, r, extra || {}, null);
-    for (const b of this.bridges) this.place('puente', { L: b.L, w: b.w + 1, y: 0 }, b.x, b.z, b.rot, { pad: false, y: b.y }, null);
+    // puentes: el tablero va de orilla a orilla siguiendo la ruta (inclinado), 10 cm arriba del terreno en las puntas
+    for (const b of this.bridges) {
+      const [ax, az] = b.rot === 1 ? [1, 0] : [0, 1];
+      const e1 = this.terrainHeight(b.x + (ax * b.L) / 2, b.z + (az * b.L) / 2), e0 = this.terrainHeight(b.x - (ax * b.L) / 2, b.z - (az * b.L) / 2);
+      b.y = (e0 + e1) / 2 + 0.1; b.dy = e1 - e0;
+      this.place('puente', { L: b.L, w: b.w + 1, y: 0, dy: b.dy }, b.x, b.z, b.rot, { pad: false, y: b.y }, null);
+    }
     this.layoutPostes();
     // Teleférico: torres con dos cables y cabinas colgando.
     const torres = TELEFERICO.map(([x, z]) => {
@@ -181,6 +190,7 @@ export class World {
       const x = (rand() - 0.5) * this.size * 0.85, z = (rand() - 0.5) * this.size * 0.85;
       const h = this.terrainHeight(x, z);
       if (h < 2 || this.slopeAt(x, z) > 0.4 || this.nearSolid(x, z, 3) || this.inTown(x, z, 0)) continue;
+      if (this.circles.some((c) => Math.abs(c.x - x) < c.r + 1 && Math.abs(c.z - z) < c.r + 1 && Math.hypot(c.x - x, c.z - z) < c.r + 0.8)) continue; // ni adentro de un árbol o una roca
       this.lootSpots.push({ x, y: h, z });
     }
   }
@@ -299,7 +309,8 @@ export class World {
     if (!fn) return;
     if (opts.jardin) {
       const [jx, jz] = rot2(0, (opts.d || 8) / 2, r);
-      this.place('jardin', { w: (opts.w || 9) + 3, d: opts.jardin }, x + jx, z + jz, r, {}, town);
+      // el caminito va frente a la puerta (en las casas con var impar la puerta está corrida)
+      this.place('jardin', { w: (opts.w || 9) + 3, d: opts.jardin, px: name === 'casa' && opts.var % 2 ? -(opts.w || 9) * 0.2 : 0 }, x + jx, z + jz, r, {}, town);
     }
     const P = fn(opts);
     const b = P.bounds();
@@ -315,22 +326,58 @@ export class World {
     }
     base += extra.dy || 0;
     if (extra.pad !== false && !extra.dy && !SIN_APLANAR.has(name)) this.flatten(fp, base, town ? 5 : 9);
+    // piezas rompibles: ids globales (el servidor y el cliente arman el mismo mundo en el mismo orden)
+    const pz = piezasDe(P), fijaTodo = NO_ROMPE.has(name), local = [], ids = new Map();
+    for (const p of pz.lista) {
+      const id = this.piezas.length, a = p.aabb;
+      const q = [rot2(a[0], a[2], r), rot2(a[3], a[5], r)];
+      this.piezas.push({
+        id, placed: this.placed.length, i: local.length, fija: p.fija || fijaTodo, clase: p.clase, color: p.color,
+        hp: Math.round(MATERIALS[p.clase].hp * p.factor), solids: [], rota: false,
+        aabb: [x + Math.min(q[0][0], q[1][0]), base + a[1], z + Math.min(q[0][1], q[1][1]), x + Math.max(q[0][0], q[1][0]), base + a[4], z + Math.max(q[0][1], q[1][1])],
+      });
+      local.push(id);
+    }
+    for (const [g, i] of pz.deGrupo) ids.set(g, i >= 0 ? local[i] : -1);
+    const dePieza = (so, g) => { const id = ids.get(g) ?? -1; if (id >= 0) { so.pz = id; this.piezas[id].solids.push(so); } };
     // sólidos en coordenadas del mundo
     for (const s of P.solids) {
       const q = [rot2(s.x0, s.z0, r), rot2(s.x1, s.z1, r)];
       const w = { x0: x + Math.min(q[0][0], q[1][0]), x1: x + Math.max(q[0][0], q[1][0]), z0: z + Math.min(q[0][1], q[1][1]), z1: z + Math.max(q[0][1], q[1][1]), y0: base + s.y0, y1: base + s.y1 };
       if (s.up) { w.up = ROT_DIR[s.up][r & 3]; w.lo = base + (s.lo ?? s.y0); }
-      this.sol.addBox(w, name);
+      if (s.vidrio) w.vidrio = true; // ventanas: frenan al jugador, no a las balas ni a la cámara
+      dePieza(this.sol.addBox(w, name), s.g);
     }
     for (const cy of P.cyls) {
       const [cx, cz] = rot2(cy.x, cy.z, r);
-      this.sol.addCyl(x + cx, z + cz, cy.r, base + cy.y0, base + cy.y1, name);
+      dePieza(this.sol.addCyl(x + cx, z + cz, cy.r, base + cy.y0, base + cy.y1, name), cy.g);
     }
     for (const l of P.loot) { const [lx, lz] = rot2(l.x, l.z, r); this.lootSpots.push({ x: x + lx, y: base + l.y, z: z + lz }); }
     for (const g of P.signs || []) { const [lx, lz] = rot2(g.x, g.z, r); this.signs.push({ ...g, x: x + lx, y: base + g.y, z: z + lz, r }); }
     for (const ch of P.chests) { const [lx, lz] = rot2(ch.x, ch.z, r); this.chestSpots.push({ x: x + lx, y: base + ch.y, z: z + lz, rot: ((ch.rot + r) * Math.PI) / 2 }); }
     this.baseLoot = this.lootSpots.length;
-    this.placed.push({ name, P, r, x, y: base, z, fp, town: town?.id });
+    this.placed.push({ name, P, r, x, y: base, z, fp, town: town?.id, piezas: local, ids, lista: pz.lista });
+  }
+
+  // ---------- Piezas rompibles ----------
+  // Rompe una pieza del mapa: deja de chocar y (en el cliente) desaparece de las mallas. Devuelve la pieza, o null.
+  romperPieza(id) {
+    const pz = this.piezas[id];
+    if (!pz || pz.rota || pz.fija) return null;
+    pz.rota = true;
+    for (const s of pz.solids) this.sol.remove(s);
+    if (this.lotePz) { this.lotePz.get(id)?.ocultar(id); for (const L of this.lotesChoque) L.ocultar(id); }
+    return pz;
+  }
+
+  // Piezas de la misma estructura que quedan en el aire (sin llegar al piso por piezas sanas).
+  piezasSinApoyo(id) {
+    const pl = this.placed[this.piezas[id]?.placed];
+    if (!pl?.lista) return [];
+    if (!pl.vec) pl.vec = vecinasDe(pl.lista);
+    const rotas = new Set();
+    pl.piezas.forEach((gid, i) => { if (this.piezas[gid].rota) rotas.add(i); });
+    return sinApoyo(pl.lista, pl.vec, rotas).map((i) => pl.piezas[i]).filter((gid) => !this.piezas[gid].fija);
   }
 
   // Postes de luz con cables a lo largo de las rutas asfaltadas, e indicadores a la salida de los pueblos.
@@ -660,6 +707,26 @@ export class World {
     scene.add(rm);
   }
 
+  // ¿El punto está sobre el tablero de un puente? (ahí no se dibuja la calle: el tablero la reemplaza)
+  enPuente(x, z, margen = 0) {
+    for (const b of this.bridges || []) {
+      const [ax, az] = b.rot === 1 ? [1, 0] : [0, 1], dx = x - b.x, dz = z - b.z;
+      if (Math.abs(dx * ax + dz * az) < b.L / 2 + margen && Math.abs(-dx * az + dz * ax) < (b.w + 1) / 2 + 0.5 + margen) return true;
+    }
+    return false;
+  }
+
+  // Tramo [t0, t1] del segmento i..i+1 de la cinta que queda fuera de los puentes (o null si está todo sobre uno).
+  tramoFueraDePuente(pts, i) {
+    const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
+    const ia = this.enPuente(ax, az), ib = this.enPuente(bx, bz);
+    if (!ia && !ib) return [0, 1];
+    if (ia && ib) return null;
+    let lo = 0, hi = 1; // bisección hasta el borde del puente
+    for (let k = 0; k < 20; k++) { const m = (lo + hi) / 2; if (this.enPuente(ax + (bx - ax) * m, az + (bz - az) * m) === ia) lo = m; else hi = m; }
+    return ia ? [hi, 1] : [0, lo];
+  }
+
   buildRoads(scene) {
     const pos = [], col = [];
     const c = new THREE.Color(), line = new THREE.Color('#f2efe6');
@@ -667,20 +734,31 @@ export class World {
       c.set(CALLE_COLOR[rb.m] || '#888');
       const off = rb.under ? 0.045 : 0.07 + (idx % 7) * 0.01;
       const pts = rb.pts;
-      const edge = (i, s) => {
-        const [px, pz] = pts[i];
-        const [ax, az] = pts[Math.max(0, i - 1)], [bx, bz] = pts[Math.min(pts.length - 1, i + 1)];
-        const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) || 1;
+      // borde de la cinta en el punto i (+t hacia i+1; con t > 0 usa la dirección del segmento)
+      const edge = (i, s, t = 0) => {
+        let px = pts[i][0], pz = pts[i][1], dx, dz;
+        if (t > 0) {
+          const [bx, bz] = pts[Math.min(pts.length - 1, i + 1)];
+          px += (bx - px) * t; pz += (bz - pz) * t; dx = bx - pts[i][0]; dz = bz - pts[i][1];
+        } else {
+          const [ax, az] = pts[Math.max(0, i - 1)], [bx, bz] = pts[Math.min(pts.length - 1, i + 1)];
+          dx = bx - ax; dz = bz - az;
+        }
+        const L = Math.hypot(dx, dz) || 1;
         const x = px + (-dz / L) * s, z = pz + (dx / L) * s;
         return [x, this.terrainHeight(x, z) + off, z];
       };
       for (let i = 0; i < pts.length - 1; i++) {
         const w = rb.w / 2;
-        const a = edge(i, w), b = edge(i, -w), d = edge(i + 1, -w), e = edge(i + 1, w);
+        const tr = this.tramoFueraDePuente(pts, i);
+        if (!tr) continue;
+        const [t0, t1] = tr;
+        const ea = (s) => (t0 > 0 ? edge(i, s, t0) : edge(i, s)), eb = (s) => (t1 < 1 ? edge(i, s, t1) : edge(i + 1, s));
+        const a = ea(w), b = ea(-w), d = eb(-w), e = eb(w);
         pos.push(...a, ...b, ...d, ...a, ...d, ...e);
         for (let k = 0; k < 6; k++) col.push(c.r, c.g, c.b);
         if (rb.m === 'asfalto' && rb.w >= 6 && i % 3 === 0) {
-          const a2 = edge(i, 0.12), b2 = edge(i, -0.12), d2 = edge(i + 1, -0.12), e2 = edge(i + 1, 0.12);
+          const a2 = ea(0.12), b2 = ea(-0.12), d2 = eb(-0.12), e2 = eb(0.12);
           for (const p of [a2, b2, d2, e2]) p[1] += 0.01;
           pos.push(...a2, ...b2, ...d2, ...a2, ...d2, ...e2);
           for (let k = 0; k < 6; k++) col.push(line.r, line.g, line.b);
@@ -707,26 +785,36 @@ export class World {
     };
     const M = new THREE.Matrix4(), R = new THREE.Matrix4();
     const rand = rng(MAP_SEED + 7);
+    this.lotePz = new Map(); // pieza -> lote donde están sus triángulos
     for (const p of this.placed) {
       M.makeTranslation(p.x, p.y, p.z).multiply(R.makeRotationY((p.r * Math.PI) / 2));
-      lote(p.x, p.z).plano(p.P, M, { jitter: (rand() - 0.5) * 0.04 });
+      const L = lote(p.x, p.z);
+      let piezaDe = null;
+      if (p.ids) {
+        piezaDe = new Map();
+        for (const [g, id] of p.ids) if (id >= 0 && !this.piezas[id].fija) piezaDe.set(g, id);
+        for (const id of p.piezas) this.lotePz.set(id, L);
+      }
+      L.plano(p.P, M, { jitter: (rand() - 0.5) * 0.04, piezaDe });
     }
     for (const L of chunks.values()) for (const m of L.meshes(mats)) scene.add(m);
-    // Malla invisible con los sólidos exactos: la usan los disparos y la cámara.
+    // Malla invisible con los sólidos exactos: la usan los disparos y la cámara (cada triángulo sabe de qué pieza es).
     const hidden = new THREE.MeshBasicMaterial({ visible: false });
     const cols = new Map();
     const I = new THREE.Matrix4();
     for (const s of this.sol.list) {
+      if (s.dead || s.vidrio) continue;
       const k = `${Math.floor(((s.x0 + s.x1) / 2) / CH)},${Math.floor(((s.z0 + s.z1) / 2) / CH)}`;
-      if (!cols.has(k)) cols.set(k, new Lote());
+      if (!cols.has(k)) cols.set(k, new Lote({ porTri: true }));
       const L = cols.get(k);
+      L.marca = s.pz ?? -1;
       if (s.cyl) L.part({ t: 'cyl', x: s.x, y: s.y0, z: s.z, r: s.r, r2: s.r, h: s.y1 - s.y0, seg: 10, m: 'hormigon' }, I, 0);
       else if (s.up) L.part({ t: 'ramp', a: [s.x0, s.y0, s.z0, s.x1, s.y1, s.z1], up: s.up, lo: s.lo, m: 'hormigon' }, I, 0);
       else L.part({ t: 'box', a: [s.x0, s.y0, s.z0, s.x1, s.y1, s.z1], m: 'hormigon' }, I, 0);
     }
-    for (const L of cols.values()) for (const m of L.meshes({ s: hidden, m: hidden, v: hidden, e: hidden })) {
+    this.lotesChoque = [...cols.values()];
+    for (const L of this.lotesChoque) for (const m of L.meshes({ s: hidden, m: hidden, v: hidden, e: hidden })) {
       m.castShadow = false; m.receiveShadow = false;
-      m.userData.harvest = { kind: 'house' };
       scene.add(m);
       this.solidMeshes.push(m);
       this.camMeshes.push(m);
@@ -910,6 +998,15 @@ export class World {
       scene.add(g);
       return g;
     });
+  }
+
+  // Baja un cofre (se rompió el piso donde estaba).
+  moveChest(idx, y) {
+    const c = this.chestSpots[idx];
+    if (!c) return;
+    c.y = y;
+    const m = this.chestMeshes?.[idx];
+    if (m) m.position.y = y;
   }
 
   openChest(idx) {

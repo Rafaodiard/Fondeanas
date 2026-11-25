@@ -6,7 +6,7 @@ import { PLANOS } from '../../public/js/planos.js';
 
 const G = 25, H = 1.8, R = 0.45;
 let fails = 0;
-const fail = (m) => { fails++; if (fails < 40) console.log('FALLA:', m); };
+const fail = (m) => { fails++; if (fails < 40 || process.env.TODAS) console.log('FALLA:', m); }; // TODAS=1 muestra todas
 
 // Simulación mínima del jugador (igual que main.js): gravedad, pasos, piso.
 function sim(world, p, vel, steps, input = () => null, dt = 1 / 60) {
@@ -135,6 +135,7 @@ const llegar = (name, opts, ruta, yMin) => {
 llegar('tanqueAgua', {}, [{ x: 4.2, y: 0.06, z: 5.2 }, { x: -3.6, y: 0, z: 5.2 }, { x: -4.0, y: 0, z: 4.0 }, { x: -4.0, y: 0, z: -2.3 }, { x: -2.4, y: 0, z: -2.3 }], 8.9);
 llegar('torreVigia', {}, [{ x: -1.0, y: 0.06, z: 1.5 }, { x: 0.65, y: 0, z: 1.8 }, { x: 0.65, y: 0, z: 8.0 }, { x: 2.15, y: 0, z: 8.0 }, { x: 2.15, y: 0, z: 1.5 }, { x: 0, y: 0, z: 0 }], 7.9);
 // 5) Todo el loot y los cofres de cada estructura se alcanzan caminando (grilla de lugares donde cabe el jugador).
+const alcances = []; // [nombre, opciones, resultado] (los reusan las pruebas visuales)
 function alcance(name, opts = {}, entrada = 0) {
   const P = PLANOS[name](opts);
   const sol = new Solidos();
@@ -178,7 +179,7 @@ function alcance(name, opts = {}, entrada = 0) {
     }
   };
   bfs(0.55, 'walk'); bfs(1.3, 'jump');
-  const res = { mal: [], salto: [] };
+  const res = { mal: [], salto: [], P, nodes: nodes.filter((n) => n.jump), sol };
   for (const l of [...P.loot.map((l) => ({ ...l, t: 'loot' })), ...P.chests.map((c) => ({ ...c, t: 'cofre' }))]) {
     let w = false, j = false;
     for (const n of nodes) if (Math.hypot(n.x - l.x, n.z - l.z) < 0.9 && Math.abs(n.y - l.y) < 0.35) { w ||= n.walk; j ||= n.jump; }
@@ -194,6 +195,7 @@ function alcance(name, opts = {}, entrada = 0) {
   for (const [name, opts] of casos) {
     // el muelle se entra desde el malecón, a la altura de su piso
     const r = alcance(name, opts, name === 'muelle' ? 1.5 : 0);
+    alcances.push([name, opts, r]);
     total++;
     for (const m of r.mal) fail(`${name}${opts.pisos ? ' ' + opts.pisos + ' pisos' : ''}: ${m} no se alcanza`);
     if (r.salto.length) console.log(`${name}: solo saltando ->`, r.salto.join(', '));
@@ -212,5 +214,6 @@ function alcance(name, opts = {}, entrada = 0) {
   w.chestSpots.forEach((l) => chk(l, 'cofre'));
   console.log('lugares de loot y cofres del mapa revisados:', w.lootSpots.length + w.chestSpots.length);
 }
+await import('./visuales.mjs').then((m) => m.pruebasVisuales({ alcances, world, fail }));
 console.log(fails ? `${fails} fallas` : 'todo OK');
 process.exit(fails ? 1 : 0);

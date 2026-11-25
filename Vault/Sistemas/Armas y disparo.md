@@ -19,8 +19,8 @@ Cada arma tiene además multiplicador de cabeza, cooldown, alcance, dispersión 
 
 1. El cliente (`tryShoot` en [[main.js]]) hace los raycasts y manda `shoot` con `from`, `to` y `hits`.
 2. El servidor revisa que el jugador esté en el piso, que el arma tenga balas y el cooldown (con 25 % de tolerancia), descuenta una bala y reenvía `shot` a los demás.
-3. Por cada impacto valida el rango y aplica daño a jugadores (`damagePlayer`, el escudo absorbe primero) o a estructuras (`damageStruct`). Al tirador le manda `hitConfirm`.
-4. Cohete: el servidor espera el tiempo de viaje y llama a `explode` (el que dispara recibe la mitad del daño).
+3. Por cada impacto valida el rango y aplica daño a jugadores (`damagePlayer`, el escudo absorbe primero) o a estructuras (`damageStruct` para las construidas, `damagePieza` para las del mapa: ver [[Estructuras rompibles]]). Al tirador le manda `hitConfirm`.
+4. Cohete: el servidor espera el tiempo de viaje y llama a `explode` (el que dispara recibe la mitad del daño; también rompe las piezas del mapa dentro del radio).
 
 ## Recarga
 
