@@ -91,6 +91,8 @@ function matchSnapshot(room) {
     trees: room.trees.map((hp, i) => (hp <= 0 ? i : -1)).filter((i) => i >= 0),
     rocks: room.rocks.map((hp, i) => (hp <= 0 ? i : -1)).filter((i) => i >= 0),
     structs: [...room.world.structs.values()].map(structPublic),
+    piezas: room.pzRotas, // piezas del mapa ya rotas (en orden)
+    cofresMovidos: room.chests.flatMap((c, i) => (c.movido ? [[i, c.y]] : [])),
   };
 }
 const structPublic = (s) => ({ key: s.key, type: s.type, i: s.i, j: s.j, y: s.y, dir: s.dir, mat: s.mat, hp: s.hp });
@@ -125,6 +127,9 @@ function startMatch(room) {
   room.trees = room.world.trees.map(() => 150);
   room.rocks = room.world.rocks.map((r) => Math.round(150 + r.s * 120));
   room.chests = room.world.chestSpots.map((c) => ({ ...c, open: false }));
+  // piezas rompibles del mapa (paredes, losas, techos, muebles...): vida por pieza y lista de rotas
+  room.pzHp = room.world.piezas.map((pz) => (pz.fija ? 0 : pz.hp));
+  room.pzRotas = [];
   // Loot del piso: arma con su munición, o consumible, o munición.
   for (const s of room.world.lootSpots) {
     const r = Math.random();
@@ -404,6 +409,8 @@ function handleGame(room, player, msg) {
         if (h.key) {
           const s = room.world.structs.get(h.key);
           if (s) damageStruct(room, s, def.struct * RARITIESmul(it) * (n / def.pellets) * (def.pellets > 1 ? 1 : 1));
+        } else if (Number.isInteger(h.pz)) {
+          if (distPieza(room, h.pz, player.pos) <= def.range + 5) damagePieza(room, h.pz, def.struct * RARITIESmul(it) * (n / def.pellets));
         } else if (h.pid) {
           const target = room.players.get(h.pid);
           if (!target || !target.alive || target === player) continue;
@@ -431,6 +438,14 @@ function handleGame(room, player, msg) {
       } else if (msg.key) {
         const s = room.world.structs.get(msg.key);
         if (s) damageStruct(room, s, PICKAXE.struct);
+      } else if (Number.isInteger(msg.pz)) {
+        const pz = room.world.piezas[msg.pz];
+        if (!pz || pz.fija || pz.rota || distPieza(room, msg.pz, player.pos) > PICKAXE.range + 2) break;
+        const rompio = damagePieza(room, msg.pz, PICKAXE.struct);
+        const [gainMat, base] = PICKAXE.gain[pz.clase];
+        const amount = rompio ? base * 2 : base;
+        player.mats[gainMat] = Math.min(MAX_MATS, player.mats[gainMat] + amount);
+        send(player.ws, { ...invMsg(player), gained: [gainMat, amount] });
       } else if (msg.res === 'tree' || msg.res === 'rock' || msg.res === 'house') {
         let gainMat, amount;
         if (msg.res === 'house') {
@@ -530,6 +545,53 @@ function explode(room, attacker, at, def, base) {
     const c = [s.i * GRID + GRID / 2, s.y + GRID / 2, s.j * GRID + GRID / 2];
     if (dist3(c, at) < def.splash + GRID * 0.6) damageStruct(room, s, def.struct);
   }
+  // piezas del mapa dentro del radio (cada una una sola vez, con menos daño cuanto más lejos)
+  const golpes = new Map();
+  room.world.sol.near(at[0], at[2], def.splash, (s) => {
+    if (!(s.pz >= 0) || s.dead) return;
+    const d = s.cyl
+      ? Math.max(0, Math.hypot(at[0] - s.x, at[2] - s.z) - s.r, s.y0 - at[1], at[1] - s.y1)
+      : Math.hypot(Math.max(s.x0 - at[0], 0, at[0] - s.x1), Math.max(s.y0 - at[1], 0, at[1] - s.y1), Math.max(s.z0 - at[2], 0, at[2] - s.z1));
+    if (d < def.splash && d < (golpes.get(s.pz) ?? Infinity)) golpes.set(s.pz, d);
+  });
+  for (const [id, d] of golpes) damagePieza(room, id, def.struct * (1 - (d / def.splash) * 0.5));
+}
+
+// Distancia de un punto a la caja de una pieza del mapa.
+function distPieza(room, id, p) {
+  const a = room.world.piezas[id]?.aabb;
+  if (!a) return Infinity;
+  return Math.hypot(Math.max(a[0] - p[0], 0, p[0] - a[3]), Math.max(a[1] - p[1], 0, p[1] - a[4]), Math.max(a[2] - p[2], 0, p[2] - a[5]));
+}
+
+// Daño a una pieza del mapa. Si se rompe, se caen también las piezas de su estructura que quedan sin apoyo,
+// y lo que estaba arriba (loot, cofres) baja hasta el piso nuevo. Devuelve true si se rompió.
+function damagePieza(room, id, dmg) {
+  const pz = room.world.piezas[id];
+  if (!pz || pz.fija || pz.rota || !(dmg > 0)) return false;
+  room.pzHp[id] -= dmg;
+  if (room.pzHp[id] > 0) return false;
+  const rotas = [id];
+  room.world.romperPieza(id);
+  for (const c of room.world.piezasSinApoyo(id)) if (room.world.romperPieza(c)) rotas.push(c);
+  room.pzRotas.push(...rotas);
+  broadcast(room, { t: 'pzRota', ids: rotas });
+  // lo que quedó en el aire cae
+  const dentro = (p, a) => p[0] > a[0] - 0.3 && p[0] < a[3] + 0.3 && p[2] > a[2] - 0.3 && p[2] < a[5] + 0.3 && p[1] > a[1] - 0.3 && p[1] < a[4] + 1.5;
+  const zonas = rotas.map((r) => room.world.piezas[r].aabb);
+  const movidos = [];
+  for (const it of room.items.values()) {
+    if (!zonas.some((a) => dentro([it.x, it.y, it.z], a))) continue;
+    const g = room.world.groundHeight(it.x, it.z, it.y + 0.3);
+    if (g < it.y - 0.05) { it.y = +g.toFixed(2); movidos.push(it); }
+  }
+  if (movidos.length) { broadcast(room, { t: 'itemsDel', ids: movidos.map((it) => it.id) }); broadcast(room, { t: 'itemsAdd', items: movidos }); }
+  room.chests.forEach((c, idx) => {
+    if (!zonas.some((a) => dentro([c.x, c.y, c.z], a))) return;
+    const g = room.world.groundHeight(c.x, c.z, c.y + 0.3);
+    if (g < c.y - 0.05) { c.y = +g.toFixed(2); c.movido = true; room.world.moveChest(idx, c.y); broadcast(room, { t: 'chestMove', idx, y: c.y }); }
+  });
+  return true;
 }
 
 const RARITIESmul = (it) => 1 + it.rarity * 0.05;

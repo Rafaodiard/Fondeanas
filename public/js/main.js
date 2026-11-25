@@ -226,6 +226,20 @@ function handle(m) {
       world.removeStruct(m.key);
       break;
     }
+    case 'pzRota': {
+      // piezas del mapa rotas (la primera es la que se rompió; las otras se cayeron por quedar sin apoyo)
+      let cerca = false;
+      for (const id of m.ids) {
+        const p = world.romperPieza(id);
+        if (!p) continue;
+        escombros(p);
+        const a = p.aabb;
+        if (Math.hypot((a[0] + a[3]) / 2 - me.pos.x, (a[2] + a[5]) / 2 - me.pos.z) < 60) cerca = true;
+      }
+      if (cerca) sfx.structBreak();
+      break;
+    }
+    case 'chestMove': world.moveChest(m.idx, m.y); break;
     case 'structHp': {
       const s = world.structs.get(m.key);
       if (s?.mesh) { s.mesh.scale.setScalar(0.94); setTimeout(() => s.mesh && s.mesh.scale.setScalar(1), 70); }
@@ -364,6 +378,8 @@ function setupMatch(snap) {
     for (const i of snap.trees) world.destroyResource('tree', i);
     for (const i of snap.rocks) world.destroyResource('rock', i);
     for (const s of snap.structs) world.addStruct(s);
+    for (const id of snap.piezas || []) world.romperPieza(id);
+    for (const [i, y] of snap.cofresMovidos || []) world.moveChest(i, y);
   }
   bus.visible = true;
   stormMesh.visible = true;
@@ -750,7 +766,7 @@ function structOf(obj) {
   return null;
 }
 
-// Primer impacto a lo largo del rayo: { dist, pid, head, key, res, idx }
+// Primer impacto a lo largo del rayo: { dist, pid, head, key, res, idx, pz }
 function castRay(origin, dir, range, near) {
   let best = { dist: range };
   raycaster.set(origin, dir);
@@ -759,6 +775,13 @@ function castRay(origin, dir, range, near) {
   for (const h of hits) {
     const key = structOf(h.object);
     if (key) { best = { dist: h.distance, key }; break; }
+    // malla de choque del mapa: cada triángulo sabe de qué pieza es (las fijas no se rompen)
+    const tp = h.object.userData.triPz;
+    if (tp) {
+      const pz = tp[h.faceIndex], p = pz >= 0 ? world.piezas[pz] : null;
+      best = p && !p.fija && !p.rota ? { dist: h.distance, pz } : { dist: h.distance };
+      break;
+    }
     const hv = h.object.userData.harvest;
     if (hv) {
       if (h.object.isInstancedMesh) {
@@ -815,7 +838,13 @@ function trySwing() {
   const at = camera.position.clone().addScaledVector(camDir, res.dist);
   if (res.pid) sendMsg({ t: 'swing', pid: res.pid });
   else if (res.key) { sendMsg({ t: 'swing', key: res.key }); sfx.pickaxe('struct'); }
-  else if (res.res) {
+  else if (res.pz !== undefined) {
+    const p = world.piezas[res.pz];
+    sendMsg({ t: 'swing', pz: res.pz });
+    sfx.pickaxe(p.clase === 'madera' ? 'tree' : 'rock');
+    sparks(at, p.color || '#dddddd');
+    return;
+  } else if (res.res) {
     sendMsg({ t: 'swing', res: res.res, idx: res.idx });
     sfx.pickaxe(res.res);
     if (res.idx !== undefined) world.shakeResource(res.res, res.idx);
@@ -847,9 +876,9 @@ function tryShoot(it, def) {
     const res = castRay(camera.position, _d, def.range, near);
     const end = camera.position.clone().addScaledVector(_d, res.dist);
     if (i === 0) mainEnd = end;
-    if (res.pid || res.key) {
-      const k = res.pid ? `p${res.pid}` : `s${res.key}`;
-      const e = tally.get(k) || { pid: res.pid, key: res.key, n: 0, head: false };
+    if (res.pid || res.key || res.pz !== undefined) {
+      const k = res.pid ? `p${res.pid}` : res.key ? `s${res.key}` : `z${res.pz}`;
+      const e = tally.get(k) || { pid: res.pid, key: res.key, pz: res.pz, n: 0, head: false };
       e.n++; e.head = e.head || !!res.head;
       tally.set(k, e);
     }
@@ -890,6 +919,23 @@ function explosionFx(at, color = '#ff9a3c', scale = 1) {
 }
 
 const sparkGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+// Escombros de una pieza del mapa que se rompe: pedazos de su color que saltan y caen.
+const escombroGeo = new THREE.BoxGeometry(1, 1, 1), escombroMats = new Map();
+function escombros(p) {
+  const a = p.aabb, vol = (a[3] - a[0]) * (a[4] - a[1]) * (a[5] - a[2]);
+  const n = Math.max(4, Math.min(18, Math.round(vol * 2)));
+  if (!escombroMats.has(p.color)) escombroMats.set(p.color, new THREE.MeshLambertMaterial({ color: p.color || '#aaaaaa' }));
+  const mat = escombroMats.get(p.color);
+  for (let i = 0; i < n; i++) {
+    const s = new THREE.Mesh(escombroGeo, mat);
+    s.scale.set(0.15 + Math.random() * 0.35, 0.1 + Math.random() * 0.25, 0.15 + Math.random() * 0.35);
+    s.position.set(a[0] + Math.random() * (a[3] - a[0]), a[1] + Math.random() * (a[4] - a[1]), a[2] + Math.random() * (a[5] - a[2]));
+    s.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+    scene.add(s);
+    const life = 0.9 + Math.random() * 0.5;
+    effects.push({ obj: s, life, total: life, vel: new THREE.Vector3((Math.random() - 0.5) * 5, Math.random() * 4, (Math.random() - 0.5) * 5) });
+  }
+}
 function sparks(at, color, n = 6) {
   const mat = new THREE.MeshBasicMaterial({ color });
   for (let i = 0; i < n; i++) {

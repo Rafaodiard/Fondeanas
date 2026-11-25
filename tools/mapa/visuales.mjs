@@ -5,9 +5,11 @@
 // - caras encimadas en el mismo plano con distinto color (titilan), dentro de una estructura, entre estructuras,
 //   contra el terreno y contra las calles
 // - piezas rompibles que arrancan sin apoyo y decoración suelta en el aire
+// - derrumbes: lo que queda colgando cuando se rompe lo que lo sostiene se cae, y lo demás no
 import * as THREE from 'three';
 import { Lote } from '../../public/js/mallas.js';
 import { Solidos } from '../../public/js/colision.js';
+import { World } from '../../public/js/world.js';
 import { PLANOS, PALETA, cajasParte, piezasDe, vecinasDe, sinApoyo } from '../../public/js/planos.js';
 
 const casos = () => {
@@ -26,6 +28,7 @@ export function pruebasVisuales({ alcances, world, fail }) {
   titilan(fail);
   titilanMundo(world, fail);
   piezas(world, fail);
+  derrumbes(fail);
 }
 
 // ---------- 7) Caras al revés ----------
@@ -341,4 +344,37 @@ function piezas(world, fail) {
   }
   const rompibles = world.piezas.filter((p) => !p.fija).length;
   console.log(`piezas del mapa: ${world.piezas.length} (${rompibles} rompibles); sin apoyo: ${sueltas}; decoración suelta: ${decor}`);
+}
+
+// ---------- 11) Derrumbes ----------
+// En un mundo aparte (romper piezas lo modifica).
+function derrumbes(fail) {
+  const w = new World(1, 1200);
+  const vol = (a) => (a[3] - a[0]) * (a[4] - a[1]) * (a[5] - a[2]);
+  let n = 0;
+  // a) la vuelta al mundo: si se rompe la estructura (patas, eje y aro), se caen todas las cabinas
+  const rueda = w.placed.find((p) => p.name === 'rueda');
+  if (rueda) {
+    const ids = rueda.piezas.filter((id) => !w.piezas[id].fija);
+    const aro = ids.reduce((a, b) => (vol(w.piezas[b].aabb) > vol(w.piezas[a].aabb) ? b : a));
+    w.romperPieza(aro);
+    const caen = new Set(w.piezasSinApoyo(aro));
+    const colgadas = ids.filter((id) => id !== aro && w.piezas[id].aabb[1] > rueda.y + 0.5);
+    const quedan = colgadas.filter((id) => !caen.has(id));
+    n++;
+    if (!colgadas.length || quedan.length) fail(`derrumbe: al romper la vuelta al mundo quedan ${quedan.length} de ${colgadas.length} cabinas en el aire`);
+    if (!w.piezas[aro].solids.every((s) => s.dead)) fail('derrumbe: la pieza rota sigue chocando');
+  }
+  // b) romper una pared de la planta baja de cada casa no tira el techo ni las otras paredes
+  for (const pl of w.placed.filter((p) => p.name === 'casa').slice(0, 6)) {
+    const ids = pl.piezas.filter((id) => !w.piezas[id].fija);
+    const pared = ids.find((id) => { const a = w.piezas[id].aabb; return a[1] < pl.y + 0.2 && a[4] > pl.y + 3 && Math.min(a[3] - a[0], a[5] - a[2]) < 0.6 && w.piezas[id].clase !== 'metal'; });
+    if (pared === undefined) continue;
+    w.romperPieza(pared);
+    const caen = w.piezasSinApoyo(pared);
+    const grandes = caen.filter((id) => vol(w.piezas[id].aabb) > 1);
+    n++;
+    if (grandes.length) fail(`derrumbe: romper una pared de la casa en (${pl.x.toFixed(0)}, ${pl.z.toFixed(0)}) tira ${grandes.length} piezas grandes (${grandes.slice(0, 3).map((id) => w.piezas[id].clase).join(', ')})`);
+  }
+  console.log(`derrumbes revisados: ${n}`);
 }

@@ -42,7 +42,8 @@ export const MAT_ORDER = ['madera', 'piedra', 'metal'];
 export const BUILD_COST = 10;
 export const MAX_MATS = 999;
 export const GRID = 4;
-export const PICKAXE = { damage: 20, struct: 50, cooldown: 0.5, range: 3.2, gain: { tree: ['madera', 8], rock: ['piedra', 8], house: ['metal', 6] } };
+// gain: material que da cada golpe según lo que se pica (árboles, rocas y piezas del mapa por su material; x2 al romper)
+export const PICKAXE = { damage: 20, struct: 50, cooldown: 0.5, range: 3.2, gain: { tree: ['madera', 8], rock: ['piedra', 8], house: ['metal', 6], madera: ['madera', 6], piedra: ['piedra', 6], metal: ['metal', 5] } };
 export const SLOTS = 5; // sin contar el pico
 
 // Peso de cada rareza al tirar loot (piso / cofre).
