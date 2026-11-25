@@ -25,21 +25,21 @@ button:hover { filter: brightness(1.1); }
 /* Miras: una por arma. --gap es la apertura (sigue a la dispersión real del disparo) y --len el largo de cada trazo */
 #crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; --gap: 8px; --len: 8px; pointer-events: none; }
 #crosshair i { position: absolute; display: none; box-sizing: border-box; }
-#crosshair .dot { width: 4px; height: 4px; left: -2px; top: -2px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.55); }
-#crosshair .ln { background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); }
+#crosshair .dot { width: 4px; height: 4px; left: -2px; top: -2px; border-radius: 50%; background: var(--mira, #fff); box-shadow: 0 0 0 1px rgba(0,0,0,.55); }
+#crosshair .ln { background: var(--mira, #fff); box-shadow: 0 0 0 1px rgba(0,0,0,.45); }
 #crosshair .t, #crosshair .b { width: 2px; height: var(--len); left: -1px; }
 #crosshair .t { top: calc(-1 * (var(--gap) + var(--len))); }
 #crosshair .b { top: var(--gap); }
 #crosshair .l, #crosshair .r { height: 2px; width: var(--len); top: -1px; }
 #crosshair .l { left: calc(-1 * (var(--gap) + var(--len))); }
 #crosshair .r { left: var(--gap); }
-#crosshair .c { width: var(--len); height: var(--len); border: 0 solid #fff; filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); }
+#crosshair .c { width: var(--len); height: var(--len); border: 0 solid var(--mira, #fff); filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); }
 #crosshair .c1 { left: calc(-1 * var(--gap)); top: calc(-1 * var(--gap)); border-left-width: 2px; border-top-width: 2px; }
 #crosshair .c2 { left: calc(var(--gap) - var(--len)); top: calc(-1 * var(--gap)); border-right-width: 2px; border-top-width: 2px; }
 #crosshair .c3 { left: calc(-1 * var(--gap)); top: calc(var(--gap) - var(--len)); border-left-width: 2px; border-bottom-width: 2px; }
 #crosshair .c4 { left: calc(var(--gap) - var(--len)); top: calc(var(--gap) - var(--len)); border-right-width: 2px; border-bottom-width: 2px; }
 #crosshair .ring { width: calc(2 * var(--gap)); height: calc(2 * var(--gap)); left: calc(-1 * var(--gap)); top: calc(-1 * var(--gap));
-  border: 2px solid rgba(255,255,255,.9); border-radius: 50%; filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); }
+  border: 2px solid var(--mira, #fff); border-radius: 50%; filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); }
 /* rifle: cruz con punto */
 #crosshair.ch-rifle .dot, #crosshair.ch-rifle .ln { display: block; }
 #crosshair.ch-rifle { --len: 9px; }
@@ -84,7 +84,9 @@ button:hover { filter: brightness(1.1); }
 #chatInput { position: absolute; left: 16px; bottom: 210px; width: min(360px, 80vw); pointer-events: auto; }
 #damage { position: absolute; inset: 0; box-shadow: inset 0 0 120px 40px rgba(255,0,0,.6); opacity: 0; transition: opacity .4s; }
 #damage.show { opacity: 1; transition: none; }
-#clickToPlay { position: absolute; top: 60%; width: 100%; text-align: center; font-weight: 800; font-size: 20px; text-shadow: 0 2px 4px #000; }
+#clickToPlay { position: absolute; top: 60%; width: 100%; text-align: center; font-weight: 800; font-size: 20px; text-shadow: 0 2px 4px #000; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+#clickToPlay button { pointer-events: auto; font-size: 14px; padding: 9px 16px; background: rgba(15,20,40,.8); border: 2px solid rgba(255,255,255,.25); text-shadow: none; }
+#clickToPlay button small { opacity: .6; margin-left: 6px; font-size: 11px; }
 @media (max-width: 600px) { #minimap { width: 120px; height: 120px; } #killfeed { top: 140px; } h1 { font-size: 34px; } }
 
 /* --- HUD v2 --- */
@@ -125,3 +127,59 @@ button:hover { filter: brightness(1.1); }
 #help { bottom: 150px; }
 #chatlog { bottom: 175px; }
 @media (max-width: 700px) { .slot { width: 52px; height: 52px; font-size: 9px; } #mats { bottom: 90px; } }
+
+#fps { font-variant-numeric: tabular-nums; }
+.btn-config { background: transparent; border: 2px solid rgba(255,255,255,.2); font-size: 13px; padding: 9px 14px; opacity: .85; }
+.btn-config:hover { opacity: 1; border-color: rgba(255,255,255,.45); }
+
+/* --- Panel de configuración --- */
+#config { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(6,10,24,.62); backdrop-filter: blur(3px); }
+.cfg-caja { width: min(760px, 100%); max-height: min(720px, calc(100vh - 32px)); display: flex; flex-direction: column;
+  background: rgba(15,20,40,.96); border: 2px solid rgba(255,255,255,.15); border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.5); overflow: hidden; }
+.cfg-caja header { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 8px; }
+.cfg-caja h2 { margin: 0; font-size: 26px; font-weight: 900; font-style: italic; letter-spacing: 1px;
+  background: linear-gradient(#ffe259, #ffa751); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.cfg-x { background: transparent; padding: 6px 10px; font-size: 18px; opacity: .7; }
+.cfg-x:hover { opacity: 1; }
+.cfg-tabs { flex: none; display: flex; gap: 4px; padding: 0 22px; border-bottom: 2px solid rgba(255,255,255,.1); overflow-x: auto; }
+.cfg-tabs button { background: transparent; border-radius: 0; padding: 10px 14px; font-size: 14px; opacity: .6; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+.cfg-tabs button.activa { opacity: 1; border-bottom-color: #ffd23f; color: #ffd23f; }
+.cfg-cuerpo { overflow-y: auto; padding: 8px 22px 16px; flex: 1; }
+.cfg-cuerpo h3 { margin: 18px 0 4px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #ffd23f; opacity: .85; }
+.cfg-nota { margin: 10px 0 0; font-size: 13px; opacity: .65; }
+.cfg-fila { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+.cfg-nombre { font-weight: 600; font-size: 15px; }
+.cfg-nombre small { display: block; font-weight: 400; font-size: 12px; opacity: .55; margin-top: 2px; }
+.cfg-rango { display: flex; align-items: center; gap: 10px; }
+.cfg-rango input { width: min(240px, 40vw); padding: 0; accent-color: #ffd23f; border: none; background: none; }
+.cfg-rango output { min-width: 48px; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+.cfg-switch { width: 50px; height: 28px; padding: 0; border-radius: 14px; background: rgba(255,255,255,.18); position: relative; flex: none; }
+.cfg-switch i { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: left .15s; }
+.cfg-switch.on { background: #ffb22e; }
+.cfg-switch.on i { left: 25px; }
+.cfg-seg { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.cfg-seg button { background: rgba(255,255,255,.08); font-size: 12px; padding: 7px 11px; display: flex; align-items: center; gap: 6px; }
+.cfg-seg button.on { background: #ffd23f; color: #2b1900; }
+.cfg-color { width: 12px; height: 12px; border-radius: 50%; background: var(--muestra); box-shadow: 0 0 0 1px rgba(0,0,0,.5); }
+.cfg-teclas { display: flex; gap: 6px; flex: none; }
+.cfg-cab { padding: 10px 0 0; border: none; }
+.cfg-cab span { min-width: 112px; text-align: center; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; opacity: .5; }
+.cfg-tecla { min-width: 112px; background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.12); font-size: 13px; padding: 7px 10px; text-transform: none; letter-spacing: 0; }
+.cfg-tecla:hover { border-color: rgba(255,255,255,.4); }
+.cfg-tecla.vacia { opacity: .45; }
+.cfg-tecla.esperando { border-color: #ffd23f; color: #ffd23f; animation: cfg-latido 1s infinite; }
+@keyframes cfg-latido { 50% { border-color: transparent; } }
+.cfg-caja footer { flex: none; display: flex; align-items: center; gap: 8px; padding: 12px 22px 18px; border-top: 2px solid rgba(255,255,255,.1); }
+.cfg-aviso { flex: 1; font-size: 13px; color: #ffd23f; min-height: 1em; }
+.cfg-sec { background: rgba(255,255,255,.1); font-size: 13px; }
+.cfg-caja footer .primary { font-size: 15px; padding: 10px 22px; }
+@media (max-width: 560px) {
+  .cfg-fila { flex-direction: column; align-items: stretch; gap: 8px; }
+  .cfg-seg { justify-content: flex-start; }
+  .cfg-tabs { padding: 0 12px; }
+  .cfg-tabs button { padding: 10px 9px; font-size: 13px; }
+  .cfg-tecla, .cfg-cab span { min-width: 0; flex: 1; }
+  .cfg-cab > div:first-child { display: none; }
+  .cfg-rango input { width: 100%; flex: 1; }
+}

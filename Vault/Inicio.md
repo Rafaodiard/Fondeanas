@@ -4,7 +4,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 
 - Repo: https://github.com/Rafaodiard/Fondeanas
 - Stack: Node (`server.js` con `ws`) + Three.js 0.170 como ES modules sin bundler. `npm start` levanta todo en el puerto 3000 (`PORT` lo cambia).
-- Vault actualizado con los arreglos del mapa y las estructuras rompibles (rama `claude/project-thread-vbeczu`, 2026-11-25), sobre el commit `ffd2cab` de `main`.
+- Vault actualizado con el panel de configuración y el registro central de controles (rama `claude/project-thread-xxn59g`, 2026-11-25), sobre el commit `8de7b6c` de `main`.
 
 ## Cómo está armado
 
@@ -27,7 +27,9 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 | [[assets.js]] | `public/js/assets.js` | Carga de los GLB y clonado con tintes |
 | [[models.js]] | `public/js/models.js` | Personajes, bus, armas y objetos (GLB o primitivas de respaldo) |
 | [[rig.js]] | `public/js/rig.js` | Esqueleto y animaciones del personaje por capas |
-| [[audio.js]] | `public/js/audio.js` | Sonidos sintetizados con WebAudio |
+| [[audio.js]] | `public/js/audio.js` | Sonidos sintetizados con WebAudio y volumen general |
+| [[controles.js]] | `public/js/controles.js` | Registro central de teclas (acciones con contexto) y opciones del juego, guardados en `localStorage` |
+| [[configuracion.js]] | `public/js/configuracion.js` | Panel de configuración: Juego, Video, Sonido y Controles |
 
 ## Pantallas
 
@@ -37,7 +39,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 
 ## Sistemas del juego
 
-- [[Mapa de la isla]] · [[Estructuras rompibles]] · [[Salas y partidas]] · [[Bus, caída y planeador]] · [[Tormenta]] · [[Loot y rarezas]] · [[Armas y disparo]] · [[Construcción]] · [[Pico y recursos]] · [[Curación y escudo]]
+- [[Mapa de la isla]] · [[Estructuras rompibles]] · [[Salas y partidas]] · [[Bus, caída y planeador]] · [[Tormenta]] · [[Loot y rarezas]] · [[Armas y disparo]] · [[Construcción]] · [[Pico y recursos]] · [[Curación y escudo]] · [[Configuración y controles]]
 
 ## Arte y herramientas
 
@@ -46,6 +48,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 - [[Pipeline de armas]]: scripts de Blender de las armas (modelado, horneado, recargas, export).
 - [[sf_tools.py]]: herramientas base de modelado por script.
 - [[Texturas]]: máscaras de cara y tatuaje hechas con Python.
+- `tools/controles/pruebas.mjs`: pruebas del registro de controles y opciones (ver [[controles.js]]).
 - [[Pruebas del mapa]]: pruebas automáticas de colisiones, escaleras, puertas, alcance del loot, lo que se ve (caras al revés, caras que titilan, pisos falsos) y derrumbes.
 
 ## Memoria

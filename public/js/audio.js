@@ -1,13 +1,20 @@
 // Efectos de sonido sintetizados con WebAudio (sin archivos).
 let ctx = null;
 let master = null;
+let volumen = 1;
+
+/** Volumen general de 0 a 1 (sale de la opción del panel de configuración). */
+export function setVolumen(v) {
+  volumen = Math.max(0, Math.min(1, Number(v) || 0));
+  if (master) master.gain.value = 0.35 * volumen;
+}
 
 function ac() {
   if (!ctx) {
     try {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
       master = ctx.createGain();
-      master.gain.value = 0.35;
+      master.gain.value = 0.35 * volumen;
       master.connect(ctx.destination);
     } catch { return null; }
   }
