@@ -20,7 +20,8 @@ def _solo(objs, activo):
     bpy.context.view_layer.objects.active = activo
 
 
-def exportar(ruta, calidad=82, rehacer=True, meshopt=True):
+def exportar(ruta, calidad=82, rehacer=True, meshopt=True, imagenes='WEBP'):
+    # imagenes='AUTO' deja las texturas como vienen (sin volver a comprimir si el héroe se importó de un GLB)
     arm = bpy.data.objects['Esqueleto']
     m = bpy.data.objects['HeroeJuego']
     if rehacer:
@@ -47,7 +48,7 @@ def exportar(ruta, calidad=82, rehacer=True, meshopt=True):
     try:
         bpy.ops.export_scene.gltf(
             filepath=ruta, export_format='GLB', use_selection=True, use_active_scene=True,
-            export_image_format='WEBP', export_image_quality=calidad, export_unused_images=False,
+            export_image_format=imagenes, export_image_quality=calidad, export_unused_images=False,
             export_tangents=False, export_extras=False, export_yup=True, export_apply=False,
             export_skins=True, export_def_bones=False, export_leaf_bone=False, export_rest_position_armature=True,
             export_animations=True, export_animation_mode='ACTIONS', export_force_sampling=True,

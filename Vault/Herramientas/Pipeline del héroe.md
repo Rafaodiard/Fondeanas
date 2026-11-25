@@ -13,6 +13,6 @@ Scripts de Blender en `tools/blender/`, que se ejecutan en Blender (5.x) en el m
 | `heroe_rig.py` | Esqueleto `Esqueleto` y pesos de la malla `HeroeJuego`. |
 | `heroe_anim.py` | Base de animación por código: poses en espacio del personaje, IK analítica de dos huesos, `Pose`, `grabar`. 30 fps. |
 | `heroe_clips.py` | Clips: locomoción con pies plantados (`MARCHAS`: Caminar, Trote, Correr, Sprint), aire, pico, poses de armas (`ARMAS`: Rifle, RifleApunta, Pistola, PistolaApunta, Lanzacohetes...) y baile. Requiere `heroe_anim.py`. |
-| `heroe_export.py` | Exporta malla con piel, esqueleto (con el hueso `Arma.R`), todas las acciones y texturas WebP. Sube el esqueleto 0,032 para que la suela quede en y = 0. Requiere `heroe_anim.py` y `heroe_clips.py`. |
+| `heroe_export.py` | Exporta malla con piel, esqueleto (con el hueso `Arma.R`), todas las acciones y texturas WebP (`imagenes='AUTO'` deja las texturas como están, para reexportar un personaje importado sin recomprimirlas). Sube el esqueleto 0,032 para que la suela quede en y = 0. Requiere `heroe_anim.py` y `heroe_clips.py`. |
 
 Las recargas y el bombeo del héroe salen de [[Pipeline de armas]] (`heroe_recargas.py`).

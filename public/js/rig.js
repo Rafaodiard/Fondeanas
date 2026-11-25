@@ -93,7 +93,7 @@ export function createRigCharacter(color) {
   gun.add(muzzle);
   root.userData = {
     rig: true, model, mixer, acts, B, gun, muzzle, glider: null, held: null, heldKind: null,
-    phase: 0, swing: 0, golpeT: 99, recoil: 0, vy: 0,
+    phase: 0, swing: 0, golpeT: 99, recoil: 0, rx: 0, rv: 0, rs: 1, vy: 0,
   };
   return root;
 }
@@ -268,10 +268,49 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
     rotWorld(B.neck, _right, pitch * 0.2);
     rotWorld(B.head, _right, pitch * 0.3);
   }
-  if (u.recoil > 0) {
-    rotWorld(B.spine2, _right, u.recoil * 0.06);
-    u.recoil = Math.max(0, u.recoil - dt * 9);
+  retroceso(u, B, dt, aiming);
+}
+
+// Retroceso por arma: cada tiro es un impulso a un resorte amortiguado (sube rápido y vuelve con un rebote chico,
+// y con las automáticas se acumula mientras se dispara). Con eso se inclina el pecho (el cañón sube), el torso gira
+// un poco a un lado al azar y el arma se levanta y se va atrás en la mano. Apuntando, el cuerpo lo absorbe más.
+// sube: pecho (rad), flip: arma en la mano (rad), atras: arma hacia atrás (m), giro: torso de costado (rad)
+const RETRO = {
+  pistola: { sube: 0.035, flip: 0.14, atras: 0.012, giro: 0.012 },
+  subfusil: { sube: 0.02, flip: 0.025, atras: 0.012, giro: 0.015 },
+  rifle: { sube: 0.035, flip: 0.02, atras: 0.016, giro: 0.012 },
+  escopeta: { sube: 0.09, flip: 0.04, atras: 0.03, giro: 0.02 },
+  francotirador: { sube: 0.11, flip: 0.035, atras: 0.035, giro: 0.015 },
+  lanzacohetes: { sube: 0.07, flip: 0, atras: 0.045, giro: 0.02 },
+};
+const R_W = 2 * Math.PI * 4.5, R_Z = 0.45, R_IMP = 46;   // frecuencia, amortiguación e impulso (pico ≈ 1)
+
+function retroceso(u, B, dt, aiming) {
+  if (u.recoil > 0) {                       // main.js marca el tiro con recoil = 1
+    u.rv = (u.rv || 0) + R_IMP * u.recoil;
+    u.rs = Math.random() < 0.5 ? -1 : 1;
+    u.recoil = 0;
   }
+  let x = u.rx || 0, v = u.rv || 0;
+  if (x || v) {
+    const n = Math.ceil(dt / 0.008), h = dt / n;
+    for (let i = 0; i < n; i++) {
+      v += (-R_W * R_W * x - 2 * R_Z * R_W * v) * h;
+      x += v * h;
+    }
+    if (Math.abs(x) < 1e-4 && Math.abs(v) < 1e-3) x = v = 0;
+    u.rx = x; u.rv = v;
+  }
+  const P = RETRO[u.heldKind];
+  const k = P ? x * (aiming ? 0.7 : 1) : 0;
+  if (k) {
+    rotWorld(B.spine2, _right, k * P.sube);
+    rotWorld(B.spine1, _up, k * P.giro * (u.rs || 1));
+  }
+  // el arma gira sobre el puño (el cañón sube) y retrocede en la mano
+  u.gun.rotation.set(Math.PI / 2 + (P ? k * P.flip : 0), 0, 0);
+  u.gun.position.set(0, 0, 0);
+  if (P && k) u.gun.translateZ(k * P.atras);     // +Z del grupo = hacia atrás del cañón en el marco de Arma.R
 }
 
 // Modelo de arma colgado de la mano: piezas móviles, su posición de reposo y un mezclador para sus clips.
