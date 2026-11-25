@@ -44,7 +44,7 @@ Para recorrer la isla sin jugar, con el servidor levantado abrí http://localhos
 
 ## Mecánicas
 
-- **Bus volador, caída libre y planeador.**
+- **Bus volador, caída libre y planeador.** El bus es un colectivo de línea retro de dos tonos con ala alta sobre el techo, dos motores con hélices que giran, cola en cruz, portaequipajes con valijas, cartel de destino iluminado, baliza que destella y reflejos en el cromo y los vidrios.
 - **Loot** en el piso y en **cofres**, con cinco rarezas (común, poco común, rara, épica y legendaria) que suben el daño y bajan el tiempo de recarga.
 - **Armas:** pistola, subfusil, rifle de asalto, escopeta, francotirador con mira y lanzacohetes con daño en área. Cada una usa su tipo de munición. Cada arma tiene su propio retroceso al disparar (sube, patea y se corre hacia atrás) y sus recargas animadas, revisadas para que el arma no atraviese el cuerpo.
 - **Inventario** con 5 slots y el pico fijo.
@@ -109,7 +109,7 @@ node tools/controles/pruebas.mjs
 - `public/js/models.js`: arma los personajes, el bus, el planeador, las armas y los objetos del piso a partir de los GLB. Si un GLB no carga, usa modelos low-poly hechos con primitivas como respaldo.
 - `public/js/rig.js`: anima el personaje con su esqueleto (capas de piernas, torso y brazo izquierdo, mezcla de locomoción, poses de armas, recargas, bombeo y retroceso por arma). Después dobla la columna para mirar y apuntar adonde va la cámara, con topes para que los brazos no se metan en el cuerpo.
 - `public/visor.html`: visor del personaje para revisar sus animaciones (`/visor.html`).
-- `tools/blender/`: scripts de Blender que generan el personaje (`heroe_*.py`), las armas (`armas_*.py`) y sus animaciones. `recargas_control.py`, `armas_choque.py` y `brazos_choque.py` revisan las animaciones sin renderizar (brazos, saltos entre cuadros, cuánto se mete el arma en el cuerpo y cuánto se meten los brazos y las manos en el cuerpo con las mismas mezclas del juego, mirando derecho, abajo y arriba). `tools/texturas/`: máscaras de la cara y el tatuaje.
+- `tools/blender/`: scripts de Blender que generan el personaje (`heroe_*.py`), las armas (`armas_*.py`), el bus volador (`bus.py`) y sus animaciones. `recargas_control.py`, `armas_choque.py` y `brazos_choque.py` revisan las animaciones sin renderizar (brazos, saltos entre cuadros, cuánto se mete el arma en el cuerpo y cuánto se meten los brazos y las manos en el cuerpo con las mismas mezclas del juego, mirando derecho, abajo y arriba). `tools/texturas/`: máscaras de la cara y el tatuaje.
 - `Vault/`: vault de Obsidian que documenta el proyecto (empezar por `Vault/Inicio.md`) y grafo del código generado con graphify en `Vault/graphify-out`.
 - `public/js/main.js`: el juego en sí (cámara en tercera persona, física, disparo, HUD, minimapa, red).
 - `public/js/controles.js`: registro central de acciones y teclas (con contexto: siempre, combate o construcción) y de las opciones del juego, guardados en `localStorage`. Cualquier control u opción nueva se agrega acá con `registrarAccion` / `registrarOpcion`.
@@ -118,7 +118,8 @@ node tools/controles/pruebas.mjs
 
 ## Capturas
 
-![Bus volador](docs/bus.png)
+![Bus volador desde el juego](docs/bus.png)
+![Bus volador renderizado en Blender](docs/bus_blender.jpg)
 ![Combate](docs/combate.png)
 ![Construcción](docs/construccion.png)
 ![Personajes](docs/personajes.png)

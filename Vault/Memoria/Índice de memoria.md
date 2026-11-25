@@ -16,3 +16,4 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 - [[Errores del mapa]]: los errores que encontró al probar el mapa y que todo se rompa.
 - [[Brazos sin atravesar el cuerpo]]: el pedido, cómo se revisa y la tolerancia.
 - [[Panel de configuración]]: el pedido del panel y quién eligió cada opción.
+- [[Pedido del bus]]: el bus volador modelado por script.

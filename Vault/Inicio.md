@@ -46,6 +46,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 - [[Modelos GLB]]: los archivos de `public/models` y quién los usa.
 - [[Pipeline del héroe]]: scripts de Blender del personaje (malla, ropa, rig, clips, export).
 - [[Pipeline de armas]]: scripts de Blender de las armas (modelado, horneado, recargas, export).
+- [[Pipeline del bus]]: script de Blender del bus volador (modelado, fotos y export).
 - [[sf_tools.py]]: herramientas base de modelado por script.
 - [[Texturas]]: máscaras de cara y tatuaje hechas con Python.
 - `tools/controles/pruebas.mjs`: pruebas del registro de controles y opciones (ver [[controles.js]]).

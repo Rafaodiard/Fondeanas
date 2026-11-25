@@ -13,4 +13,5 @@ Volver a [[Inicio]]
 - Caída libre (`FREEFALL_V = 42`, `FREEFALL_H = 20`) y planeador (`GLIDER_V = 8`, `GLIDER_H = 17`). Si el jugador está a menos de `AUTO_GLIDER = 70` del piso, el planeador se abre solo.
 - El planeador es `planeador.glb` con la tela teñida del color del jugador ([[models.js]]); [[rig.js]] lo ubica en las manos (`placeGlider`).
 - **Daño por caída**: si al tocar el piso la velocidad vertical mínima fue menor a -20, el cliente manda `fall` con `(-vy - 20) * 5` de daño (no aplica en el agua). El servidor lo limita a 100.
-- El bus es `bus.glb` ([[Modelos GLB]]).
+- El bus es `bus.glb` ([[Modelos GLB]], hecho con [[Pipeline del bus]]). `createBus()` de [[models.js]] guarda las hélices (`Helice_I`, `Helice_D`) en `userData.props` y `updateBus` las hace girar sobre su Z local; también le da a los materiales del bus un cielo de reflejo propio y hace destellar la baliza del techo y la luz blanca de la cola.
+- El centro del modelo está a media altura de la carrocería; las ruedas llegan a 2,3 m por debajo, así que el salto (`bus.position.y - 3`) sale apenas debajo de las ruedas.

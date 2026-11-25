@@ -130,13 +130,59 @@ export function animateCharacter(char, state, speed, dt, aiming, extra) {
   }
 }
 
-// Bus volador original: colectivo con alas, hélices y aleta de cola.
+// Cielo de mentira (cubo de degradés) para que el cromo, los vidrios y la pintura del bus tengan qué reflejar.
+let busEnv = null;
+function cieloBus() {
+  if (busEnv) return busEnv;
+  const cara = (arriba, abajo, horizonte = null) => {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    const ctx = cv.getContext('2d');
+    const gr = ctx.createLinearGradient(0, 0, 0, 64);
+    gr.addColorStop(0, arriba);
+    if (horizonte) gr.addColorStop(0.5, horizonte);
+    gr.addColorStop(1, abajo);
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, 0, 64, 64);
+    return cv;
+  };
+  const lado = cara('#7fb6ea', '#3f7a3a', '#eaf4ff');
+  busEnv = new THREE.CubeTexture([lado, lado, cara('#6aa6e4', '#6aa6e4'), cara('#3a6a34', '#3a6a34'), lado, lado]);
+  busEnv.colorSpace = THREE.SRGBColorSpace;
+  busEnv.needsUpdate = true;
+  return busEnv;
+}
+
+// Bus volador (bus.glb, tools/blender/bus.py): colectivo retro con ala alta, dos hélices, cola y portaequipajes.
+// La baliza del techo destella y la luz blanca de la cola hace doble flash.
 export function createBus() {
   const glb = cloneAsset('bus');
   if (glb) {
     const g = new THREE.Group();
     g.add(glb);
     g.userData.props = [glb.getObjectByName('Helice_I'), glb.getObjectByName('Helice_D')].filter(Boolean);
+    const env = cieloBus();
+    const propios = new Map();
+    glb.traverse((o) => {
+      if (!o.isMesh) return;
+      const n = o.material.name;
+      if (!propios.has(n)) {
+        const m = o.material.clone();
+        m.envMap = env;
+        m.envMapIntensity = n === 'Vidrio' ? 1.4 : 0.8;
+        propios.set(n, m);
+      }
+      o.material = propios.get(n);
+      o.castShadow = false;
+      if (n === 'Baliza' || n === 'Destello') {
+        const m = o.material, base = m.emissiveIntensity;
+        o.onBeforeRender = () => {
+          const t = performance.now() / 1000;
+          const on = n === 'Baliza' ? (t % 1) < 0.45 : (t % 1.4) < 0.07 || ((t % 1.4) > 0.18 && (t % 1.4) < 0.25);
+          m.emissiveIntensity = on ? base : 0.05;
+        };
+      }
+    });
     return g;
   }
 
