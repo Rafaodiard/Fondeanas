@@ -6,8 +6,10 @@ import {
   WEAPONS, CONSUMABLES, AMMO, MATERIALS, MAT_ORDER, RARITIES, BUILD_COST, PICKAXE, SLOTS, GRID, DIRS,
   itemLabel, itemColor, weaponReload, structKey,
 } from './items.js';
-import { sfx } from './audio.js';
+import { sfx, setVolumen } from './audio.js';
 import { setRigEnv } from './rig.js';
+import { accionesDe, activa, presionar, soltar, soltarTodo, teclaDe, listaAcciones, opcion, alCambiar, cargarDistribucion } from './controles.js';
+import { abrirConfig, cerrarConfig, abierto as configAbierta } from './configuracion.js';
 
 const GRAVITY = 25, WALK = 6, SPRINT = 9.5, AIM_WALK = 3.5, JUMP = 8.5, SWIM_Y = -1.3;
 const FREEFALL_V = 42, FREEFALL_H = 20, GLIDER_V = 8, GLIDER_H = 17, AUTO_GLIDER = 70;
@@ -39,7 +41,6 @@ function storageSet(k, v) { try { localStorage.setItem(k, v); } catch { /* sin a
 
 // ---------- Three.js ----------
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -61,6 +62,30 @@ sun.shadow.bias = -0.0005;
 scene.add(sun, sun.target);
 const SUN_DIR = new THREE.Vector3(0.5, 1, 0.3).normalize();
 addClouds();
+
+// Calidad gráfica (opciones del panel de configuración): resolución y sombras.
+const CALIDAD = { baja: { pr: 1, sombra: 0 }, media: { pr: 1.25, sombra: 1024 }, alta: { pr: 2, sombra: 2048 } };
+function aplicarVideo() {
+  const q = CALIDAD[opcion('calidad')] || CALIDAD.alta;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pr) * opcion('resolucion'));
+  const sombras = q.sombra > 0;
+  if (sombras && sun.shadow.mapSize.x !== q.sombra) {
+    sun.shadow.mapSize.set(q.sombra, q.sombra);
+    sun.shadow.map?.dispose(); sun.shadow.map = null;
+  }
+  if (renderer.shadowMap.enabled !== sombras) {
+    renderer.shadowMap.enabled = sombras;
+    sun.castShadow = sombras;
+    scene.traverse((o) => { if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true; });
+  }
+  resize();
+}
+function aplicarOpciones() {
+  aplicarVideo();
+  setVolumen(opcion('volumen'));
+  document.documentElement.style.setProperty('--mira', opcion('colorMira'));
+  $('fps').classList.toggle('hidden', !opcion('fps'));
+}
 
 function addClouds() {
   const geo = new THREE.IcosahedronGeometry(1, 1);
@@ -90,7 +115,12 @@ function resize() {
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resize);
-resize();
+aplicarOpciones();
+alCambiar((tipo) => {
+  if (tipo === 'opcion') aplicarOpciones();
+  else { ghostKey = ''; updateSlots(); updateHelp(); }
+});
+cargarDistribucion();
 
 const stormMat = new THREE.MeshBasicMaterial({ color: '#8a4dff', transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false, fog: false });
 const stormMesh = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2000, 96, 1, true), stormMat);
@@ -110,7 +140,6 @@ const me = {
   build: null, mat: 'madera', mesh: null, spectate: null, minVy: 0,
 };
 let bus = null;
-const keys = {};
 let mouseDown = false, mouseClicked = false, locked = false, rmbDown = false;
 const tracers = [];
 const effects = [];
@@ -403,9 +432,22 @@ function updateHp() {
 
 function heldItem() { return me.sel >= 0 ? me.slots[me.sel] : null; }
 
+// Ayuda de abajo: se arma con las teclas que tenga asignadas el jugador.
+function updateHelp() {
+  const k = (id) => escapeHtml(teclaDe(id));
+  const mov = ['adelante', 'izquierda', 'atras', 'derecha'].map(teclaDe).join('');
+  $('help').innerHTML = [
+    `${escapeHtml(mov.length === 4 ? mov : mov.split('').join('/'))} moverse`, `${k('correr')} correr`, `${k('saltar')} saltar`,
+    `${k('disparar')} usar/disparar`, `${k('apuntar')} apuntar`, `${k('interactuar')} agarrar/abrir`, `${k('recargar')} recargar`,
+    `${k('construirPared')}/${k('construirPiso')}/${k('construirRampa')} construir pared/piso/rampa`, `${k('modoConstruccion')} salir de construcción`,
+    `${k('cambiarMaterial')} material`, `${k('tirar')} tirar`, `${k('bailar')} bailar`, `${k('chat')} chat`, 'Esc configuración',
+  ].join(' · ');
+}
+updateHelp();
+
 function updateSlots() {
   const cells = [];
-  cells.push(`<div class="slot ${me.sel === -1 && !me.build ? 'active' : ''}"><span class="k">1</span><span class="n">⛏ Pico</span></div>`);
+  cells.push(`<div class="slot ${me.sel === -1 && !me.build ? 'active' : ''}"><span class="k">${escapeHtml(teclaDe('pico'))}</span><span class="n">⛏ Pico</span></div>`);
   for (let i = 0; i < SLOTS; i++) {
     const it = me.slots[i];
     let inner = '';
@@ -419,7 +461,7 @@ function updateSlots() {
         inner = `<span class="rar" style="background:linear-gradient(transparent,${col})"></span><span class="a">×${it.count}</span><span class="n">${CONSUMABLES[it.c].name}</span>`;
       }
     }
-    cells.push(`<div class="slot ${me.sel === i && !me.build ? 'active' : ''}"><span class="k">${i + 2}</span>${inner}</div>`);
+    cells.push(`<div class="slot ${me.sel === i && !me.build ? 'active' : ''}"><span class="k">${escapeHtml(teclaDe('ranura' + (i + 1)))}</span>${inner}</div>`);
   }
   ui.slots.innerHTML = cells.join('');
   document.querySelectorAll('.mat').forEach((el) => {
@@ -431,8 +473,8 @@ function updateSlots() {
   ui.buildbar.classList.toggle('hidden', !me.build);
   ui.slots.classList.toggle('hidden', !!me.build);
   if (me.build) {
-    ui.buildbar.innerHTML = [['pared', 'Z Pared'], ['piso', 'X Piso'], ['rampa', 'C Rampa']]
-      .map(([t, l]) => `<div class="${me.build === t ? 'active' : ''}">${l}</div>`).join('') + `<div>${MATERIALS[me.mat].name} · ${BUILD_COST}</div>`;
+    ui.buildbar.innerHTML = [['pared', 'construirPared', 'Pared'], ['piso', 'construirPiso', 'Piso'], ['rampa', 'construirRampa', 'Rampa']]
+      .map(([t, a, l]) => `<div class="${me.build === t ? 'active' : ''}">${escapeHtml(teclaDe(a))} ${l}</div>`).join('') + `<div>${MATERIALS[me.mat].name} · ${BUILD_COST}</div>`;
   }
   // Lo que tiene en la mano
   if (me.mesh) {
@@ -511,38 +553,53 @@ function addChat(html) {
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 // ---------- Entrada ----------
+// Las teclas salen del registro de controles.js (el jugador las cambia en Configuración).
 const PLAYING = ['bus', 'falling', 'glider', 'ground'];
+const contexto = () => (me.build ? 'construccion' : 'combate');
 canvas.addEventListener('click', () => {
   sfx.unlock();
+  if (configAbierta()) return;
   if (me.state === 'dead') { startSpectating(); return; }
   if (!locked && PLAYING.includes(me.state)) canvas.requestPointerLock();
 });
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
+  if (!locked) soltarEntradas();
   ui.click.classList.toggle('hidden', locked || !PLAYING.includes(me.state));
 });
+$('btnPausaConfig').addEventListener('click', (e) => { e.stopPropagation(); abrirConfigDesdeJuego(); });
+$('btnConfigMenu').addEventListener('click', () => abrirConfig());
+$('btnConfigSala').addEventListener('click', () => abrirConfig());
+function abrirConfigDesdeJuego() {
+  document.exitPointerLock?.();
+  ui.click.classList.add('hidden');
+  abrirConfig(() => {
+    // al cerrar con un clic o una tecla se vuelve a capturar el mouse
+    if (PLAYING.includes(me.state)) canvas.requestPointerLock()?.catch?.(() => {});
+    ui.click.classList.toggle('hidden', locked || !PLAYING.includes(me.state));
+  });
+}
 document.addEventListener('mousemove', (e) => {
   if (!locked) return;
   const scoped = me.aiming && heldItem()?.kind === 'weapon' && WEAPONS[heldItem().w].scope;
-  const sens = scoped ? 0.0006 : me.aiming ? 0.0012 : 0.0022;
+  const sens = 0.0022 * opcion('sens') * (scoped ? opcion('sensMira') : me.aiming ? opcion('sensApunta') : 1);
   me.yaw -= e.movementX * sens;
-  me.pitch = Math.max(-1.35, Math.min(1.2, me.pitch - e.movementY * sens));
+  me.pitch = Math.max(-1.35, Math.min(1.2, me.pitch - e.movementY * sens * (opcion('invertirY') ? -1 : 1)));
 });
 document.addEventListener('mousedown', (e) => {
   if (!locked) return;
-  if (e.button === 0) { mouseDown = true; mouseClicked = true; }
-  if (e.button === 2) { rmbDown = true; me.aiming = canAim(); }
+  pulsar('Mouse' + e.button, e);
 });
-document.addEventListener('mouseup', (e) => {
-  if (e.button === 0) mouseDown = false;
-  if (e.button === 2) { rmbDown = false; me.aiming = false; }
-});
+document.addEventListener('mouseup', (e) => { liberar('Mouse' + e.button); });
 document.addEventListener('wheel', (e) => {
-  if (!locked || me.build) return;
-  selectSlot(((me.sel + 1 + Math.sign(e.deltaY) + SLOTS + 1) % (SLOTS + 1)) - 1);
-});
+  if (!locked || !e.deltaY) return;
+  const code = e.deltaY > 0 ? 'RuedaAbajo' : 'RuedaArriba';
+  pulsar(code, e);
+  soltar(code);
+}, { passive: true });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('keydown', (e) => {
+  if (configAbierta()) return;
   if (document.activeElement === ui.chatInput) {
     if (e.key === 'Enter') {
       const text = ui.chatInput.value.trim();
@@ -555,30 +612,58 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (document.activeElement?.tagName === 'INPUT') return;
-  keys[e.code] = true;
+  // Esc con el mouse suelto abre la configuración (con el mouse capturado, el navegador usa Esc para soltarlo)
+  if (e.code === 'Escape') { if (!ui.hud.classList.contains('hidden') && !locked) abrirConfigDesdeJuego(); return; }
+  if (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'Tab') e.preventDefault();
   if (e.repeat) return;
-  if (e.code === 'Enter' && !ui.hud.classList.contains('hidden')) {
-    document.exitPointerLock?.();
-    ui.chatInput.classList.remove('hidden');
-    ui.chatInput.focus();
-    e.preventDefault();
-    return;
-  }
-  if (e.code === 'Space') { e.preventDefault(); onSpace(); }
-  const digit = /^Digit([1-6])$/.exec(e.code);
-  if (digit) { selectSlot(Number(digit[1]) - 2); }
-  if (e.code === 'KeyR') startReload();
-  if (e.code === 'KeyE') doInteract();
-  if (e.code === 'KeyG') dropHeld();
-  if (e.code === 'KeyB' && me.state === 'ground') me.dance = !me.dance;
-  if (e.code === 'KeyZ') setBuild('pared');
-  if (e.code === 'KeyX') setBuild('piso');
-  if (e.code === 'KeyC') setBuild('rampa');
-  if (e.code === 'KeyQ') setBuild(me.build ? null : 'pared');
-  if (e.code === 'KeyV') { me.mat = MAT_ORDER[(MAT_ORDER.indexOf(me.mat) + 1) % 3]; ghostKey = ''; updateSlots(); }
+  pulsar(e.code, e);
 });
-document.addEventListener('keyup', (e) => { keys[e.code] = false; });
-window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseDown = false; rmbDown = false; me.aiming = false; });
+document.addEventListener('keyup', (e) => liberar(e.code));
+window.addEventListener('blur', soltarEntradas);
+function soltarEntradas() { soltarTodo(); mouseDown = false; if (!opcion('apuntarAlternar')) { rmbDown = false; me.aiming = false; } }
+
+// Una tecla, botón o rueda: dispara las acciones que tenga asignadas en el contexto actual.
+function pulsar(code, e) {
+  presionar(code);
+  for (const a of accionesDe(code, contexto())) hacer(a, e);
+}
+function liberar(code) {
+  soltar(code);
+  for (const a of accionesDe(code)) {
+    if (a === 'disparar' && !activa('disparar')) mouseDown = false;
+    if (a === 'apuntar' && !opcion('apuntarAlternar') && !activa('apuntar')) { rmbDown = false; me.aiming = false; }
+  }
+}
+function hacer(a, e) {
+  const ranura = /^ranura([1-5])$/.exec(a);
+  if (ranura) { selectSlot(Number(ranura[1]) - 1); return; }
+  switch (a) {
+    case 'disparar': mouseDown = true; mouseClicked = true; break;
+    case 'apuntar': rmbDown = opcion('apuntarAlternar') ? !rmbDown : true; me.aiming = rmbDown && canAim(); break;
+    case 'saltar': onSpace(); break;
+    case 'recargar': startReload(); break;
+    case 'interactuar': doInteract(); break;
+    case 'tirar': dropHeld(); break;
+    case 'bailar': if (me.state === 'ground') me.dance = !me.dance; break;
+    case 'pico': selectSlot(-1); break;
+    case 'ranuraSiguiente': case 'ranuraAnterior':
+      if (!me.build) selectSlot(((me.sel + 1 + (a === 'ranuraSiguiente' ? 1 : -1) + SLOTS + 1) % (SLOTS + 1)) - 1);
+      break;
+    case 'construirPared': setBuild('pared'); break;
+    case 'construirPiso': setBuild('piso'); break;
+    case 'construirRampa': setBuild('rampa'); break;
+    case 'modoConstruccion': setBuild(me.build ? null : 'pared'); break;
+    case 'cambiarMaterial': me.mat = MAT_ORDER[(MAT_ORDER.indexOf(me.mat) + 1) % 3]; ghostKey = ''; updateSlots(); break;
+    case 'chat':
+      if (ui.hud.classList.contains('hidden')) break;
+      document.exitPointerLock?.();
+      ui.chatInput.classList.remove('hidden');
+      ui.chatInput.focus();
+      e?.preventDefault?.();
+      break;
+    default: break;
+  }
+}
 // Solo se apunta con un arma en la mano (con el pico, objetos o construyendo, el clic derecho no hace zoom).
 function canAim() {
   const it = heldItem();
@@ -589,6 +674,7 @@ function selectSlot(i) {
   if (i === me.sel && !me.build) return;
   me.sel = i;
   me.build = null; clearGhost();
+  if (opcion('apuntarAlternar')) rmbDown = false;
   if (me.use) cancelUse();
   if (me.reloadSlot >= 0 && me.reloadSlot !== i) { me.reloading = 0; me.reloadSlot = -1; stopWeaponAction(me.mesh); }
   sfx.click();
@@ -600,6 +686,7 @@ function selectSlot(i) {
 function setBuild(type) {
   if (me.state !== 'ground' && me.state !== 'glider' && me.state !== 'falling') return;
   me.build = type;
+  if (type && opcion('apuntarAlternar')) rmbDown = false;
   if (me.use) cancelUse();
   ghostKey = '';
   if (!type) clearGhost();
@@ -670,11 +757,12 @@ function updatePrompt() {
   interact = findInteract();
   if (!interact) { ui.prompt.classList.add('hidden'); return; }
   ui.prompt.classList.remove('hidden');
-  if (interact.kind === 'chest') ui.prompt.innerHTML = '<b>E</b> Abrir cofre';
+  const tecla = escapeHtml(teclaDe('interactuar'));
+  if (interact.kind === 'chest') ui.prompt.innerHTML = `<b>${tecla}</b> Abrir cofre`;
   else {
     const it = interact.it;
     const full = it.kind === 'weapon' && me.slots.every(Boolean);
-    ui.prompt.innerHTML = `<b>E</b> ${full ? 'Cambiar por' : 'Agarrar'} <span style="color:${itemColor(it)}">${escapeHtml(itemLabel(it))}</span>`;
+    ui.prompt.innerHTML = `<b>${tecla}</b> ${full ? 'Cambiar por' : 'Agarrar'} <span style="color:${itemColor(it)}">${escapeHtml(itemLabel(it))}</span>`;
   }
 }
 
@@ -947,6 +1035,7 @@ function sparks(at, color, n = 6) {
 }
 
 function addDmgNum(pos, dmg, color) {
+  if (!opcion('numerosDanio')) return;
   const el = document.createElement('div');
   el.textContent = dmg;
   el.style.color = color;
@@ -1025,10 +1114,10 @@ function updateMe(dt) {
   const fwd = new THREE.Vector3(-Math.sin(me.yaw), 0, -Math.cos(me.yaw));
   const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
   const input = new THREE.Vector3();
-  if (keys.KeyW) input.add(fwd);
-  if (keys.KeyS) input.sub(fwd);
-  if (keys.KeyD) input.add(right);
-  if (keys.KeyA) input.sub(right);
+  if (activa('adelante')) input.add(fwd);
+  if (activa('atras')) input.sub(fwd);
+  if (activa('derecha')) input.add(right);
+  if (activa('izquierda')) input.sub(right);
   if (input.lengthSq() > 0) input.normalize();
   const ground = world.groundHeight(me.pos.x, me.pos.z, me.pos.y);
 
@@ -1046,7 +1135,9 @@ function updateMe(dt) {
   } else if (me.state === 'ground') {
     const swimming = ground < SWIM_Y;
     const slow = me.use ? 0.5 : 1;
-    const speed = (swimming ? 4 : me.aiming ? AIM_WALK : keys.ShiftLeft && keys.KeyW ? SPRINT : WALK) * slow;
+    // "Correr siempre": se corre sin apretar nada y la tecla de correr pasa a caminar
+    const corre = activa('adelante') && (activa('correr') !== !!opcion('correrSiempre'));
+    const speed = (swimming ? 4 : me.aiming ? AIM_WALK : corre ? SPRINT : WALK) * slow;
     const accel = me.onGround || swimming ? 12 : 3;
     me.vel.x += (input.x * speed - me.vel.x) * Math.min(1, dt * accel);
     me.vel.z += (input.z * speed - me.vel.z) * Math.min(1, dt * accel);
@@ -1176,7 +1267,8 @@ function updateCamera(dt, t) {
   if (camTarget.y < minY) camTarget.y = minY;
   camera.position.copy(camTarget);
   camera.lookAt(camera.position.clone().add(dir));
-  const fovTarget = scoped ? 18 : me.aiming ? 52 : me.state === 'falling' ? 80 : 70;
+  const fovBase = opcion('fov');
+  const fovTarget = scoped ? 18 : me.aiming ? fovBase - 18 : me.state === 'falling' ? fovBase + 10 : fovBase;
   camera.fov += (fovTarget - camera.fov) * Math.min(1, dt * 12);
   camera.updateProjectionMatrix();
   ui.scope.classList.toggle('hidden', !scoped);
@@ -1256,15 +1348,19 @@ function updateHud(t) {
   if (me.state === 'bus') {
     const left = (room.bus.start - t) / 1000;
     if (left > 0) showCenter(`Despegue en ${Math.ceil(left)}`, 'Elegí dónde caer mirando el mapa');
-    else ui.center.innerHTML = '<small>Apretá ESPACIO para saltar del bus</small>';
-  } else if (me.state === 'falling') ui.center.innerHTML = `<small>Altura ${Math.round(me.pos.y - world.groundHeight(me.pos.x, me.pos.z))} m · ESPACIO abre el planeador</small>`;
+    else ui.center.innerHTML = `<small>Apretá ${escapeHtml(teclaDe('saltar').toUpperCase())} para saltar del bus</small>`;
+  } else if (me.state === 'falling') ui.center.innerHTML = `<small>Altura ${Math.round(me.pos.y - world.groundHeight(me.pos.x, me.pos.z))} m · ${escapeHtml(teclaDe('saltar').toUpperCase())} abre el planeador</small>`;
   else if ((me.state === 'glider' || me.state === 'ground') && (ui.center.innerHTML.includes('planeador') || ui.center.innerHTML.includes('bus'))) showCenter('');
   if (me.state === 'ground') updatePrompt(); else ui.prompt.classList.add('hidden');
 }
 
+let fpsN = 0, fpsT = 0;
 function frame() {
   requestAnimationFrame(frame);
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const rawDt = clock.getDelta();
+  const dt = Math.min(rawDt, 0.05);
+  fpsN++; fpsT += rawDt;
+  if (fpsT >= 0.5) { if (opcion('fps')) $('fps').textContent = `${Math.round(fpsN / fpsT)} FPS`; fpsN = 0; fpsT = 0; }
   const t = now();
   if (world && room && room.phase !== 'lobby') {
     updateBus(t);
@@ -1297,6 +1393,6 @@ frame();
 import * as ITEMS from "./items.js";
 window.__WEAPONS = ITEMS.WEAPONS;
 window.__game = {
-  me, others, items, camera, sendMsg, selectSlot, setBuild, doInteract, findInteract, trySwing, tryShoot, updateSlots,
+  me, others, items, camera, sendMsg, selectSlot, setBuild, doInteract, findInteract, trySwing, tryShoot, updateSlots, renderer,
   get room() { return room; }, get world() { return world; },
 };

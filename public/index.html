@@ -24,6 +24,7 @@
       <button id="btnJoin">Unirse</button>
     </div>
     <p id="menuError" class="error"></p>
+    <button id="btnConfigMenu" class="btn-config" type="button">⚙ Configuración</button>
   </div>
 </div>
 
@@ -36,6 +37,7 @@
     <ul id="playerList"></ul>
     <button id="btnStart" class="primary">Empezar partida</button>
     <p id="waitHost" class="hint">Esperando a que el anfitrión empiece…</p>
+    <button id="btnConfigSala" class="btn-config" type="button">⚙ Configuración</button>
   </div>
 </div>
 
@@ -50,6 +52,7 @@
     <span id="alive">👤 0</span>
     <span id="kills">💀 0</span>
     <span id="stormInfo"></span>
+    <span id="fps" class="hidden"></span>
   </div>
   <canvas id="minimap" width="200" height="200"></canvas>
   <div id="killfeed"></div>
@@ -69,11 +72,11 @@
     <div id="buildbar" class="hidden"></div>
     <div id="slots"></div>
   </div>
-  <div id="help">WASD moverse · Shift correr · Espacio saltar · Clic usar/disparar · Clic der. apuntar · E agarrar/abrir · R recargar · 1-6 o rueda slots · Z/X/C construir pared/piso/rampa · Q salir de construcción · V material · G tirar · B bailar · Enter chat</div>
+  <div id="help"></div>
   <div id="chatlog"></div>
   <input id="chatInput" class="hidden" maxlength="120" placeholder="Escribí y apretá Enter">
   <div id="damage"></div>
-  <div id="clickToPlay" class="hidden">Hacé clic para jugar</div>
+  <div id="clickToPlay" class="hidden">Hacé clic para jugar<button id="btnPausaConfig" type="button">⚙ Configuración <small>Esc</small></button></div>
 </div>
 
 <script type="module" src="js/main.js"></script>

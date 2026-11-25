@@ -55,9 +55,11 @@ Para recorrer la isla sin jugar, con el servidor levantado abrí http://localhos
 
 ## Controles
 
+Estas son las teclas de fábrica. **Todas se pueden cambiar** desde **⚙ Configuración** (botón en el menú, en la sala de espera, o Esc durante la partida): cada acción tiene una tecla principal y una secundaria, y sirven también los botones y la rueda del mouse.
+
 | Tecla | Acción |
 |---|---|
-| WASD | Moverse |
+| WASD o flechas | Moverse |
 | Shift | Correr |
 | Espacio | Saltar del bus / abrir planeador / saltar |
 | Clic izquierdo | Disparar, usar el pico, usar un consumible o construir |
@@ -69,7 +71,26 @@ Para recorrer la isla sin jugar, con el servidor levantado abrí http://localhos
 | Q | Entrar y salir del modo construcción |
 | V | Cambiar material |
 | G | Tirar el objeto que tenés en la mano |
+| B | Bailar |
 | Enter | Chat |
+| Esc | Soltar el mouse / abrir la configuración |
+
+Los carteles del juego (ayuda de abajo, números de los slots, "Apretá … para saltar del bus", "E Abrir cofre", barra de construcción) muestran la tecla que tenga asignada cada jugador.
+
+## Configuración
+
+El panel tiene cuatro pestañas y todo se guarda en el navegador (`localStorage`), así que queda para la próxima vez:
+
+- **Juego:** sensibilidad del mouse, sensibilidad apuntando y con mira telescópica, invertir el eje vertical, apuntar manteniendo o alternando, correr siempre y números de daño.
+- **Video:** calidad gráfica (baja sin sombras, media y alta), resolución 3D, campo de visión, color de la mira y contador de FPS.
+- **Sonido:** volumen general.
+- **Controles:** cambiar cualquier tecla. Si elegís una que ya usaba otra acción, se la saca a esa y te avisa. Una tecla puede repetirse entre combate y construcción (por ejemplo, la misma tecla para recargar y para algo de construcción) porque no se usan a la vez.
+
+Las pruebas del registro de controles y opciones:
+
+```bash
+node tools/controles/pruebas.mjs
+```
 
 ## Estructura
 
@@ -91,6 +112,9 @@ Para recorrer la isla sin jugar, con el servidor levantado abrí http://localhos
 - `tools/blender/`: scripts de Blender que generan el personaje (`heroe_*.py`), las armas (`armas_*.py`) y sus animaciones. `recargas_control.py`, `armas_choque.py` y `brazos_choque.py` revisan las animaciones sin renderizar (brazos, saltos entre cuadros, cuánto se mete el arma en el cuerpo y cuánto se meten los brazos y las manos en el cuerpo con las mismas mezclas del juego, mirando derecho, abajo y arriba). `tools/texturas/`: máscaras de la cara y el tatuaje.
 - `Vault/`: vault de Obsidian que documenta el proyecto (empezar por `Vault/Inicio.md`) y grafo del código generado con graphify en `Vault/graphify-out`.
 - `public/js/main.js`: el juego en sí (cámara en tercera persona, física, disparo, HUD, minimapa, red).
+- `public/js/controles.js`: registro central de acciones y teclas (con contexto: siempre, combate o construcción) y de las opciones del juego, guardados en `localStorage`. Cualquier control u opción nueva se agrega acá con `registrarAccion` / `registrarOpcion`.
+- `public/js/configuracion.js`: el panel de configuración (pestañas Juego, Video, Sonido y Controles).
+- `tools/controles/pruebas.mjs`: pruebas del registro de controles y opciones.
 
 ## Capturas
 
