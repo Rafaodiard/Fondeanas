@@ -135,7 +135,7 @@ const llegar = (name, opts, ruta, yMin) => {
 llegar('tanqueAgua', {}, [{ x: 4.2, y: 0.06, z: 5.2 }, { x: -3.6, y: 0, z: 5.2 }, { x: -4.0, y: 0, z: 4.0 }, { x: -4.0, y: 0, z: -2.3 }, { x: -2.4, y: 0, z: -2.3 }], 8.9);
 llegar('torreVigia', {}, [{ x: -1.0, y: 0.06, z: 1.5 }, { x: 0.65, y: 0, z: 1.8 }, { x: 0.65, y: 0, z: 8.0 }, { x: 2.15, y: 0, z: 8.0 }, { x: 2.15, y: 0, z: 1.5 }, { x: 0, y: 0, z: 0 }], 7.9);
 // 5) Todo el loot y los cofres de cada estructura se alcanzan caminando (grilla de lugares donde cabe el jugador).
-function alcance(name, opts = {}) {
+function alcance(name, opts = {}, entrada = 0) {
   const P = PLANOS[name](opts);
   const sol = new Solidos();
   for (const s of P.solids) sol.addBox(s);
@@ -165,7 +165,7 @@ function alcance(name, opts = {}) {
   }
   const bfs = (maxUp, flag) => {
     const q = [];
-    for (const n of nodes) if ((n.i === 0 || n.j === 0 || n.i === nx - 1 || n.j === nz - 1) && n.y === 0) { n[flag] = true; q.push(n); }
+    for (const n of nodes) if ((n.x < b.x0 + 0.5 || n.x > b.x1 - 0.5 || n.z < b.z0 + 0.5 || n.z > b.z1 - 0.5) && n.y <= entrada) { n[flag] = true; q.push(n); }
     while (q.length) {
       const n = q.pop();
       for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -192,12 +192,25 @@ function alcance(name, opts = {}) {
   casos.push(['casa', { pisos: 2 }], ['edificio', { pisos: 4 }], ['adobe', { pisos: 2 }], ['casa', { pisos: 2, porche: true }]);
   let total = 0;
   for (const [name, opts] of casos) {
-    const r = alcance(name, opts);
+    // el muelle se entra desde el malecón, a la altura de su piso
+    const r = alcance(name, opts, name === 'muelle' ? 1.5 : 0);
     total++;
     for (const m of r.mal) fail(`${name}${opts.pisos ? ' ' + opts.pisos + ' pisos' : ''}: ${m} no se alcanza`);
     if (r.salto.length) console.log(`${name}: solo saltando ->`, r.salto.join(', '));
   }
   console.log('alcance revisado en', total, 'estructuras');
+}
+// 6) En el mapa armado, cada lugar de loot y cada cofre queda sobre un piso, con lugar para pararse.
+{
+  const w = new World(1, 1200);
+  const chk = (l, t) => {
+    const g = w.groundHeight(l.x, l.z, l.y + 0.3), c = w.sol.ceiling(l.x, l.z, g);
+    const q = { x: l.x, y: g, z: l.z }; w.collide(q, 0.3, 1.8);
+    if (Math.abs(g - l.y) > 0.4 || c - g < 1.5 || Math.hypot(q.x - l.x, q.z - l.z) > 0.35) fail(`${t} en (${l.x.toFixed(1)}, ${l.y.toFixed(1)}, ${l.z.toFixed(1)}) sin lugar para pararse`);
+  };
+  w.lootSpots.forEach((l) => chk(l, 'loot'));
+  w.chestSpots.forEach((l) => chk(l, 'cofre'));
+  console.log('lugares de loot y cofres del mapa revisados:', w.lootSpots.length + w.chestSpots.length);
 }
 console.log(fails ? `${fails} fallas` : 'todo OK');
 process.exit(fails ? 1 : 0);

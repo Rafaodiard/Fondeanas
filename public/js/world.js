@@ -574,7 +574,14 @@ export class World {
       if (y > 24) c.lerp(COL.alpine, smoothstep(24, 60, y) * 0.45 * (1 - bio.snow));
       if (slope > 0.42) c.lerp(bio.quarry > 0.2 ? COL.redrock : COL.rock, smoothstep(0.42, 0.62, slope));
       if (bio.quarry > 0) c.lerp(n > 0.5 ? COL.redrock : COL.redrock2, smoothstep(0, 0.5, bio.quarry));
-      if (bio.snow > 0) c.lerp(COL.snow, bio.snow * (0.8 + 0.2 * smoothstep(0.3, 0.7, n + bio.snow - 0.5))).lerp(COL.rock, bio.snow * smoothstep(0.7, 1.1, slope));
+      if (bio.snow > 0) {
+        // nieve con matices: zonas azuladas (viento y sombra) y, lejos de las casas, algunas rocas que asoman
+        const v = this.noise(x / 26 - 9, z / 26 + 2), r = this.noise(x / 22 + 7, z / 22 - 4);
+        const lejos = smoothstep(0, 25, Math.min(...this.pois.map((t) => Math.hypot(t.x - x, t.z - z) - t.r)));
+        c.lerp(COL.snow, bio.snow * (0.8 + 0.2 * smoothstep(0.3, 0.7, n + bio.snow - 0.5)));
+        c.lerp(COL.snowsh, bio.snow * smoothstep(-0.08, 0.12, v) * 0.8);
+        c.lerp(n > 0.5 ? COL.rock : COL.rock2, bio.snow * Math.max(smoothstep(0.7, 1.1, slope), smoothstep(0.17, 0.23, r) * 0.85 * lejos));
+      }
       if (road < 2.5) c.lerp(COL.dirt, (1 - smoothstep(0, 2.5, road)) * 0.3);
       if (river < 7) c.lerp(COL.mud, (1 - smoothstep(3, 7, river)) * 0.8);
     }
@@ -1093,7 +1100,7 @@ function aguaShader(mat, { time, htex, half = 0, cell = 1, N = 1, mar }) {
 
 const COL = {
   sand: new THREE.Color('#e8d39a'), grass: new THREE.Color('#6cbf4b'), grass2: new THREE.Color('#58a83f'),
-  rock: new THREE.Color('#8a8576'), snow: new THREE.Color('#f2f6fa'), seabed: new THREE.Color('#c9b98a'),
+  rock: new THREE.Color('#8a8576'), rock2: new THREE.Color('#6f6c66'), snow: new THREE.Color('#f2f6fa'), snowsh: new THREE.Color('#cddbeb'), seabed: new THREE.Color('#c9b98a'),
   mud: new THREE.Color('#6f7a3e'), desert: new THREE.Color('#e3c78f'), desert2: new THREE.Color('#d6ae72'),
   redrock: new THREE.Color('#b8603f'), redrock2: new THREE.Color('#9c4e34'), alpine: new THREE.Color('#7f9f58'), dirt: new THREE.Color('#9c8458'),
 };

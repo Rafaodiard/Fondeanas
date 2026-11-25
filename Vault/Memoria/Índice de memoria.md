@@ -11,3 +11,4 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 - [[Herramientas descartadas]]: cosas que se decidió no usar.
 - [[README siempre al día]]: actualizar el README en cada PR.
 - [[Graphify de la PC de Rafael]]: el grafo se genera en su compu.
+- [[Pedido del mapa]]: qué pidió para el mapa de la isla.

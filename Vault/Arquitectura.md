@@ -14,7 +14,7 @@ Según el comentario de cabecera de [[server.js]]: **el cliente decide su movimi
 
 ## Mismo mundo en todos lados
 
-La sala tiene una `seed`. El servidor crea `new World(seed, ISLAND_SIZE)` y cada cliente `new World(room.seed, room.islandSize)` con los datos que le manda el servidor ([[world.js]]). Todos obtienen exactamente la misma isla, así no hace falta mandar el mapa. El servidor usa el `World` sin escena (solo datos: lugares de loot, cofres, árboles, rocas); el cliente además llama a `build(scene)`.
+El servidor crea `new World(seed, ISLAND_SIZE)` y cada cliente `new World(room.seed, room.islandSize)` con los datos que le manda el servidor ([[world.js]]). La isla es fija (sale de [[isla.js]] y de una semilla propia del mapa, `MAP_SEED`), así que todos obtienen exactamente la misma isla y no hace falta mandar el mapa; la `seed` de la sala ya no cambia el mapa. El servidor usa el `World` sin escena (solo datos: lugares de loot, cofres, árboles, rocas); el cliente además llama a `build(scene)`.
 
 ## Código compartido
 
@@ -26,7 +26,7 @@ La sala tiene una `seed`. El servidor crea `new World(seed, ISLAND_SIZE)` y cada
 public/models/*.glb ──► assets.js (loadAssets, cloneAsset, bakedParts)
                           │
                           ├─► models.js ──► rig.js (personaje con esqueleto)
-                          └─► world.js vía MODEL.clone / MODEL.baked (casas, árboles, rocas, cofres)
+                          └─► world.js vía MODEL.clone / MODEL.baked (árboles, rocas, cofres)
 ```
 
 `main.js` completa `MODEL.clone = cloneAsset; MODEL.baked = bakedParts;` para que `world.js` pueda usar los GLB sin importar `assets.js` (así el servidor puede importar `world.js` sin Three cargando modelos). Si un GLB no carga, se usan los modelos procedurales de [[models.js]].
@@ -37,7 +37,8 @@ public/models/*.glb ──► assets.js (loadAssets, cloneAsset, bakedParts)
 - [[main.js]] → [[world.js]], [[assets.js]], [[models.js]], [[items.js]], [[audio.js]], [[rig.js]]
 - [[models.js]] → [[assets.js]], [[rig.js]]
 - [[rig.js]] → [[assets.js]]
-- [[world.js]] → [[items.js]]
+- [[world.js]] → [[items.js]], [[planos.js]], [[isla.js]], [[colision.js]], [[mallas.js]]
+- [[mapa.html]] → [[world.js]], [[assets.js]]
 - [[visor.html]] → [[rig.js]], [[assets.js]], [[models.js]], [[items.js]]
 
 Ver también [[Grafo del código]].
