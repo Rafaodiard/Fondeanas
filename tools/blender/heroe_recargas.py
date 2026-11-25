@@ -236,7 +236,7 @@ def pesos(k, fuentes):
 
 # ---------------------------------------------------------------------------
 # Puntos útiles del cuerpo (espacio del personaje, de reposo)
-CARTUCHERA_L = V(0.13, -0.13, 1.00)      # portacargadores en el cinturón, adelante a la izquierda
+CARTUCHERA_L = V(0.145, -0.145, 1.00)    # portacargadores en el cinturón, adelante a la izquierda
 PECHO_L = V(0.10, -0.17, 1.30)           # bolsillo del chaleco
 ESPALDA_L = V(0.13, 0.17, 1.62)          # por encima del hombro izquierdo (cohetes a la espalda)
 
@@ -287,15 +287,17 @@ def poner_sueltas(claves, tabla, lado='L'):
 # Diseñado en 53 cuadros (2,2 s); otras duraciones escalan las claves.
 def recarga_cargador(nombre, arma, T, piv_carg, salida, ag_carg, piv_cerr, ag_man, tirar, previa, alto=1.25,
                      G1=None, d1=V(0.766, -0.643, 0.02), rol1=-30.0, giro1=-32.0, incl1=9.0,
-                     G2=V(-0.16, -0.36, 1.22), d2=V(0.643, -0.766, 0.02), rol2=-12.0, giro2=-28.0, incl2=5.0):
+                     G2=V(-0.16, -0.39, 1.22), d2=V(0.643, -0.766, 0.02), rol2=-12.0, giro2=-28.0, incl2=5.0):
     # G1/d1/rol1: el arma mientras se cambia el cargador (rol1 = giro sobre el cañón, para mostrar el pozo del
     # cargador a la mano izquierda); G2/d2/rol2: mientras se tira de la manija (lejos del pecho para que la mano
     # no se meta en el chaleco). giro/incl: torso en cada tramo.
     # El arma cruza el pecho con el cañón 50° a la izquierda y el puño a la derecha: así la culata queda afuera del
     # costado derecho (con el arma de frente, la culata se metía hasta 18 cm en el chaleco).
+    # El arma va 3 cm más lejos del pecho que en la primera versión: así el antebrazo izquierdo no se apoya en los
+    # cargadores del chaleco (lo mide brazos_choque.py).
     k = T / 53.0
     G0, d0, u0 = ARMAS['Rifle'][:3]
-    G1 = V(-0.16, -0.28, alto) if G1 is None else Vector(G1)
+    G1 = V(-0.16, -0.31, alto) if G1 is None else Vector(G1)
     u1 = girar(V(0, 0, 1), d1, rol1)
     u2 = girar(V(0, 0, 1), d2, rol2)
     claves = {
@@ -367,7 +369,10 @@ def recarga_rifle(**kw):
 
 
 def recarga_subfusil(**kw):
-    # manija al costado izquierdo, adelante: la mano la pellizca desde afuera y la tira hacia atrás
+    # manija al costado izquierdo, adelante: la mano la pellizca desde afuera y la tira hacia atrás.
+    # El subfusil queda 3 cm más cerca que el rifle: más adelante, el antebrazo izquierdo cruzaba los cargadores
+    # del chaleco al meter el cargador nuevo (lo mide brazos_choque.py)
+    kw.setdefault('G1', V(-0.16, -0.28, 1.25))
     return recarga_cargador(
         'RecargaSubfusil', 'subfusil', 48, (0, 0.097, -0.01), (0, 0.0, -0.115),
         Agarre(V(0, 0.0, -0.085), rot_agarre('L', V(1, 0.35, 0), V(0, 0, 1)), OFF_PUNO),
@@ -401,7 +406,9 @@ def recarga_pistola(G1=V(-0.02, -0.29, 1.27), d1=V(0.22, -1, 0.30), rol1=-25.0, 
                          28: (0, 1, 0, 0), 30: (1, 0, 0, 0)}, ('wa', 'wx', 'wc', 'wm'))
     poner_sueltas(claves, {
         2: (V(-0.06, 0.02, -0.08), V(0.4, 0.5, 0.6), V(-0.8, 0, -0.3), (30.0, 15.0, 6.0)),
-        8: (a_arma(G1, d1, u1, CARTUCHERA_L + V(0, 0, 0.10)), V(0.2, 0.3, -1), V(-1, 0, 0), (50.0, 30.0, 4.0)),
+        # pasa por delante y arriba de los cargadores del chaleco (en línea recta los dedos rozaban los del centro)
+        5: (a_arma(G1, d1, u1, CARTUCHERA_L + V(-0.02, -0.12, 0.17)), V(0.2, 0.3, -1), V(-1, 0, 0), (30.0, 20.0, 4.0)),
+        8: (a_arma(G1, d1, u1, CARTUCHERA_L + V(0.01, -0.01, 0.10)), V(0.2, 0.3, -1), V(-1, 0, 0), (50.0, 30.0, 4.0)),
         19.5: (V(-0.01, -0.02, -0.15), V(0.3, 0.4, 0.9), V(-0.6, 0, 0.3), (15.0, 10.0, 4.0)),
         # por el costado izquierdo de la pistola, de abajo del cargador a arriba de la corredera
         21.5: (V(-0.08, -0.02, -0.03), V(0.5, 0.2, 0.1), V(-0.6, -0.3, 0.4), (22.0, 12.0, 4.0)),
@@ -414,7 +421,7 @@ def recarga_pistola(G1=V(-0.02, -0.29, 1.27), d1=V(0.22, -1, 0.30), rol1=-25.0, 
         claves[f]['dL'] = dd
     piv = V(0, -0.033, -0.05)
     eje = V(0, -0.15, -0.99)
-    bolsa = a_arma(G1, d1, u1, CARTUCHERA_L + V(0, 0, 0.10))
+    bolsa = a_arma(G1, d1, u1, CARTUCHERA_L + V(0.01, -0.01, 0.10))
     gb = rot_arma(G1, d1, u1, marco(V(0, 0, 0), V(0.1, -1, 0), V(0, 0.15, 1)).to_3x3())
     cargador = Pieza(piv, {
         0: dict(), 2: dict(),
@@ -443,7 +450,7 @@ def recarga_pistola(G1=V(-0.02, -0.29, 1.27), d1=V(0.22, -1, 0.30), rol1=-25.0, 
 
 # ---------------------------------------------------------------------------
 # Escopeta (62 cuadros, 2,6 s): la gira de costado, mete cuatro cartuchos de a uno desde el portacartuchos y bombea.
-def recarga_escopeta(G1=V(-0.13, -0.30, 1.20), d1=V(0.766, -0.643, 0.06), rol1=-55.0, giro1=-32.0, incl1=9.0):
+def recarga_escopeta(G1=V(-0.13, -0.33, 1.20), d1=V(0.766, -0.643, 0.06), rol1=-55.0, giro1=-32.0, incl1=9.0):
     # como el rifle: cruzada al pecho con el cañón 50° a la izquierda para que la culata quede afuera del costado
     T = 66
     G0, d0, u0 = ARMAS['Rifle'][:3]

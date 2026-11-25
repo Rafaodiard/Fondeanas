@@ -13,3 +13,4 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 - [[Graphify de la PC de Rafael]]: el grafo se genera en su compu.
 - [[Blender en la nube]]: los scripts de Blender se corren en la nube.
 - [[Pedido del mapa]]: qué pidió para el mapa de la isla.
+- [[Brazos sin atravesar el cuerpo]]: el pedido, cómo se revisa y la tolerancia.

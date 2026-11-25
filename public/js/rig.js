@@ -1,6 +1,7 @@
 // Personaje con esqueleto y animaciones hechas en Blender (personaje.glb).
-// Dos capas: piernas (cadera, columna baja y piernas) y torso (columna alta, brazos y cabeza). La locomoción
-// mezcla varios ciclos según la velocidad con la fase sincronizada; arriba se pone la pose del arma o el golpe.
+// Tres capas: piernas (cadera, columna baja y piernas), torso (columna alta, brazo derecho y cabeza) y brazo izquierdo.
+// La locomoción mezcla varios ciclos según la velocidad con la fase sincronizada; arriba se pone la pose del arma o el
+// golpe. El brazo izquierdo va con el torso, salvo en las poses que dejan esa mano libre: ahí sigue a la locomoción.
 // Después del mezclador se dobla la columna para apuntar adonde mira la cámara.
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
@@ -10,6 +11,9 @@ import { ASSETS, ANIMS } from './assets.js';
 // [clip, velocidad del juego donde manda, velocidad natural del clip (m/s, sin patinar)]
 const LOCO = [['Quieto', 0, 0], ['Caminar', 1.6, 0.907], ['Trote', 3.5, 2.479], ['Correr', 6, 4.038], ['Sprint', 9.5, 5.278]];
 const PIERNAS = /^(Hips|Spine|UpperLeg[LR]|LowerLeg[LR]|Foot[LR]|Toe[LR])$/;
+const BRAZO_L = /^(Shoulder|UpperArm|LowerArm|Hand|(Index|Middle|Ring|Pinky|Thumb)\d)L$/;
+// poses del torso que llevan el objeto solo en la mano derecha: la izquierda se balancea con la carrera
+const MANO_L_LIBRE = new Set(['SostenerPico', 'Objeto']);
 const POSE_ARMA = { pico: 'SostenerPico', rifle: 'Rifle', subfusil: 'Rifle', escopeta: 'Rifle', francotirador: 'Rifle', pistola: 'Pistola', lanzacohetes: 'Lanzacohetes', item: 'Objeto' };
 const APUNTA = { Rifle: 'RifleApunta', Pistola: 'PistolaApunta', Lanzacohetes: 'Lanzacohetes' };
 // Acciones de arma (animaciones_armas.glb): pisan la pose del torso y mueven las piezas del arma con el mismo clip.
@@ -18,6 +22,10 @@ const BOMBEO = { escopeta: ['BombeoEscopeta', 'BombeoEscopetaApunta'] };
 const ACCIONES = new Set([...Object.values(RECARGA), ...Object.values(BOMBEO).flat()]);
 const PIEZAS = ['cargador', 'cerrojo', 'bomba', 'corredera', 'cohete', 'cartucho', 'bala'];
 const SALTO_APICE = 13 / 30;
+// cuánto puede doblarse la columna para seguir la mira con un arma (rad, abajo / arriba): apuntando y a la cadera.
+// Lo revisa tools/blender/brazos_choque.py (más allá los brazos se meten en el cuerpo o en las rodillas).
+const CURVA_APUNTA = [-55 * Math.PI / 180, 65 * Math.PI / 180];
+const CURVA_CADERA = [-15 * Math.PI / 180, 20 * Math.PI / 180];
 const ALTO_BARRA = 2.122; // altura de las manos en el planeador
 
 let CLIPS = null;
@@ -32,9 +40,9 @@ function rigClips() {
   CLIPS = {};
   for (const c of src) {
     const bone = (t) => t.name.slice(0, t.name.lastIndexOf('.'));
-    const p = new THREE.AnimationClip(c.name + '|p', c.duration, c.tracks.filter((t) => PIERNAS.test(bone(t))));
-    const t = new THREE.AnimationClip(c.name + '|t', c.duration, c.tracks.filter((t) => !PIERNAS.test(bone(t))));
-    CLIPS[c.name] = { p, t, dur: c.duration };
+    const capa = (t) => (PIERNAS.test(bone(t)) ? 'p' : BRAZO_L.test(bone(t)) ? 'b' : 't');
+    const sub = (k) => new THREE.AnimationClip(c.name + '|' + k, c.duration, c.tracks.filter((t) => capa(t) === k));
+    CLIPS[c.name] = { p: sub('p'), t: sub('t'), b: sub('b'), dur: c.duration };
   }
   return CLIPS;
 }
@@ -75,13 +83,14 @@ export function createRigCharacter(color) {
     if (o.material.name === 'Ropa') { o.material = o.material.clone(); o.material.color.set(color); }
   });
   const bone = (n) => model.getObjectByName(n);
-  const B = { spine1: bone('Spine1'), spine2: bone('Spine2'), neck: bone('Neck'), head: bone('Head'), arma: bone('ArmaR') };
+  const B = { spine: bone('Spine'), spine1: bone('Spine1'), spine2: bone('Spine2'), neck: bone('Neck'), head: bone('Head'), arma: bone('ArmaR'),
+    brazoL: bone('UpperArmL'), brazoR: bone('UpperArmR') };
   const mixer = new THREE.AnimationMixer(model);
   const acts = {};
   for (const [name, c] of Object.entries(clips)) {
-    const p = mixer.clipAction(c.p), t = mixer.clipAction(c.t);
-    for (const a of [p, t]) { a.play(); a.timeScale = 0; a.setEffectiveWeight(0); }
-    acts[name] = { p, t, dur: c.dur, wp: 0, wt: 0, clock: Math.random() * c.dur };
+    const p = mixer.clipAction(c.p), t = mixer.clipAction(c.t), b = mixer.clipAction(c.b);
+    for (const a of [p, t, b]) { a.play(); a.timeScale = 0; a.setEffectiveWeight(0); }
+    acts[name] = { p, t, b, dur: c.dur, wp: 0, wt: 0, wb: 0, clock: Math.random() * c.dur };
   }
   // el arma cuelga de un grupo propio dentro del hueso: se cambia sin tocar el esqueleto
   // los huesos conservan los ejes de Blender: en Arma.R el cañón es +Y y arriba es +Z. Las armas vienen con el
@@ -176,20 +185,24 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
     if (aiming && APUNTA[n]) n = APUNTA[n];
     over[n] = n === 'SostenerPico' ? Math.max(0, 1 - speed / 2.5) * (air ? 0.4 : 1) : 1;
   }
-  let O = 0;
-  for (const n in over) O += over[n];
+  let O = 0, OL = 0;      // peso de la pose de arriba, y la parte que deja libre la mano izquierda
+  for (const n in over) { O += over[n]; if (MANO_L_LIBRE.has(n)) OL += over[n]; }
   O = Math.min(1, O);
+  OL = Math.min(O, OL);
 
   // ---- pesos con suavizado (lineal: las sumas se mantienen en 1)
   for (const n in A) {
     const a = A[n];
     const tp = base[n] || 0;
     const tt = (base[n] || 0) * (1 - O) + (over[n] || 0);
+    const tb = (base[n] || 0) * (1 - O + OL) + (MANO_L_LIBRE.has(n) ? 0 : over[n] || 0);
     const k = n === 'Golpe' || (golpe && tt === 0) ? 22 : n === 'Salto' || base.Salto || ACCIONES.has(n) ? 14 : 10;
     a.wp = smooth(a.wp, tp, k, dt);
     a.wt = smooth(a.wt, tt, k, dt);
+    a.wb = smooth(a.wb, tb, k, dt);
     if (a.wp < 1e-3 && tp === 0) a.wp = 0;
     if (a.wt < 1e-3 && tt === 0) a.wt = 0;
+    if (a.wb < 1e-3 && tb === 0) a.wb = 0;
     // tiempo de cada clip
     let time;
     const loco = LOCO.find((l) => l[0] === n);
@@ -203,12 +216,13 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
       if (accion && accion.name === n) a.clock = Math.min(accion.t / accion.len, 0.999) * a.dur;
       time = a.clock;
     } else {
-      if (a.wp > 0 || a.wt > 0) a.clock += dt;
+      if (a.wp > 0 || a.wt > 0 || a.wb > 0) a.clock += dt;
       time = a.clock % a.dur;
     }
-    a.p.time = time; a.t.time = time;
+    a.p.time = time; a.t.time = time; a.b.time = time;
     a.p.setEffectiveWeight(a.wp);
     a.t.setEffectiveWeight(a.wt);
+    a.b.setEffectiveWeight(a.wb);
   }
   u.mixer.update(0);
 
@@ -258,13 +272,31 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
       _v.set(0, 1, 0).applyQuaternion(_q).applyQuaternion(_qp.copy(char.quaternion).invert());
     }
     const want = aiming ? pitch : pitch * 0.8 - 0.12;
-    const err = (want - Math.asin(Math.max(-1, Math.min(1, _v.y)))) * fuerza;
-    rotWorld(B.spine1, _right, err * 0.45);
-    rotWorld(B.spine2, _right, err * 0.55);
+    // la curva se reparte en toda la columna (si se doblara solo el pecho, los antebrazos se hundirían en la panza) y
+    // tiene tope: más abajo las manos chocan con las rodillas al correr
+    const [abajo, arriba] = aiming ? CURVA_APUNTA : CURVA_CADERA;
+    const err = Math.max(abajo, Math.min(arriba, (want - Math.asin(Math.max(-1, Math.min(1, _v.y)))) * fuerza));
+    rotWorld(B.spine, _right, err * 0.4);
+    rotWorld(B.spine1, _right, err * 0.3);
+    rotWorld(B.spine2, _right, err * 0.3);
+  } else if (accion) {
+    // recargando: el pecho se dobla poco y en toda la columna, como con el arma a la cadera (doblado como sin arma,
+    // el antebrazo izquierdo se metía en los cargadores del chaleco); el resto lo hace la cabeza
+    const c = Math.max(CURVA_CADERA[0], Math.min(CURVA_CADERA[1], pitch * 0.4));
+    rotWorld(B.spine, _right, c * 0.4);
+    rotWorld(B.spine1, _right, c * 0.3);
+    rotWorld(B.spine2, _right, c * 0.3);
+    rotWorld(B.neck, _right, pitch * 0.2);
+    rotWorld(B.head, _right, pitch * 0.3);
   } else {
     // girar en +X (derecha) levanta la mirada
     rotWorld(B.spine1, _right, pitch * 0.18);
     rotWorld(B.spine2, _right, pitch * 0.22);
+    // mirando abajo los brazos cuelgan en vez de seguir al pecho (si no, las manos se meten en el muslo y en los
+    // bolsillos del chaleco); mirando arriba sí lo siguen
+    const cuelga = -Math.min(0, pitch * 0.4);
+    rotWorld(B.brazoL, _right, cuelga);
+    rotWorld(B.brazoR, _right, cuelga);
     rotWorld(B.neck, _right, pitch * 0.2);
     rotWorld(B.head, _right, pitch * 0.3);
   }
