@@ -14,6 +14,8 @@ Scripts de Blender en `tools/blender/`. Diseños propios.
 | `armas_choque.py` | Control de calidad sin render: cuánto se mete el arma en el torso, en cada pose de `ARMAS` y en cada cuadro de las recargas. Deforma el torso por código, lo corta en rebanadas de 1 cm y mide contra el casco convexo de cada rebanada (apoyar el arma en el hombro da 1-2 cm). `control_choque()` imprime una línea por pose y por recarga y devuelve los cuadros que pasan `LIMITE` (2,5 cm). No cuenta las piezas que viajan solas (cargador, cartucho, bala, cohete). |
 | `armas_export.py` | Exporta `armas.glb` (rifle, escopeta, francotirador, pistola, subfusil, lanzacohetes y pico, con una pista NLA por clip) y `animaciones_armas.glb` (solo esqueleto con los clips nuevos). |
 
-Orden para revisar antes de exportar: `heroe_anim.py`, `heroe_clips.py`, `heroe_recargas.py`, con las armas en la escena, y después `recargas_control.py` y `armas_choque.py`.
+Orden para revisar antes de exportar: `heroe_anim.py`, `heroe_clips.py`, `heroe_recargas.py`, con las armas en la escena, y después `recargas_control.py`, `armas_choque.py` y `brazos_choque.py` ([[Pipeline del héroe]]).
+
+En las recargas del rifle y de la escopeta el arma va unos 3 cm más lejos del pecho que en la primera versión (el subfusil queda donde estaba), y la cartuchera (`CARTUCHERA_L`) está 1,5 cm más adelante y afuera: así el antebrazo izquierdo no se apoya en los cargadores del chaleco. Al agarrar un cargador los dedos entran 1-1,5 cm en el bolsillo, que es lo esperable (2026-11-25).
 
 Los clips del arma se llaman igual que los del personaje (por ejemplo `RecargaRifle`, `BombeoEscopeta`), y [[rig.js]] los reproduce juntos.

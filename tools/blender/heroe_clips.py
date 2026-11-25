@@ -305,6 +305,7 @@ class Marcha:
         self.puno = (55.0, 35.0)
         self.muneca = -10.0
         self.hombros = 0.0
+        self.arco = 1.0          # >1: la mano recién cruza hacia el centro al final del vaivén (rodea el chaleco)
         self.vuelo = []
         self.__dict__.update(k)
         self.ts = self.duty * self.T / FPS
@@ -382,7 +383,7 @@ class Marcha:
             s = -c if l == 'L' else c            # 1 = brazo adelante
             t = (s + 1) / 2
             o = Vector(self.brazo_atras).lerp(Vector(self.brazo_adelante), t)
-            o.x *= S(l)
+            o.x = lerp(self.brazo_atras[0], self.brazo_adelante[0], t ** self.arco) * S(l)
             if self.hombros:
                 hombro(p, l, 0.0, self.hombros * s)
             W = desde_hombro(p, l, o)
@@ -407,7 +408,8 @@ TROTE = dict(T=22, duty=0.33, y_land=-0.30, y_off=0.30, ancho=0.115, giro_pie=-7
              balanceo=0.014, giro_cadera=7.0, ladeo_cadera=3.5, incl_cadera=4.0, incl=7.0, giro_hombros=9.0,
              cabeza=1.0, vuelo=[(0.25, 0.0, 0.30, 0.31, 60.0, -5.0), (0.52, -0.005, 0.0, 0.36, 26.0, 0.0),
                                 (0.8, 0.0, -0.31, 0.22, -6.0, 0.0)],
-             brazo_adelante=(-0.08, -0.19, -0.27), brazo_atras=(0.0, 0.15, -0.40), puno=(50.0, 30.0))
+             brazo_adelante=(-0.06, -0.28, -0.19), brazo_atras=(0.0, 0.15, -0.40), brazo_polo=(0.45, 0.9, -0.3),
+             arco=3.0, puno=(50.0, 30.0))
 
 CORRER = dict(T=20, duty=0.26, y_land=-0.36, y_off=0.34, ancho=0.11, giro_pie=-8.0,
               p_land=-5.0, p_mid=0.0, p_off=50.0, roll=(0.18, 0.42),
@@ -415,8 +417,8 @@ CORRER = dict(T=20, duty=0.26, y_land=-0.36, y_off=0.34, ancho=0.11, giro_pie=-8
               balanceo=0.012, giro_cadera=9.0, ladeo_cadera=4.0, incl_cadera=6.0, incl=10.0, giro_hombros=12.0,
               cabeza=2.0, vuelo=[(0.22, 0.0, 0.40, 0.42, 72.0, -5.0), (0.5, -0.005, 0.02, 0.50, 34.0, 0.0),
                                  (0.79, 0.0, -0.39, 0.30, -2.0, 0.0)],
-              brazo_adelante=(-0.09, -0.25, -0.24), brazo_atras=(0.01, 0.21, -0.40), puno=(55.0, 35.0),
-              hombros=3.0)
+              brazo_adelante=(-0.07, -0.32, -0.16), brazo_atras=(0.01, 0.21, -0.40), brazo_polo=(0.45, 0.9, -0.3),
+              arco=3.0, puno=(55.0, 35.0), hombros=3.0)
 
 SPRINT = dict(T=18, duty=0.24, y_land=-0.38, y_off=0.38, ancho=0.10, giro_pie=-9.0,
               p_land=8.0, p_mid=4.0, p_off=55.0, roll=(0.15, 0.36),
@@ -424,7 +426,7 @@ SPRINT = dict(T=18, duty=0.24, y_land=-0.38, y_off=0.38, ancho=0.10, giro_pie=-9
               balanceo=0.01, giro_cadera=10.0, ladeo_cadera=4.0, incl_cadera=10.0, incl=16.0, giro_hombros=14.0,
               cabeza=4.0, vuelo=[(0.22, 0.0, 0.42, 0.55, 78.0, -5.0), (0.5, -0.005, -0.03, 0.58, 38.0, 0.0),
                                  (0.8, 0.0, -0.42, 0.32, 4.0, 0.0)],
-              brazo_adelante=(-0.08, -0.31, -0.17), brazo_atras=(0.02, 0.27, -0.36), puno=(45.0, 30.0),
+              brazo_adelante=(-0.08, -0.31, -0.17), brazo_atras=(0.02, 0.27, -0.36), puno=(45.0, 30.0), arco=3.0,
               muneca=-4.0, hombros=5.0)
 
 MARCHAS = {'Caminar': CAMINAR, 'Trote': TROTE, 'Correr': CORRER, 'Sprint': SPRINT}
@@ -442,11 +444,18 @@ def piernas_quietas(p, dx=0.0, abre=0.0, adelante_L=-0.035, adelante_R=0.025):
         pierna(p, l, A, 0.0, 0.0, 0.0, polo=V(s * 0.3, -1, 0))
 
 
+# Brazos caídos: la mano cuelga un poco adelante del muslo (no al costado), así los dedos no se meten en la funda y
+# los bolsillos de las piernas. Por lado: (afuera, adelante) del hombro en metros.
+SUELTOS = {'L': (0.095, -0.10), 'R': (0.10, -0.12)}
+SUELTOS_ABAJO = -0.515
+
+
 def brazos_sueltos(p, br=0.0, lados='LR'):
     D = p.delta('Spine2')
     for l in lados:
         s = S(l)
-        o = V(s * 0.085, -0.04 - 0.004 * br, -0.528 + 0.004 * br)
+        afuera, adelante = SUELTOS[l]
+        o = V(s * afuera, adelante - 0.004 * br, SUELTOS_ABAJO + 0.004 * br)
         brazo(p, l, desde_hombro(p, l, o), D.to_3x3() @ V(s * 0.45, 0.85, 0.0))
         p.rot_local('Hand.' + l, (1, 0, 0), -8)
         p.dedos(l, 20 + 4 * br, 12, abre=3)
@@ -612,16 +621,16 @@ def pico_en_mano(p, G, alfa, giro=0.0, ladeo=0.0, polo=V(-0.6, 0.5, -0.6), repar
 
 
 GOLPE = Claves({
-    0: dict(G=V(-0.21, -0.20, 1.04), a=32.0, gi=0.0, la=0.0, tg=0.0, ti=2.0, ad=0.0,
-            mL=V(0.085, -0.04, -0.528), cab=(2.0, 0.0, 0.0)),
+    0: dict(G=V(-0.22, -0.25, 1.13), a=32.0, gi=0.0, la=0.0, tg=0.0, ti=2.0, ad=0.0,
+            mL=V(0.12, -0.08, -0.50), cab=(2.0, 0.0, 0.0)),
     4: dict(G=V(-0.26, 0.06, 1.66), a=-38.0, gi=10.0, la=-12.0, tg=-22.0, ti=-5.0, ad=0.0,
             mL=V(-0.02, -0.38, -0.20), cab=(0.0, 12.0, 0.0)),
     7: dict(G=V(-0.12, -0.44, 1.30), a=100.0, gi=6.0, la=-6.0, tg=16.0, ti=12.0, ad=0.0,
             mL=V(0.10, 0.12, -0.40), cab=(8.0, 4.0, 0.0)),
     10: dict(G=V(-0.05, -0.32, 1.12), a=128.0, gi=14.0, la=0.0, tg=22.0, ti=16.0, ad=0.0,
              mL=V(0.12, 0.16, -0.42), cab=(8.0, 6.0, 0.0)),
-    15: dict(G=V(-0.21, -0.20, 1.04), a=32.0, gi=0.0, la=0.0, tg=0.0, ti=2.0, ad=0.0,
-             mL=V(0.085, -0.04, -0.528), cab=(2.0, 0.0, 0.0)),
+    15: dict(G=V(-0.22, -0.25, 1.13), a=32.0, gi=0.0, la=0.0, tg=0.0, ti=2.0, ad=0.0,
+             mL=V(0.12, -0.08, -0.50), cab=(2.0, 0.0, 0.0)),
 })
 
 
@@ -646,7 +655,7 @@ def pose_sostener_pico(f, T=90):
     br = math.sin(2 * math.pi * t)
     p = pose_quieto(f, T, brazos=False)
     brazos_sueltos(p, br, 'L')
-    pico_en_mano(p, V(-0.21, -0.20 - 0.004 * br, 1.04 + 0.004 * br), 32.0)
+    pico_en_mano(p, V(-0.22, -0.25 - 0.004 * br, 1.13 + 0.004 * br), 32.0)
     return p
 
 
@@ -695,7 +704,7 @@ ARMAS = {
     # apuntando: culata apoyada en el hueco del hombro; el torso se inclina adelante para llevar el hombro al arma
     'RifleApunta': (V(-0.15, -0.40, 1.39), V(0.04, -1, 0.03), V(0, 0, 1), 'largo', V(-1.0, 0.2, -0.15),
                     V(0.3, 0.1, -1.0), (15.0, -4.0, 12.0), (-32.0, 14.0), 8.0),
-    'Pistola': (V(-0.06, -0.30, 1.13), V(0.03, -1, -0.25), V(0, 0, 1), 'pistola', V(-0.6, 0.3, -1.0), V(0.6, 0.3, -1.0),
+    'Pistola': (V(-0.06, -0.33, 1.14), V(0.03, -1, -0.25), V(0, 0, 1), 'pistola', V(-0.6, 0.3, -1.0), V(0.6, 0.3, -1.0),
                 (4.0, 0.0, 0.0), (0.0, 3.0), 0.0),
     'PistolaApunta': (V(-0.04, -0.47, 1.53), V(0.06, -1, 0.0), V(0, 0, 1), 'pistola', V(-0.6, 0.2, -1.0),
                       V(0.6, 0.2, -1.0), (5.0, 0.0, 2.0), (0.0, 4.0), 3.0),

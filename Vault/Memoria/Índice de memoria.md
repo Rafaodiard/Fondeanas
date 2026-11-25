@@ -14,3 +14,4 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 - [[Blender en la nube]]: los scripts de Blender se corren en la nube.
 - [[Pedido del mapa]]: qué pidió para el mapa de la isla.
 - [[Errores del mapa]]: los errores que encontró al probar el mapa y que todo se rompa.
+- [[Brazos sin atravesar el cuerpo]]: el pedido, cómo se revisa y la tolerancia.
