@@ -224,7 +224,7 @@ export const PUEBLOS = [
     ],
   },
   {
-    id: 'cantera', name: 'Cantera Roja', x: -95, z: -205, r: 80, h: 27, tema: 'cantera', pozo: { r: 38, prof: 14 },
+    id: 'cantera', name: 'Cantera Roja', x: -95, z: -205, etiqueta: [15, 55], r: 80, h: 27, tema: 'cantera', pozo: { r: 38, prof: 14 },
     calles: [
       { p: [[0, -82], [0, -52], [-12, -32], [-16, -14], [-6, 0]], w: 6, m: 'tierra' },
       { p: [[-80, 50], [80, 50]], w: 5, m: 'tierra' },
@@ -244,7 +244,7 @@ export const PUEBLOS = [
     ],
   },
   {
-    id: 'refugio', name: 'Refugio Nevado', x: -238, z: -212, r: 56, h: 'auto', hOff: 1, borde: 70, tema: 'nieve',
+    id: 'refugio', name: 'Refugio Nevado', x: -238, z: -212, etiqueta: [-15, -58], r: 56, h: 'auto', hOff: 1, borde: 70, tema: 'nieve',
     calles: [{ p: [[58, 10], [0, 12], [-56, 12]], w: 5, m: 'nieve' }],
     items: [
       ['cartel', { text: 'Refugio Nevado', fondo: 'azul' }, 54, 17, 1], ['pino', { s: 1.2 }, -10, 35, 0], ['pino', {}, 15, 38, 0], ['pino', { s: 1.3 }, -40, 30, 0], ['pino', {}, 42, 32, 0], ['banco', {}, 5, 30, 0],
@@ -254,7 +254,6 @@ export const PUEBLOS = [
       ['cabana', { techo: 'techo_verde' }, -26, -32, 0],
       ['cabana', { techo: 'techo_negro', cofre: false }, 26, -30, 0],
       ['cobertizo', { pared: 'tronco', techo: 'techo_marron', cofre: true }, -45, -5, 1],
-      ['torreTeleferico', {}, 45, -8, 0],
       ['fogon', {}, 0, 26, 0],
     ],
   },
@@ -293,6 +292,9 @@ export const RUTAS = [
   { p: [[90, 230], [130, 230], [178, 252]], w: 4, m: 'tierra' },
 ];
 
+// Teleférico: del Refugio Nevado a la cumbre de la montaña (torres en orden, de abajo hacia arriba).
+export const TELEFERICO = [[-232, -259], [-260, -288], [-290, -318]];
+
 // Río: baja de la montaña y desemboca en la ciénaga.
 export const RIO = { p: [[-196, -168], [-192, -140], [-180, -80], [-185, 0], [-205, 90], [-250, 170], [-300, 235]], w: 9 };
 
@@ -308,7 +310,6 @@ export const SUELTOS = [
   ['casa', { pisos: 1, pared: 'blanco', techo: 'techo_rojo', porche: true }, -265, 115, 1], ['casa', { pisos: 2, pared: 'crema', techo: 'techo_verde' }, 225, 225, 3],
   ['casa', { pisos: 1, pared: 'celeste', techo: 'techo_gris' }, -120, -75, 0], ['casa', { pisos: 1, pared: 'durazno', techo: 'techo_marron' }, 120, -20, 2],
   ['contenedor', { m: 'chapa_verde' }, 130, 130, 1], ['contenedor', { m: 'chapa_roja' }, -60, -30, 0],
-  ['torreTeleferico', {}, -275, -262, 0], ['torreTeleferico', {}, -298, -300, 0],
   ['antena', { h: 22 }, -300, -130, 0],
   ['molino', { cofre: false }, 225, -100, 0],
   ['auto', { m: 'rojo' }, -230, 4, 1], ['auto', { m: 'azul' }, 45, 140, 0], ['auto', { m: 'verde' }, 200, 82, 1], ['auto', { m: 'amarillo' }, 125, -125, 1],

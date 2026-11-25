@@ -2,8 +2,8 @@
 // Todos los clientes de una sala generan exactamente el mismo mundo.
 import * as THREE from 'three';
 import { GRID, MATERIALS } from './items.js';
-import { PLANOS } from './planos.js';
-import { PUEBLOS, RUTAS, RIO, SUELTOS } from './isla.js';
+import { PLANOS, Plano } from './planos.js';
+import { PUEBLOS, RUTAS, RIO, SUELTOS, TELEFERICO } from './isla.js';
 import { Solidos } from './colision.js';
 import { Lote, materialesMapa, terrainDetail } from './mallas.js';
 
@@ -131,7 +131,7 @@ export class World {
   biome(x, z, h) {
     const des = this.desert(x, z);
     const sw = this.swamp(x, z) * 1.1;
-    const snow = smoothstep(40, 50, h + this.noise(x / 30, z / 30) * 6) * (1 - smoothstep(170, 250, Math.hypot(x + 300, z + 300) + this.noise(x / 40, z / 40) * 30));
+    const snow = smoothstep(36, 54, h + this.noise(x / 45, z / 45) * 12 + this.noise(x / 11 + 3, z / 11) * 4) * (1 - smoothstep(170, 250, Math.hypot(x + 300, z + 300) + this.noise(x / 40, z / 40) * 30));
     const quarry = bump(x, z, -95, -205, 48);
     return { des, sw, snow, quarry };
   }
@@ -158,11 +158,20 @@ export class World {
     this.stampRiver();
     // 4) estructuras
     for (const t of PUEBLOS) {
-      this.pois.push({ name: t.name, x: t.x, z: t.z, r: t.r, id: t.id });
+      this.pois.push({ name: t.name, x: t.x, z: t.z, r: t.r, id: t.id, lx: t.etiqueta?.[0], lz: t.etiqueta?.[1] });
       for (const [name, opts, lx, lz, r, extra] of t.items) this.place(name, opts, t.x + lx, t.z + lz, r, extra || {}, t);
     }
     for (const [name, opts, x, z, r, extra] of SUELTOS) this.place(name, opts, x, z, r, extra || {}, null);
     for (const b of this.bridges) this.place('puente', { L: b.L, w: b.w + 1, y: 0 }, b.x, b.z, b.rot, { pad: false, y: b.y }, null);
+    this.layoutPostes();
+    // Teleférico: torres con dos cables y cabinas colgando.
+    const torres = TELEFERICO.map(([x, z]) => {
+      this.place('torreTeleferico', {}, x, z, 0, { pad: false }, null);
+      const t = this.placed[this.placed.length - 1];
+      t.aisl = [[x - 3.6, t.y + 13.85, z], [x + 3.6, t.y + 13.85, z]];
+      return t;
+    });
+    for (let i = 0; i < torres.length - 1; i++) this.cable(torres[i], torres[i + 1], { sagK: 0.008, r: 0.035, cabina: i % 2 ? 0.62 : 0.38 });
     // 5) vegetación y rocas
     const rand = rng(MAP_SEED ^ 0x9e3779b9);
     this.layoutTrees(rand);
@@ -324,6 +333,88 @@ export class World {
     this.placed.push({ name, P, r, x, y: base, z, fp, town: town?.id });
   }
 
+  // Postes de luz con cables a lo largo de las rutas asfaltadas, e indicadores a la salida de los pueblos.
+  layoutPostes() {
+    const libre = (x, z, minRoad) => {
+      if (this.inTown(x, z, 4) || this.terrainHeight(x, z) < 0.8 || this.slopeAt(x, z) > 0.5) return false;
+      if (this.gridVal(this.riverDist, x, z) < 10 || this.nearSolid(x, z, 1.6)) return false;
+      if (this.bridges.some((b) => Math.hypot(b.x - x, b.z - z) < 22)) return false;
+      for (const rb of this.ribbons) for (const [px, pz] of rb.pts) if (Math.hypot(px - x, pz - z) - rb.w / 2 < minRoad) return false;
+      return true;
+    };
+    const cerca = (x, z) => {
+      let best = null, bd = Infinity;
+      for (const t of PUEBLOS) { const d = Math.hypot(t.x - x, t.z - z) - t.r; if (d < bd) { bd = d; best = t; } }
+      return bd < 45 ? best : null;
+    };
+    const flecha = (dx, dz) => (Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 1 : 3) : dz > 0 ? 0 : 2);
+    const indicadores = [];
+    for (const ru of RUTAS) {
+      const path = catmull(ru.p, 3);
+      const tan = (i) => { const [ax, az] = path[Math.max(0, i - 2)], [bx, bz] = path[Math.min(path.length - 1, i + 2)]; const L = Math.hypot(bx - ax, bz - az) || 1; return [(bx - ax) / L, (bz - az) / L]; };
+      // indicadores en los dos extremos, del lado izquierdo de la ruta
+      const ini = cerca(...path[0]), fin = cerca(...path[path.length - 1]);
+      for (const [from, to, dirSign, order] of [[ini, fin, 1, path.map((_, i) => i)], [fin, ini, -1, path.map((_, i) => path.length - 1 - i)]]) {
+        if (!from || !to || from === to) continue;
+        for (const i of order) {
+          const [px, pz] = path[i];
+          if (this.inTown(px, pz, 8)) continue;
+          const [tx, tz] = tan(i), sx = tx * dirSign, sz = tz * dirSign;
+          const x = px + sz * (ru.w / 2 + 2.2), z = pz - sx * (ru.w / 2 + 2.2);
+          if (indicadores.some((q) => Math.hypot(q[0] - x, q[1] - z) < 30) || !libre(x, z, 1.2)) break;
+          indicadores.push([x, z]);
+          this.place('indicador', { textos: [[to.name, flecha(sx, sz)], [from.name, flecha(-sx, -sz)]] }, x, z, 0, { pad: false }, null);
+          break;
+        }
+      }
+      if (ru.m !== 'asfalto') continue;
+      // postes cada ~38 m del lado derecho, con cables entre vecinos
+      let prev = null, acc = 0;
+      for (let i = 1; i < path.length; i++) {
+        acc += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+        if (acc < 38) continue;
+        acc = 0;
+        const [tx, tz] = tan(i), off = ru.w / 2 + 2.6;
+        const x = path[i][0] - tz * off, z = path[i][1] + tx * off;
+        if (!libre(x, z, 1.8)) { prev = null; continue; }
+        const r = Math.abs(tx) > Math.abs(tz) ? 1 : 0;
+        this.place('poste', {}, x, z, r, { pad: false }, null);
+        const cur = this.placed[this.placed.length - 1];
+        cur.aisl = [-0.9, 0, 0.9].map((lx) => { const [ax, az] = rot2(lx, 0, r); return [x + ax, cur.y + 7.62, z + az]; });
+        if (prev && Math.hypot(prev.x - x, prev.z - z) < 60) this.cable(prev, cur);
+        prev = cur;
+      }
+    }
+  }
+
+  // Cables con comba entre los puntos de amarre de dos postes (o torres). cabina: dónde cuelga una cabina (0..1).
+  cable(A, B, { sagK = 0.018, r = 0.022, cabina = null } = {}) {
+    const ux = B.x - A.x, uz = B.z - A.z, L = Math.hypot(ux, uz);
+    const nx = -uz / L, nz = ux / L;
+    const ord = (arr) => arr.slice().sort((p, q) => (p[0] * nx + p[2] * nz) - (q[0] * nx + q[2] * nz));
+    const a = ord(A.aisl), b = ord(B.aisl);
+    const P = new Plano();
+    const sag = sagK * L, n = Math.max(10, Math.ceil(L / 4));
+    const at = (w, t) => [a[w][0] + (b[w][0] - a[w][0]) * t - A.x, a[w][1] + (b[w][1] - a[w][1]) * t - 4 * sag * t * (1 - t) - A.y, a[w][2] + (b[w][2] - a[w][2]) * t - A.z];
+    for (let w = 0; w < a.length; w++) {
+      let last = null;
+      for (let k = 0; k <= n; k++) {
+        const p = at(w, k / n);
+        if (last) P.tube(last, p, r, 'negro', 4);
+        last = p;
+      }
+    }
+    if (cabina !== null) {
+      const [cx, cy, cz] = at(0, cabina);
+      P.tube([cx, cy, cz], [cx, cy - 2.2, cz], 0.06, 'metal_osc', 5);
+      P.cbox(cx, cy - 2.4, cz, 0.9, 0.2, 0.9, 'metal_osc', false);
+      P.cbox(cx, cy - 4.5, cz, 2.0, 2.1, 1.8, 'rojo', false);
+      P.cbox(cx, cy - 3.6, cz, 2.06, 0.8, 1.86, 'vidrio', false);
+      P.cbox(cx, cy - 2.4 - 0.05, cz, 2.1, 0.12, 1.9, 'blanco', false);
+    }
+    this.placed.push({ name: 'cables', P, r: 0, x: A.x, y: A.y, z: A.z, fp: { x0: Math.min(A.x, B.x), x1: Math.max(A.x, B.x), z0: Math.min(A.z, B.z), z1: Math.max(A.z, B.z) } });
+  }
+
   // Aplana exactamente la huella (así la puerta queda al ras del piso) y suaviza alrededor.
   flatten(fp, base, F) {
     const m = this.cell * 1.01;
@@ -480,10 +571,10 @@ export class World {
       c.copy(COL.grass).lerp(COL.grass2, n);
       if (bio.sw > 0) c.lerp(COL.mud, smoothstep(0.2, 0.6, bio.sw) * (0.5 + n * 0.5));
       if (bio.des > 0) c.lerp(COL.desert, smoothstep(0.2, 0.7, bio.des)).lerp(COL.desert2, bio.des * n * 0.5);
-      if (y > 30 && bio.snow < 0.5) c.lerp(COL.alpine, smoothstep(30, 55, y) * 0.6);
+      if (y > 24) c.lerp(COL.alpine, smoothstep(24, 60, y) * 0.45 * (1 - bio.snow));
       if (slope > 0.42) c.lerp(bio.quarry > 0.2 ? COL.redrock : COL.rock, smoothstep(0.42, 0.62, slope));
       if (bio.quarry > 0) c.lerp(n > 0.5 ? COL.redrock : COL.redrock2, smoothstep(0, 0.5, bio.quarry));
-      if (bio.snow > 0) c.lerp(slope > 0.6 ? COL.rock : COL.snow, bio.snow);
+      if (bio.snow > 0) c.lerp(COL.snow, bio.snow * (0.8 + 0.2 * smoothstep(0.3, 0.7, n + bio.snow - 0.5))).lerp(COL.rock, bio.snow * smoothstep(0.7, 1.1, slope));
       if (road < 2.5) c.lerp(COL.dirt, (1 - smoothstep(0, 2.5, road)) * 0.3);
       if (river < 7) c.lerp(COL.mud, (1 - smoothstep(3, 7, river)) * 0.8);
     }
@@ -526,9 +617,22 @@ export class World {
   buildWater(scene) {
     const geo = new THREE.PlaneGeometry(this.size * 6, this.size * 6, 1, 1);
     geo.rotateX(-Math.PI / 2);
-    const mat = new THREE.MeshStandardMaterial({ color: '#2a9fd6', transparent: true, opacity: 0.82, roughness: 0.2, metalness: 0.1 });
+    const mat = new THREE.MeshStandardMaterial({ color: '#2a9fd6', transparent: true, opacity: 0.82, roughness: 0.14, metalness: 0.05 });
+    // Profundidad (R) y ciénaga (G) por vértice de la grilla: color según profundidad y espuma en la orilla.
+    const N = this.N, data = new Uint8Array(N * N * 4), half = this.size / 2;
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const k = j * N + i, d = Math.min(20, Math.max(-4, -this.heights[k]));
+      data[k * 4] = Math.round(((d + 4) / 24) * 255);
+      data[k * 4 + 1] = Math.round(Math.min(1, this.swamp(-half + i * this.cell, -half + j * this.cell) * 1.3) * 255);
+      data[k * 4 + 3] = 255;
+    }
+    const htex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+    htex.magFilter = THREE.LinearFilter; htex.minFilter = THREE.LinearFilter; htex.needsUpdate = true;
+    const time = { value: 0 };
+    aguaShader(mat, { time, htex, half, cell: this.cell, N, mar: true });
     this.water = new THREE.Mesh(geo, mat);
     this.water.position.y = SEA_LEVEL;
+    this.water.onBeforeRender = () => { time.value = performance.now() / 1000; };
     scene.add(this.water);
     // río: cinta de agua siguiendo el cauce
     const { path, water } = this.river;
@@ -543,7 +647,9 @@ export class World {
     const rg = new THREE.BufferGeometry();
     rg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     rg.computeVertexNormals();
-    const rm = new THREE.Mesh(rg, new THREE.MeshStandardMaterial({ color: '#3fb0e0', transparent: true, opacity: 0.8, roughness: 0.15, side: THREE.DoubleSide }));
+    const rmat = new THREE.MeshStandardMaterial({ color: '#45b6e3', transparent: true, opacity: 0.8, roughness: 0.12, side: THREE.DoubleSide });
+    aguaShader(rmat, { time, mar: false });
+    const rm = new THREE.Mesh(rg, rmat);
     scene.add(rm);
   }
 
@@ -620,28 +726,40 @@ export class World {
     }
   }
 
-  // Carteles con el nombre de cada pueblo (texto dibujado en un canvas).
+  // Carteles (nombres de pueblos e indicadores de caminos): texto dibujado en un canvas, en las dos caras.
   buildSigns(scene) {
     if (typeof document === 'undefined') return;
-    for (const g of this.signs) {
+    const tex = (g, flip) => {
       const cv = document.createElement('canvas');
-      cv.width = 512; cv.height = Math.round((512 * g.h) / g.w);
+      cv.width = 512; cv.height = Math.max(64, Math.round((512 * g.h) / g.w));
       const ctx = cv.getContext('2d');
-      ctx.fillStyle = '#2f7d4a'; ctx.fillRect(0, 0, cv.width, cv.height);
-      ctx.strokeStyle = '#f4f1e6'; ctx.lineWidth = 8; ctx.strokeRect(10, 10, cv.width - 20, cv.height - 20);
-      ctx.fillStyle = '#f4f1e6'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      let fs = 72; ctx.font = `bold ${fs}px system-ui, sans-serif`;
-      while (ctx.measureText(g.text).width > cv.width - 60 && fs > 20) { fs -= 4; ctx.font = `bold ${fs}px system-ui, sans-serif`; }
-      ctx.fillText(g.text, cv.width / 2, cv.height / 2 + 4);
-      const tex = new THREE.CanvasTexture(cv);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.anisotropy = 4;
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(g.w, g.h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
-      mesh.position.set(g.x, g.y - g.h / 2 + 0.02, g.z);
-      mesh.rotation.y = (g.r * Math.PI) / 2;
-      const back = mesh.clone(); back.rotation.y += Math.PI;
-      const [bx, bz] = rot2(0, -0.16, g.r); back.position.x += bx; back.position.z += bz;
-      scene.add(mesh, back);
+      ctx.fillStyle = g.color; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.strokeStyle = g.ink; ctx.globalAlpha = 0.85; ctx.lineWidth = Math.max(4, cv.height * 0.05);
+      ctx.strokeRect(ctx.lineWidth, ctx.lineWidth, cv.width - ctx.lineWidth * 2, cv.height - ctx.lineWidth * 2);
+      ctx.globalAlpha = 1; ctx.fillStyle = g.ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      let text = g.text;
+      if (g.dir) text = flip ? `◀  ${text}` : `${text}  ▶`;
+      let fs = Math.round(cv.height * 0.55);
+      ctx.font = `bold ${fs}px system-ui, sans-serif`;
+      while (ctx.measureText(text).width > cv.width - 50 && fs > 14) { fs -= 2; ctx.font = `bold ${fs}px system-ui, sans-serif`; }
+      ctx.fillText(text, cv.width / 2, cv.height / 2 + fs * 0.06);
+      const t = new THREE.CanvasTexture(cv);
+      t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+      return t;
+    };
+    for (const g of this.signs) {
+      const ang = ((g.r + (g.face || 0)) * Math.PI) / 2;
+      const nx = Math.sin(ang), nz = Math.cos(ang); // normal de la cara del frente
+      // ¿la flecha del frente apunta a la derecha? (derecha de quien mira el frente = (cos, -sin))
+      let right = true;
+      if (g.dir) { const [wx, wz] = rot2(g.dir[0], g.dir[1], g.r); right = wx * Math.cos(ang) - wz * Math.sin(ang) > 0; }
+      for (const side of [1, -1]) {
+        const flip = g.dir ? (side === 1 ? !right : right) : false;
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(g.w, g.h), new THREE.MeshStandardMaterial({ map: tex(g, flip), roughness: 0.8 }));
+        mesh.position.set(g.x + nx * (g.d + 0.01) * side, g.y - g.h / 2, g.z + nz * (g.d + 0.01) * side);
+        mesh.rotation.y = ang + (side === 1 ? 0 : Math.PI);
+        scene.add(mesh);
+      }
     }
   }
 
@@ -925,13 +1043,52 @@ export class World {
       ctx.beginPath(); rb.pts.forEach(([x, z], k) => (k ? ctx.lineTo(toM(x), toM(z)) : ctx.moveTo(toM(x), toM(z)))); ctx.stroke();
     }
     for (const p of this.placed) {
-      if (['farol', 'cerca', 'auto', 'caja3', 'barriles', 'fogon', 'campo', 'tractor', 'puesto', 'carpa', 'pasarela', 'muelle', 'malecon', 'puente', 'montanaRusa', 'rueda'].includes(p.name)) continue;
+      if (['farol', 'cerca', 'auto', 'caja3', 'barriles', 'fogon', 'campo', 'tractor', 'puesto', 'carpa', 'pasarela', 'muelle', 'malecon', 'puente', 'montanaRusa', 'rueda', 'poste', 'cables', 'indicador', 'torreTeleferico', 'banco', 'tacho', 'hidrante', 'buzon', 'cartel', 'cantero', 'seto', 'jardin'].includes(p.name)) continue;
       const f = p.fp;
       ctx.fillStyle = 'rgba(70,45,35,.85)';
       ctx.fillRect(toM(f.x0), toM(f.z0), Math.max(1.5, toM(f.x1) - toM(f.x0)), Math.max(1.5, toM(f.z1) - toM(f.z0)));
     }
     return cv;
   }
+}
+
+// Agua con olitas (normales animadas) y, en el mar, color según profundidad y espuma en la orilla.
+function aguaShader(mat, { time, htex, half = 0, cell = 1, N = 1, mar }) {
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uTime = time;
+    if (mar) { sh.uniforms.uHeight = { value: htex }; sh.uniforms.uHalf = { value: half }; sh.uniforms.uCell = { value: cell }; sh.uniforms.uN = { value: N }; }
+    sh.vertexShader = 'varying vec3 vAgW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vAgW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    let head = 'varying vec3 vAgW;\nuniform float uTime;\n';
+    if (mar) head += 'uniform sampler2D uHeight; uniform float uHalf, uCell, uN;\n';
+    let col = '';
+    if (mar) col = `
+      vec2 wuv = ((vAgW.xz + uHalf) / uCell + 0.5) / uN;
+      float inside = step(0.0, wuv.x) * step(wuv.x, 1.0) * step(0.0, wuv.y) * step(wuv.y, 1.0);
+      vec4 hs = texture2D(uHeight, clamp(wuv, 0.0, 1.0));
+      float depth = mix(20.0, hs.r * 24.0 - 4.0, inside);
+      float swampW = hs.g * inside;
+      vec3 deep = vec3(0.012, 0.16, 0.42), shallow = vec3(0.07, 0.55, 0.62), murky = vec3(0.12, 0.2, 0.07);
+      vec3 wc = mix(shallow, deep, smoothstep(0.2, 10.0, depth));
+      wc = mix(wc, murky, swampW * 0.7);
+      float fN = sin(vAgW.x * 0.9 + uTime * 1.7) * sin(vAgW.z * 0.8 - uTime * 1.3) * 0.5 + 0.5;
+      float edge = 1.0 - smoothstep(0.0, 0.3 + 0.18 * sin(uTime * 0.9 + vAgW.x * 0.07 + vAgW.z * 0.05), depth);
+      float foam = clamp(edge * (0.6 + 0.4 * fN), 0.0, 1.0) * (1.0 - swampW);
+      diffuseColor.rgb = mix(wc, vec3(0.92, 0.96, 1.0), foam * 0.85);
+      diffuseColor.a = clamp(mix(0.6, 0.92, smoothstep(0.0, 6.0, depth)) + foam * 0.35, 0.0, 1.0);`;
+    sh.fragmentShader = head + sh.fragmentShader
+      .replace('#include <color_fragment>', '#include <color_fragment>' + col)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      {
+        vec2 p = vAgW.xz; float t = uTime;
+        float fade = 1.0 - smoothstep(50.0, 400.0, length(vViewPosition));
+        vec2 g = vec2(0.0);
+        g += vec2(0.31, 0.12) * cos(dot(p, vec2(0.31, 0.12)) + t * 1.5) * 0.32;
+        g += vec2(-0.11, 0.38) * cos(dot(p, vec2(-0.11, 0.38)) + t * 1.8) * 0.26;
+        g += (vec2(0.95, 0.62) * cos(dot(p, vec2(0.95, 0.62)) - t * 2.6) * 0.06 + vec2(-0.7, 1.15) * cos(dot(p, vec2(-0.7, 1.15)) + t * 3.0) * 0.05) * fade;
+        vec3 nW = normalize(vec3(-g.x, 1.0, -g.y));
+        normal = normalize((viewMatrix * vec4(nW, 0.0)).xyz);
+      }`);
+  };
 }
 
 const COL = {

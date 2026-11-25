@@ -107,7 +107,7 @@ export class Plano {
 
   // Pared recta de (x0,z0) a (x1,z1) (eje X o Z), con aberturas.
   // ops: [{c: centro a lo largo de la pared desde el inicio, w, y: base, h, kind: 'puerta'|'ventana'|'hueco'}]
-  wall(x0, z0, x1, z1, y0, h, m, ops = [], { t = T, frame = 'marco', glass = false, out = 1 } = {}) {
+  wall(x0, z0, x1, z1, y0, h, m, ops = [], { t = T, frame = 'marco', glass = false, out = 1, door = 'madera' } = {}) {
     const alongX = Math.abs(z1 - z0) < 1e-6;
     const L = alongX ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
     const sgn = alongX ? Math.sign(x1 - x0) || 1 : Math.sign(z1 - z0) || 1;
@@ -126,6 +126,13 @@ export class Plano {
       seg(a, b, o.y + o.h, h); // encima (dintel)
       cur = b;
       if (frame && o.kind !== 'hueco') this.opening(x0, z0, alongX, sgn, o, y0, t, frame, glass && o.kind === 'ventana', out);
+      if (o.kind === 'puerta' && o.w <= 1.9 && door) {
+        // hoja de la puerta abierta hacia adentro (el adentro es el lado del centro del plano)
+        const inn = alongX ? -Math.sign(z0) || 1 : -Math.sign(x0) || 1;
+        const hinge = sgn * a, L = o.w - 0.1;
+        if (alongX) this.box(x0 + hinge, y0, z0 + inn * (t / 2), x0 + hinge + sgn * 0.06, y0 + o.h - 0.05, z0 + inn * (t / 2 + L), door, false);
+        else this.box(x0 + inn * (t / 2), y0, z0 + hinge, x0 + inn * (t / 2 + L), y0 + o.h - 0.05, z0 + hinge + sgn * 0.06, door, false);
+      }
     }
     seg(cur, L, 0, h);
     return this;
@@ -365,6 +372,7 @@ export function casa({ w = 9, d = 8, pisos = 1, pared = 'blanco', techo = 'techo
   }
   // muebles
   const fy = 0.05;
+  P.box(x0 + 1.0, fy, z1 - 3.6, x0 + 3.4, fy + 0.03, z1 - 1.0, v % 2 ? 'alfombra' : 'tela', false);
   mesa(P, x0 + 2.2, fy, z1 - 2.4);
   silla(P, x0 + 1.6, fy, z1 - 1.6); silla(P, x0 + 2.8, fy, z1 - 1.6);
   sillon(P, x0 + 2.0, fy, z0 + 1.0, true);
@@ -398,9 +406,13 @@ export function galpon({ w = 18, d = 12, h = 7, pared = 'chapa_azul', techo = 'c
   const mz0 = z0 + T / 2, mz1 = z1 - T / 2, mx0 = x0 + T / 2, mx1 = x0 + 4.2, my = y + 3.6;
   P.box(mx0, my - 0.25, mz0, mx1, my, mz1, 'metal_osc');
   for (const z of [mz0 + 1, mz1 - 1]) P.cbox(mx1 - 0.15, y, z, 0.25, 3.35, 0.25, 'amarillo_seg', false);
-  P.rail(mx1, mz0 + 2.0, mx1, mz1, my, 'amarillo_seg');
-  P.stairs(mx1 + 0.05, mz0 + 0.2, mx1 + 1.45, mz0 + 0.2 + 3.8, y, my, '-z', 'metal', { rail: 'amarillo_seg' });
-  P.solids[P.solids.length - 1]; // (la rampa ya quedó registrada)
+  // escalera con descanso arriba (el descanso empalma con el entrepiso, lejos de la pared del fondo)
+  const sl = mz0 + 1.7;
+  P.rail(mx1, sl + 0.1, mx1, mz1, my, 'amarillo_seg');
+  P.box(mx1 - 0.1, my - 0.25, mz0, mx1 + 1.45, my, sl, 'metal_osc');
+  P.rail(mx1 + 1.45, mz0, mx1 + 1.45, sl, my, 'amarillo_seg');
+  P.cbox(mx1 + 1.3, y, sl - 0.15, 0.2, my - 0.3, 0.2, 'amarillo_seg', false);
+  P.stairs(mx1 + 0.05, sl, mx1 + 1.45, sl + 3.8, y, my, '-z', 'metal', { rail: 'amarillo_seg' });
   // techo curvo aproximado: dos aguas bajas
   P.gable(x0, z0, x1, z1, y + h - T, 1.6, techo, { axis: 'x', over: 0.5, wallM: pared, solidCeil: true, ceil: 'metal_osc' });
   // estanterías y cajas
@@ -628,17 +640,19 @@ export function tanqueAgua({ h = 9, m = 'chapa', tanque = 'celeste' } = {}) {
     P.tube([-2, y, -2], [-2, y, 2], 0.06, 'metal_osc'); P.tube([2, y, -2], [2, y, 2], 0.06, 'metal_osc');
   }
   P.box(-3, h - 0.3, -3, 3, h, 3, 'madera_osc');
-  P.rail(-3, -3, 3, -3, h, 'metal_osc'); P.rail(-3, 3, -1.2, 3, h, 'metal_osc'); P.rail(-3, -3, -3, 3, h, 'metal_osc'); P.rail(3, -3, 3, 3, h, 'metal_osc');
-  P.cyl(0, h, 0, 2.3, 3.6, tanque, { solid: true, seg: 14 });
-  P.cyl(0, h + 3.6, 0, 2.4, 1.0, m, { r2: 0.3, seg: 14 });
-  // escalera en dos tramos con descanso
-  P.stairs(-0.4, 3.0, 0.9, 3.0 + 5.2, 0.05, h / 2, '-z', 'metal');
-  P.stairs(-0.4, 3.0, 0.9, 3.0 + 0.01, 0, 0, '-z', null);
-  P.box(-0.4, h / 2 - 0.25, 1.6, 2.2, h / 2, 3.0, 'metal');
-  P.stairs(0.9, 3.0 - 1.4, 2.2, 3.0 + 3.6, h / 2, h, '+z', 'metal');
-  P.solids.pop();
-  P.solids.push({ x0: 0.9, x1: 2.2, z0: 1.6, z1: 6.6, y0: h / 2, y1: h, up: '-z', lo: h / 2 });
-  P.addLoot(0, h, -1.5);
+  P.rail(-3, -3, 3, -3, h, 'metal_osc'); P.rail(-3, 3, 3, 3, h, 'metal_osc'); P.rail(-3, -1.6, -3, 3, h, 'metal_osc'); P.rail(3, -3, 3, 3, h, 'metal_osc');
+  P.cyl(0, h, 0, 1.85, 3.8, tanque, { solid: true, seg: 14 });
+  P.cyl(0, h + 3.8, 0, 1.95, 1.0, m, { r2: 0.3, seg: 14 });
+  for (const y of [h + 0.9, h + 2.8]) P.cyl(0, y, 0, 1.91, 0.12, 'metal_osc', { seg: 14 });
+  // escalera por fuera: tramo 1 al sur (sube hacia -x), descanso, tramo 2 al oeste (sube hacia -z) y descanso de arriba
+  P.stairs(-2.6, 4.6, 3.4, 5.8, 0.05, h / 2, '-x', 'metal', { rail: 'metal_osc' });
+  P.box(-4.6, h / 2 - 0.25, 3.4, -2.6, h / 2, 5.8, 'metal');
+  P.rail(-4.6, 5.8, -2.6, 5.8, h / 2, 'metal_osc'); P.rail(-4.6, 3.4, -4.6, 5.8, h / 2, 'metal_osc');
+  P.stairs(-4.6, -1.6, -3.4, 3.4, h / 2, h, '-z', 'metal', { rail: 'metal_osc' });
+  P.box(-4.6, h - 0.3, -3.0, -3.0, h, -1.6, 'madera_osc');
+  P.rail(-4.6, -3.0, -4.6, -1.6, h, 'metal_osc'); P.rail(-4.6, -3.0, -3.0, -3.0, h, 'metal_osc');
+  for (const [x, z, top] of [[-4.5, 3.5, h / 2 - 0.25], [-4.5, 5.7, h / 2 - 0.25], [-2.7, 5.7, h / 2 - 0.25], [-4.5, -2.9, h - 0.3], [-4.5, -1.7, h - 0.3], [-4.5, 1.0, h * 0.62]]) P.cbox(x, -0.6, z, 0.2, top + 0.6, 0.2, 'metal_osc');
+  P.addLoot(2.0, h, -2.0);
   return P;
 }
 
@@ -858,13 +872,13 @@ export function torreVigia({ h = 8, cofre = true } = {}) {
   P.rail(s + 0.4, -s - 0.4, s + 0.4, s + 0.4, h, 'madera_osc'); P.rail(-s - 0.4, s + 0.4, -0.2, s + 0.4, h, 'madera_osc');
   P.gable(-s - 0.4, -s - 0.4, s + 0.4, s + 0.4, h + 2.4, 1.2, 'techo_marron', { axis: 'x', over: 0.3, solidCeil: true, ceil: 'madera' });
   // escalera en dos tramos
-  P.stairs(0.0, s + 0.4, 1.3, s + 0.4 + h * 0.6, 0.05, h * 0.5, '-z', 'madera');
-  P.box(0.0, h * 0.5 - 0.25, s + 0.4 + h * 0.6, 2.8, h * 0.5, s + 0.4 + h * 0.6 + 1.4, 'madera');
-  P.stairs(1.5, s + 0.4, 2.8, s + 0.4 + h * 0.6, h * 0.5, h, '-z', 'madera');
-  P.solids.pop();
-  P.solids.push({ x0: 1.5, x1: 2.8, z0: s + 0.4, z1: s + 0.4 + h * 0.6, y0: h * 0.5, y1: h, up: '-z', lo: h * 0.5 });
-  P.solids.find((q) => q.up === '-z' && q.x0 === 1.5).up = '-z';
-  // el segundo tramo sube hacia -z desde el descanso
+  const zl = s + 0.4 + h * 0.6;
+  P.stairs(0.0, s + 0.4, 1.3, zl, 0.05, h * 0.5, '+z', 'madera');
+  P.box(0.0, h * 0.5 - 0.25, zl, 2.8, h * 0.5, zl + 1.4, 'madera');
+  P.rail(0.0, zl + 1.4, 2.8, zl + 1.4, h * 0.5, 'madera_osc'); P.rail(2.8, zl, 2.8, zl + 1.4, h * 0.5, 'madera_osc');
+  for (const [x, z] of [[0.12, zl + 1.28], [2.68, zl + 1.28], [2.68, zl + 0.12]]) P.cbox(x, -0.6, z, 0.24, h * 0.5 + 0.35, 0.24, 'tronco');
+  // el segundo tramo sube desde el descanso hacia la torre (-z)
+  P.stairs(1.5, s + 0.4, 2.8, zl, h * 0.5, h, '-z', 'madera');
   P.addLoot(0, h, 0);
   if (cofre) P.addChest(-s + 0.5, h, -s + 0.5, 0);
   return P;
@@ -1112,7 +1126,17 @@ export function cupula({ cofre = true } = {}) {
   P.cbox(0, y, R, 1.8, 2.8, 0.6, 'marco', false);
   P.box(-0.8, y, R - 0.4, 0.8, y + 2.6, R + 0.35, null, false);
   P.sphere(0, y + H, 0, R + 0.2, 'blanco_puro', { half: true, seg: 20, sy: 0.85 });
-  P.box(-0.9, y + H, -R, 0.9, y + H + R * 0.85, R * 0.2, 'metal_osc', false); // ranura
+  // ranura de observación: placas siguiendo la curva de la cúpula, con rieles a los costados
+  {
+    const Rd = R + 0.2 + 0.12, n = 9, a1 = (78 * Math.PI) / 180;
+    for (let k = 0; k < n; k++) {
+      const ta = (k / n) * a1 - 0.08, tb = ((k + 1) / n) * a1;
+      const za = -Rd * Math.sin(Math.max(0, ta)), ya = y + H + Rd * 0.85 * Math.cos(Math.max(0, ta));
+      const zb = -Rd * Math.sin(tb), yb = y + H + Rd * 0.85 * Math.cos(tb);
+      P.slope(-0.9, zb, 0.9, za, yb, ya, '+z', 0.08, 'negro');
+      for (const x of [-1.05, 1.05]) P.tube([x, ya + 0.05, za], [x, yb + 0.05, zb], 0.09, 'metal', 5);
+    }
+  }
   P.slab(-R, -R, R, R, y + H, 'metal_osc', [{ x0: -R, z0: -R, x1: R, z1: R }]);
   P.solids.push({ x0: -R + 0.5, x1: R - 0.5, z0: -R + 0.5, z1: R - 0.5, y0: y + H, y1: y + H + 0.4 });
   // telescopio en el centro sobre pedestal
@@ -1169,11 +1193,11 @@ export function lodge({ cofre = true } = {}) {
 // Teleférico: torre con plataforma.
 export function torreTeleferico() {
   const P = new Plano();
-  P.cbox(0, -1, 0, 1.2, 14, 1.2, 'metal_osc');
+  P.cbox(0, -3, 0, 2.4, 3.6, 2.4, 'hormigon');
+  P.cbox(0, -1, 0, 1.2, 14, 1.2, 'metal_osc', false);
   P.box(-4, 13, -1, 4, 13.6, 1, 'metal_osc', false);
-  P.tube([-3.6, 13.6, 0], [-3.6, 40, 0], 0.04, 'negro');
-  P.tube([3.6, 13.6, 0], [3.6, 40, 0], 0.04, 'negro');
-  P.cbox(-3.6, 9, 0, 1.8, 2.4, 1.6, 'rojo', false);
+  for (const x of [-3.6, 3.6]) { P.cyl(x, 13.6, -0.6, 0.45, 0.25, 'amarillo_seg', { seg: 10 }); P.cyl(x, 13.6, 0.6, 0.45, 0.25, 'amarillo_seg', { seg: 10 }); }
+  P.tube([-0.6, 9, 0], [-3.4, 13, 0], 0.12, 'metal_osc'); P.tube([0.6, 9, 0], [3.4, 13, 0], 0.12, 'metal_osc');
   P.solids.push({ x0: -0.6, x1: 0.6, z0: -0.6, z1: 0.6, y0: -1, y1: 13 });
   return P;
 }
@@ -1323,7 +1347,7 @@ export function cartel({ text = '', m = 'madera_osc', fondo = 'verde', w = 5 } =
   P.cbox(0, 1.8, 0, w, 1.3, 0.14, fondo, false);
   P.cbox(0, 1.72, 0, w + 0.14, 0.08, 0.2, m, false);
   P.cbox(0, 3.1, 0, w + 0.14, 0.08, 0.2, m, false);
-  P.signs = [{ x: 0, y: 2.45, z: 0.08, w: w - 0.25, h: 1.15, text }];
+  P.signs = [{ x: 0, y: 2.45, z: 0, w: w - 0.25, h: 1.15, text, face: 0, d: 0.08, color: PALETA[fondo] ? PALETA[fondo][0] : '#2f7d4a', ink: '#f4f1e6' }];
   return P;
 }
 
@@ -1365,6 +1389,35 @@ export function jardin({ w = 12, d = 5 } = {}) {
   return P;
 }
 
+
+// Poste de luz de madera (los cables los tiende el mundo entre postes vecinos).
+export function poste() {
+  const P = new Plano();
+  P.cyl(0, -0.5, 0, 0.14, 8.5, 'tronco', { seg: 6, solid: true, r2: 0.11 });
+  P.cbox(0, 7.4, 0, 2.2, 0.14, 0.14, 'madera_osc', false);
+  for (const x of [-0.9, 0, 0.9]) P.cyl(x, 7.54, 0, 0.05, 0.16, 'blanco', { seg: 5 });
+  return P;
+}
+
+// Indicador de caminos: poste con flechas a los pueblos. textos: [[texto, rot de la flecha 0..3], ...]
+export function indicador({ textos = [] } = {}) {
+  const P = new Plano();
+  P.cbox(0, -0.4, 0, 0.16, 3.7, 0.16, 'madera_osc');
+  textos.forEach(([text, r], k) => {
+    const y = 3.0 - k * 0.55;
+    const [dx, dz] = [[0, 1], [1, 0], [0, -1], [-1, 0]][r & 3];
+    const along = dx !== 0;
+    const L = 2.2;
+    const cx = dx * (L / 2 + 0.05), cz = dz * (L / 2 + 0.05);
+    if (along) P.box(cx - L / 2, y - 0.42, cz - 0.04, cx + L / 2, y, cz + 0.04, 'madera2', false);
+    else P.box(cx - 0.04, y - 0.42, cz - L / 2, cx + 0.04, y, cz + L / 2, 'madera2', false);
+    P.signs = P.signs || [];
+    // cartel a los dos lados de la tabla
+    P.signs.push({ x: cx, y: y - 0.02, z: cz, w: L - 0.1, h: 0.38, text, dir: [dx, dz], face: along ? 0 : 1, d: 0.05, color: '#f6ead0', ink: '#3b2a1a' });
+  });
+  return P;
+}
+
 // ---------- utilidades ----------
 export function merge(dst, src, dx = 0, dz = 0, dy = 0) {
   const t = (a) => [a[0] + dx, a[1] + dy, a[2] + dz, a[3] + dx, a[4] + dy, a[5] + dz];
@@ -1390,5 +1443,5 @@ export const PLANOS = {
   casa, galpon, edificio, local, cobertizo, granero, silo, molino, tanqueAgua, faro, muelle, bote, grua, contenedor,
   palafito, pasarela, adobe, puesto, carpa, torreVigia, capilla, estacion, parada, puente, fogon, auto, tractor, cerca,
   farol, fuente, calesita, rueda, kiosco, laboratorio, cupula, antena, cabana, lodge, torreTeleferico, tolva, andamio,
-  malecon, caja3, barriles, campo, arco, montanaRusa, ruinas, banco, tacho, hidrante, cartel, seto, cantero, buzon, jardin,
+  malecon, caja3, barriles, campo, arco, montanaRusa, ruinas, banco, tacho, hidrante, cartel, seto, cantero, buzon, jardin, poste, indicador,
 };

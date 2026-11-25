@@ -1180,7 +1180,8 @@ function drawMinimap(s) {
   ctx.font = 'bold 9px system-ui';
   ctx.fillStyle = 'rgba(255,255,255,.9)';
   ctx.textAlign = 'center';
-  for (const p of world.pois) ctx.fillText(p.name, toM(p.x), toM(p.z) - 6);
+  ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+  for (const p of world.pois) { const lx = toM(p.x + (p.lx || 0)), ly = toM(p.z + (p.lz || 0)) - 6; ctx.strokeText(p.name, lx, ly); ctx.fillText(p.name, lx, ly); }
   if (s) {
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
     ctx.beginPath(); ctx.arc(toM(s.next.x), toM(s.next.z), (s.next.r / size) * W, 0, Math.PI * 2); ctx.stroke();

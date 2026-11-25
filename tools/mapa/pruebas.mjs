@@ -127,5 +127,77 @@ function subir(name, opts, ruta) {
   const p = subir('casa', { pisos: 2 }, [{ x: 0, y: 0.06, z: 3.8 }, { x: 0, y: 0, z: 2.2 }, { x: 3.85, y: 0, z: 2.5 }, { x: 3.85, y: 0, z: -3.7 }, { x: 1.5, y: 0, z: -3.3 }]);
   if (p.y < 3.9) fail(`casa: no se llega al primer piso (y=${p.y.toFixed(2)})`); else console.log('casa: primer piso alcanzado a', p.y.toFixed(2));
 }
+// Estructuras sueltas con escalera exterior: se llega arriba caminando.
+const llegar = (name, opts, ruta, yMin) => {
+  const p = subir(name, opts, ruta);
+  if (p.y < yMin) fail(`${name}: no se llega arriba (y=${p.y.toFixed(2)}, se esperaba ${yMin})`); else console.log(`${name}: arriba a`, p.y.toFixed(2));
+};
+llegar('tanqueAgua', {}, [{ x: 4.2, y: 0.06, z: 5.2 }, { x: -3.6, y: 0, z: 5.2 }, { x: -4.0, y: 0, z: 4.0 }, { x: -4.0, y: 0, z: -2.3 }, { x: -2.4, y: 0, z: -2.3 }], 8.9);
+llegar('torreVigia', {}, [{ x: -1.0, y: 0.06, z: 1.5 }, { x: 0.65, y: 0, z: 1.8 }, { x: 0.65, y: 0, z: 8.0 }, { x: 2.15, y: 0, z: 8.0 }, { x: 2.15, y: 0, z: 1.5 }, { x: 0, y: 0, z: 0 }], 7.9);
+// 5) Todo el loot y los cofres de cada estructura se alcanzan caminando (grilla de lugares donde cabe el jugador).
+function alcance(name, opts = {}) {
+  const P = PLANOS[name](opts);
+  const sol = new Solidos();
+  for (const s of P.solids) sol.addBox(s);
+  for (const c of P.cyls) sol.addCyl(c.x, c.z, c.r, c.y0, c.y1);
+  const b = P.bounds(), M = 2.5, D = 0.25;
+  const x0 = b.x0 - M, z0 = b.z0 - M, nx = Math.ceil((b.x1 - b.x0 + 2 * M) / D), nz = Math.ceil((b.z1 - b.z0 + 2 * M) / D);
+  const nodes = [], cell = new Map();
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+    const x = x0 + (i + 0.5) * D, z = z0 + (j + 0.5) * D;
+    // alturas de pisado cerca del punto (con 12 cm de tolerancia: el jugador no cae por rendijas de centímetros)
+    const tops = [];
+    sol.near(x, z, 0.12, (s) => {
+      if (s.cyl) { if (Math.hypot(x - s.x, z - s.z) <= s.r + 0.12) tops.push(s.y1); return; }
+      if (x < s.x0 - 0.12 || x > s.x1 + 0.12 || z < s.z0 - 0.12 || z > s.z1 + 0.12) return;
+      tops.push(Solidos.topAt(s, Math.min(s.x1, Math.max(s.x0, x)), Math.min(s.z1, Math.max(s.z0, z))));
+    });
+    const hs = new Set([0, ...tops.filter((t) => t > 0)]);
+    const list = [];
+    for (const y of hs) {
+      if (tops.some((t) => t > y + 0.01 && t <= y + 0.55)) continue;
+      if (sol.ceiling(x, z, y) - y < H) continue;
+      const q = { x, y, z }; sol.push(q, R, H);
+      if (Math.hypot(q.x - x, q.z - z) > 0.05) continue;
+      list.push(nodes.length); nodes.push({ i, j, x, y, z, walk: false, jump: false });
+    }
+    cell.set(i * 4096 + j, list);
+  }
+  const bfs = (maxUp, flag) => {
+    const q = [];
+    for (const n of nodes) if ((n.i === 0 || n.j === 0 || n.i === nx - 1 || n.j === nz - 1) && n.y === 0) { n[flag] = true; q.push(n); }
+    while (q.length) {
+      const n = q.pop();
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        for (const k of cell.get((n.i + di) * 4096 + n.j + dj) || []) {
+          const m = nodes[k];
+          if (m[flag] || m.y - n.y > maxUp) continue;
+          m[flag] = true; q.push(m);
+        }
+      }
+    }
+  };
+  bfs(0.55, 'walk'); bfs(1.3, 'jump');
+  const res = { mal: [], salto: [] };
+  for (const l of [...P.loot.map((l) => ({ ...l, t: 'loot' })), ...P.chests.map((c) => ({ ...c, t: 'cofre' }))]) {
+    let w = false, j = false;
+    for (const n of nodes) if (Math.hypot(n.x - l.x, n.z - l.z) < 0.9 && Math.abs(n.y - l.y) < 0.35) { w ||= n.walk; j ||= n.jump; }
+    if (!j) res.mal.push(`${l.t} (${l.x.toFixed(1)}, ${l.y.toFixed(1)}, ${l.z.toFixed(1)})`);
+    else if (!w) res.salto.push(`${l.t} (${l.x.toFixed(1)}, ${l.y.toFixed(1)}, ${l.z.toFixed(1)})`);
+  }
+  return res;
+}
+{
+  const casos = Object.keys(PLANOS).map((n) => [n, {}]);
+  casos.push(['casa', { pisos: 2 }], ['edificio', { pisos: 4 }], ['adobe', { pisos: 2 }], ['casa', { pisos: 2, porche: true }]);
+  let total = 0;
+  for (const [name, opts] of casos) {
+    const r = alcance(name, opts);
+    total++;
+    for (const m of r.mal) fail(`${name}${opts.pisos ? ' ' + opts.pisos + ' pisos' : ''}: ${m} no se alcanza`);
+    if (r.salto.length) console.log(`${name}: solo saltando ->`, r.salto.join(', '));
+  }
+  console.log('alcance revisado en', total, 'estructuras');
+}
 console.log(fails ? `${fails} fallas` : 'todo OK');
 process.exit(fails ? 1 : 0);
