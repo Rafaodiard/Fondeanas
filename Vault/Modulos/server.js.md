@@ -25,12 +25,13 @@ Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.
 ## Funciones principales
 
 - `makeCode`, `createRoom`, `roomInfo`, `matchSnapshot` → [[Salas y partidas]]
-- `startMatch`: crea el `World` ([[world.js]]), reparte loot del piso, arma el recorrido del bus y las fases de la tormenta, resetea jugadores.
+- `startMatch`: crea el `World` ([[world.js]]), reparte loot del piso, arma el recorrido del bus y las fases de la tormenta, resetea jugadores y la vida de las piezas del mapa (`room.pzHp`, `room.pzRotas`).
 - `stormAt` → [[Tormenta]]
 - `damagePlayer` (el escudo absorbe primero), `killPlayer` (tira todo lo que tenía), `checkWinner`.
 - `addToInventory`, `spawnItem`, `spawnAround` → [[Loot y rarezas]]
 - `handleGame`: un `case` por mensaje de juego (salto, estado, loot, cofres, recarga, disparo, pico, construcción, consumibles, caída).
-- `explode` (lanzacohetes, daño en área; el que dispara recibe la mitad) y `damageStruct` → [[Armas y disparo]], [[Construcción]]
+- `explode` (lanzacohetes, daño en área; el que dispara recibe la mitad; también daña las piezas del mapa dentro del radio) y `damageStruct` → [[Armas y disparo]], [[Construcción]]
+- `distPieza` (distancia a la caja de una pieza) y `damagePieza` (rompe la pieza y las que quedan sin apoyo, avisa con `pzRota` y baja el loot y los cofres que estaban encima) → [[Estructuras rompibles]]
 
 ## Usa
 

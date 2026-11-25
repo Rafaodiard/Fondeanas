@@ -16,7 +16,15 @@ function colorOf(m) {
 }
 
 export class Lote {
-  constructor() { this.b = {}; for (const k of KINDS) this.b[k] = { p: [], n: [], c: [], ao: [], pat: [] }; this.curPat = 0; this.useAo = true; }
+  constructor({ porTri = false } = {}) {
+    this.b = {}; for (const k of KINDS) this.b[k] = { p: [], n: [], c: [], ao: [], pat: [], tp: [] };
+    this.curPat = 0; this.useAo = true;
+    // Piezas rompibles: qué vértices de cada malla son de cada pieza (para sacarlos cuando se rompe).
+    this.marca = -1; // pieza de lo que se está agregando (-1 = ninguna)
+    this.rangos = new Map(); // pieza -> [[tipo, desde, hasta], ...] en vértices
+    this.porTri = porTri; // guardar la pieza de cada triángulo (mallas de choque, para los disparos)
+    this.mallas = {};
+  }
 
   // Agrega un triángulo en coordenadas locales, con la matriz del objeto.
   tri(buf, a, b, c, col, M, shade) {
@@ -27,6 +35,7 @@ export class Lote {
     n.divideScalar(len);
     // Sombra de contacto: en caras verticales se guarda la altura local (el shader oscurece cerca de cada piso).
     const vertical = shade && Math.abs(n.dot(UP)) < 0.5;
+    if (this.porTri) buf.tp.push(this.marca);
     for (let i = 0; i < 3; i++) {
       buf.p.push(v[i].x, v[i].y, v[i].z);
       buf.n.push(n.x, n.y, n.z);
@@ -49,9 +58,11 @@ export class Lote {
     this.quad(buf, d, h, e, a, col, M, shade);
   }
 
-  // Agrega todas las piezas de un plano con la matriz M. jitter: variación de color por objeto.
-  plano(P, M, { jitter = 0 } = {}) {
-    for (const part of P.parts) this.part(part, M, jitter);
+  // Agrega todas las partes de un plano con la matriz M. jitter: variación de color por objeto.
+  // piezaDe: Map(grupo -> id de pieza rompible) para poder sacar cada pieza cuando se rompe.
+  plano(P, M, { jitter = 0, piezaDe = null } = {}) {
+    for (const part of P.parts) { this.marca = piezaDe?.get(part.g) ?? -1; this.part(part, M, jitter); }
+    this.marca = -1;
   }
 
   part(q, M, jitter) {
@@ -60,8 +71,38 @@ export class Lote {
     const col = _c.copy(base);
     if (jitter) col.offsetHSL(0, 0, jitter);
     const buf = this.b[k];
+    const v0 = buf.p.length / 3;
+    this.dibujar(q, buf, col, M);
+    this.anotar(k, v0, buf.p.length / 3);
+  }
+
+  anotar(k, v0, v1) {
+    if (this.marca < 0 || v1 <= v0) return;
+    let r = this.rangos.get(this.marca);
+    if (!r) this.rangos.set(this.marca, (r = []));
+    const u = r[r.length - 1];
+    if (u && u[0] === k && u[2] === v0) u[2] = v1; else r.push([k, v0, v1]);
+  }
+
+  // Saca de las mallas los triángulos de una pieza (quedan aplastados en un punto).
+  ocultar(id) {
+    const r = this.rangos.get(id);
+    if (!r) return false;
+    for (const [k, v0, v1] of r) {
+      const m = this.mallas[k];
+      if (!m) continue;
+      const pos = m.geometry.attributes.position, a = pos.array;
+      for (let i = v0 * 3 + 3; i < v1 * 3; i += 3) { a[i] = a[v0 * 3]; a[i + 1] = a[v0 * 3 + 1]; a[i + 2] = a[v0 * 3 + 2]; }
+      pos.addUpdateRange(v0 * 3, (v1 - v0) * 3);
+      pos.needsUpdate = true;
+    }
+    this.rangos.delete(id);
+    return true;
+  }
+
+  dibujar(q, buf, col, M) {
     // Sombreado de contacto: las caras verticales se oscurecen cerca del piso de cada nivel.
-    const shade = k === 's' || k === 'm' ? aoShade : null;
+    const shade = buf === this.b.s || buf === this.b.m ? aoShade : null;
     switch (q.t) {
       case 'box': {
         const [x0, y0, z0, x1, y1, z1] = q.a;
@@ -108,6 +149,25 @@ export class Lote {
       case 'cyl': this.cyl(buf, q, col, M); break;
       case 'tube': this.tube(buf, q, col, M); break;
       case 'sph': this.sph(buf, q, col, M); break;
+      case 'arc': this.arc(buf, q, col, M); break;
+    }
+  }
+
+  // Sector de anillo grueso (pared curva): caras de afuera, de adentro, arriba, abajo y las dos puntas.
+  arc(buf, q, col, M) {
+    const { x, y, z, r0, r1, h, a0, a1 } = q;
+    const n = Math.max(1, Math.ceil(((a1 - a0) / (Math.PI * 2)) * (q.seg || 8) * 6));
+    const p = (a, rr, yy) => [x + Math.cos(a) * rr, yy, z + Math.sin(a) * rr];
+    for (let i = 0; i < n; i++) {
+      const b0 = a0 + ((a1 - a0) * i) / n, b1 = a0 + ((a1 - a0) * (i + 1)) / n;
+      this.quad(buf, p(b0, r1, y), p(b0, r1, y + h), p(b1, r1, y + h), p(b1, r1, y), col, M, aoShade);
+      this.quad(buf, p(b1, r0, y), p(b1, r0, y + h), p(b0, r0, y + h), p(b0, r0, y), col, M, aoShade);
+      this.quad(buf, p(b0, r0, y + h), p(b1, r0, y + h), p(b1, r1, y + h), p(b0, r1, y + h), col, M);
+      this.quad(buf, p(b0, r1, y), p(b1, r1, y), p(b1, r0, y), p(b0, r0, y), col, M);
+    }
+    if (a1 - a0 < Math.PI * 2 - 1e-6) {
+      this.quad(buf, p(a0, r0, y), p(a0, r0, y + h), p(a0, r1, y + h), p(a0, r1, y), col, M, aoShade);
+      this.quad(buf, p(a1, r1, y), p(a1, r1, y + h), p(a1, r0, y + h), p(a1, r0, y), col, M, aoShade);
     }
   }
 
@@ -136,9 +196,9 @@ export class Lote {
     const pt = (base, ang) => { const o = base.clone().addScaledVector(u, Math.cos(ang) * q.r).addScaledVector(w, Math.sin(ang) * q.r); return [o.x, o.y, o.z]; };
     for (let i = 0; i < q.seg; i++) {
       const a0 = (i / q.seg) * Math.PI * 2, a1 = ((i + 1) / q.seg) * Math.PI * 2;
-      this.quad(buf, pt(a, a0), pt(a, a1), pt(b, a1), pt(b, a0), col, M);
-      this.tri(buf, q.a, pt(a, a1), pt(a, a0), col, M);
-      this.tri(buf, q.b, pt(b, a0), pt(b, a1), col, M);
+      this.quad(buf, pt(a, a0), pt(b, a0), pt(b, a1), pt(a, a1), col, M);
+      this.tri(buf, q.a, pt(a, a0), pt(a, a1), col, M);
+      this.tri(buf, q.b, pt(b, a1), pt(b, a0), col, M);
     }
   }
 
@@ -151,6 +211,13 @@ export class Lote {
     };
     for (let i = 0; i < rows; i++) for (let j = 0; j < seg; j++) {
       this.quad(buf, p(i, j), p(i + 1, j), p(i + 1, j + 1), p(i, j + 1), col, M);
+    }
+    if (q.grosor > 0) {
+      // cara de adentro (se ve desde abajo de la cúpula) y, si es un casquete, el anillo de la base
+      const ri = r - q.grosor, k = ri / r;
+      const pi = (i, j) => { const o = p(i, j); return [x + (o[0] - x) * k, y + (o[1] - y) * k, z + (o[2] - z) * k]; };
+      for (let i = 0; i < rows; i++) for (let j = 0; j < seg; j++) this.quad(buf, pi(i, j), pi(i, j + 1), pi(i + 1, j + 1), pi(i + 1, j), col, M);
+      if (half) for (let j = 0; j < seg; j++) this.quad(buf, p(0, j), p(0, j + 1), pi(0, j + 1), pi(0, j), col, M);
     }
   }
 
@@ -170,6 +237,8 @@ export class Lote {
       const m = new THREE.Mesh(g, mats[k]);
       m.castShadow = k !== 'v' && k !== 'e';
       m.receiveShadow = true;
+      if (this.porTri) m.userData.triPz = Int32Array.from(b.tp);
+      this.mallas[k] = m;
       out.push(m);
     }
     return out;

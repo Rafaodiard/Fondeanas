@@ -31,7 +31,10 @@ Isla fija de 1200 × 1200 m (la misma en todas las partidas), con diseño propio
 - Lo que se ve y lo que choca sale de la misma lista de piezas ([[planos.js]]).
 - El jugador se mueve en pasos chicos con techo, piso y paredes ([[world.js]] `moveBody`): no se atraviesan techos ni pisos.
 - Todo el loot y los cofres se alcanzan caminando (lo verifica [[Pruebas del mapa]]).
+- Las escaleras tienen baranda sólida, las ventanas tienen vidrio que frena al jugador y deja pasar las balas, y los puentes siguen la pendiente entre las dos orillas.
+- No hay caras que titilen, estructuras metidas en otras ni en las calles: también lo revisa [[Pruebas del mapa]].
+- **Todo se rompe** pieza por pieza (pico, tiros y explosiones), y lo que queda sin apoyo se cae. Ver [[Estructuras rompibles]].
 
 ## Pedido
 
-Ver [[Pedido del mapa]] en la memoria.
+Ver [[Pedido del mapa]] y [[Errores del mapa]] en la memoria.
