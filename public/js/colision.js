@@ -27,6 +27,19 @@ export class Solidos {
     return s;
   }
 
+  // Saca un sólido (pieza del mapa rota): deja de chocar; queda en `list` marcado como muerto.
+  remove(s) {
+    if (s.dead) return;
+    s.dead = true;
+    const i0 = Math.floor(s.x0 / CELL), i1 = Math.floor(s.x1 / CELL);
+    const j0 = Math.floor(s.z0 / CELL), j1 = Math.floor(s.z1 / CELL);
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+      const arr = this.grid.get(i * 65536 + j);
+      const k = arr ? arr.indexOf(s) : -1;
+      if (k >= 0) arr.splice(k, 1);
+    }
+  }
+
   addBox(b, kind = 'house') { return this.add({ ...b, kind }); }
   addCyl(x, z, r, y0, y1, kind = 'house') { return this.add({ cyl: true, x, z, r, y0, y1, x0: x - r, x1: x + r, z0: z - r, z1: z + r, kind }); }
 
