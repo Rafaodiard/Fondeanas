@@ -7,6 +7,7 @@
 // - piezas rompibles que arrancan sin apoyo y decoración suelta en el aire
 import * as THREE from 'three';
 import { Lote } from '../../public/js/mallas.js';
+import { Solidos } from '../../public/js/colision.js';
 import { PLANOS, PALETA, cajasParte, piezasDe, vecinasDe, sinApoyo } from '../../public/js/planos.js';
 
 const casos = () => {
@@ -69,15 +70,28 @@ function carasAlReves(fail) {
 }
 
 // ---------- 8) Partes visibles donde camina el jugador, y pisos falsos ----------
-// El cuerpo es una caja de 0.6 x 1.58 m desde los tobillos (12 cm sobre el piso).
+// El cuerpo es una caja de 0.6 x 1.58 m desde los tobillos (12 cm sobre el piso). Cuenta sólo lo que se mete
+// más de 6 cm en el cuerpo y no está dentro de un sólido (lo que está dentro de un escalón pisable es la pierna
+// subiendo el escalón, no un error).
 function intrusiones(alcances, fail) {
   let total = 0, falsos = 0;
   for (const [name, opts, r] of alcances) {
-    const { P, nodes } = r;
+    const { P, nodes, sol } = r;
     const celda = new Map(), C = 1;
     for (const n of nodes) { const k = Math.floor(n.x / C) * 8192 + Math.floor(n.z / C); let a = celda.get(k); if (!a) celda.set(k, (a = [])); a.push(n); }
     const cerca = (b, fn) => {
       for (let i = Math.floor((b[0] - 0.4) / C); i <= Math.floor((b[3] + 0.4) / C); i++) for (let j = Math.floor((b[2] - 0.4) / C); j <= Math.floor((b[5] + 0.4) / C); j++) for (const n of celda.get(i * 8192 + j) || []) fn(n);
+    };
+    const enSolido = (x, y, z) => {
+      let s0 = false;
+      sol.near(x, z, 0.1, (s) => {
+        if (s0) return;
+        if (s.cyl) { if (Math.hypot(x - s.x, z - s.z) <= s.r + 0.06 && y >= s.y0 - 0.06 && y <= s.y1 + 0.06) s0 = true; return; }
+        if (x < s.x0 - 0.06 || x > s.x1 + 0.06 || z < s.z0 - 0.06 || z > s.z1 + 0.06 || y < s.y0 - 0.06) return;
+        const top = Solidos.topAt(s, Math.min(s.x1, Math.max(s.x0, x)), Math.min(s.z1, Math.max(s.z0, z)));
+        if (y <= top + 0.06) s0 = true;
+      });
+      return s0;
     };
     const lista = [], pisos = [];
     for (const q of P.parts) {
@@ -85,14 +99,17 @@ function intrusiones(alcances, fail) {
       const hits = new Set(), sube = new Set();
       for (const b of cajasParte(q)) {
         cerca(b, (n) => {
-          // ¿se mete en el cuerpo?
-          const B = [n.x - 0.3, n.y + 0.12, n.z - 0.3, n.x + 0.3, n.y + 1.7, n.z + 0.3];
-          const ox = Math.min(b[3], B[3]) - Math.max(b[0], B[0]), oy = Math.min(b[4], B[4]) - Math.max(b[1], B[1]), oz = Math.min(b[5], B[5]) - Math.max(b[2], B[2]);
-          if (ox > 0.06 && oy > 0.06 && oz > 0.06) {
-            let dentro = true;
-            if (q.t === 'cyl') dentro = Math.hypot(n.x - q.x, n.z - q.z) < Math.max(q.r, q.r2) + 0.3 - 0.06;
-            else if (q.t === 'tube') dentro = distTubo(q, n) < q.r + 0.3 - 0.06;
-            if (dentro) hits.add(n);
+          // ¿se mete en el cuerpo? (cuerpo achicado 6 cm: lo que queda adentro es intrusión de verdad)
+          if (!hits.has(n)) {
+            const B = [n.x - 0.24, n.y + 0.18, n.z - 0.24, n.x + 0.24, n.y + 1.64, n.z + 0.24];
+            const I = [Math.max(b[0], B[0]), Math.max(b[1], B[1]), Math.max(b[2], B[2]), Math.min(b[3], B[3]), Math.min(b[4], B[4]), Math.min(b[5], B[5])];
+            if (I[3] > I[0] && I[4] > I[1] && I[5] > I[2]) {
+              const K = 4;
+              busca: for (let a = 0; a < K; a++) for (let c = 0; c < K; c++) for (let e = 0; e < K; e++) {
+                const x = I[0] + ((I[3] - I[0]) * (a + 0.5)) / K, y = I[1] + ((I[4] - I[1]) * (c + 0.5)) / K, z = I[2] + ((I[5] - I[2]) * (e + 0.5)) / K;
+                if (dentroParte(q, x, y, z) && !enSolido(x, y, z)) { hits.add(n); break busca; }
+              }
+            }
           }
           // ¿el piso que se ve (cara de arriba de una caja) queda más arriba que los pies?
           if (q.t === 'box' && q.m !== 'agua' && n.x > b[0] && n.x < b[3] && n.z > b[2] && n.z < b[5]) {
@@ -110,15 +127,61 @@ function intrusiones(alcances, fail) {
   console.log('partes visibles que se atraviesan:', total, '- pisos falsos:', falsos);
 }
 
-function distTubo(q, n) {
-  // distancia del eje del tubo al eje del cuerpo (segmento vertical de n.y+0.42 a n.y+1.4)
-  let best = Infinity;
-  for (let k = 0; k <= 16; k++) {
-    const t = k / 16, x = q.a[0] + (q.b[0] - q.a[0]) * t, y = q.a[1] + (q.b[1] - q.a[1]) * t, z = q.a[2] + (q.b[2] - q.a[2]) * t;
-    const dy = y < n.y + 0.42 ? n.y + 0.42 - y : y > n.y + 1.4 ? y - n.y - 1.4 : 0;
-    best = Math.min(best, Math.hypot(x - n.x, dy, z - n.z));
+// ¿El punto está dentro del volumen dibujado de la parte?
+function dentroParte(q, x, y, z) {
+  switch (q.t) {
+    case 'box': { const a = q.a; return x >= a[0] && x <= a[3] && y >= a[1] && y <= a[4] && z >= a[2] && z <= a[5]; }
+    case 'ramp': {
+      const a = q.a;
+      if (x < a[0] || x > a[3] || z < a[2] || z > a[5] || y < a[1]) return false;
+      return y <= Solidos.topAt({ x0: a[0], y0: a[1], z0: a[2], x1: a[3], y1: a[4], z1: a[5], up: q.up, lo: q.lo }, x, z);
+    }
+    case 'tri': {
+      const a = q.a;
+      if (x < a[0] || x > a[3] || y < a[1] || z < a[2] || z > a[5]) return false;
+      const t = q.axis === 'z' ? (z - a[2]) / (a[5] - a[2]) : (x - a[0]) / (a[3] - a[0]);
+      return y <= a[1] + (a[4] - a[1]) * (1 - Math.abs(2 * t - 1));
+    }
+    case 'slope': {
+      const [x0, z0, x1, z1] = q.a;
+      if (x < Math.min(x0, x1) || x > Math.max(x0, x1) || z < Math.min(z0, z1) || z > Math.max(z0, z1)) return false;
+      let t;
+      switch (q.up) {
+        case '+x': t = (x - Math.min(x0, x1)) / Math.abs(x1 - x0); break;
+        case '-x': t = (Math.max(x0, x1) - x) / Math.abs(x1 - x0); break;
+        case '+z': t = (z - Math.min(z0, z1)) / Math.abs(z1 - z0); break;
+        default: t = (Math.max(z0, z1) - z) / Math.abs(z1 - z0);
+      }
+      const yy = q.ylo + (q.yhi - q.ylo) * Math.min(1, Math.max(0, t));
+      return y <= yy && y >= yy - q.th;
+    }
+    case 'cyl': {
+      if (y < q.y || y > q.y + q.h) return false;
+      const rr = q.r + (q.r2 - q.r) * ((y - q.y) / q.h), d = Math.hypot(x - q.x, z - q.z);
+      return q.open ? Math.abs(d - rr) < 0.04 : d <= rr;
+    }
+    case 'tube': {
+      const ab = [q.b[0] - q.a[0], q.b[1] - q.a[1], q.b[2] - q.a[2]], ap = [x - q.a[0], y - q.a[1], z - q.a[2]];
+      const L2 = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2 || 1, t = (ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / L2;
+      if (t < 0 || t > 1) return false; // cilindro de tapas planas
+      return Math.hypot(ap[0] - ab[0] * t, ap[1] - ab[1] * t, ap[2] - ab[2] * t) <= q.r;
+    }
+    case 'sph': {
+      if (q.half && y < q.y) return false;
+      const d = Math.hypot(x - q.x, (y - q.y) / q.sy, z - q.z);
+      return d <= q.r && (!(q.grosor > 0) || d >= q.r - q.grosor);
+    }
+    case 'arc': {
+      if (y < q.y || y > q.y + q.h) return false;
+      const d = Math.hypot(x - q.x, z - q.z);
+      if (d < q.r0 || d > q.r1) return false;
+      let ang = Math.atan2(z - q.z, x - q.x);
+      while (ang < q.a0) ang += Math.PI * 2;
+      while (ang > q.a0 + Math.PI * 2) ang -= Math.PI * 2;
+      return ang <= q.a1;
+    }
   }
-  return best;
+  return false;
 }
 
 // ---------- 9) Caras encimadas (titilan) ----------
@@ -142,6 +205,7 @@ function encimadas(cajas, { mismoGrupo = true } = {}) {
   cajas.forEach((c, idx) => {
     if (opaco(c.m)) celdas(c.b, (k) => { let a = ocl.get(k); if (!a) ocl.set(k, (a = [])); a.push(idx); });
     for (const f of carasDe(c.b, idx)) {
+      if (f[0] === 1 && f[1] < 0 && f[2] < (c.base || 0) + 0.3) continue; // caras de abajo al ras del piso: no se ven nunca
       const k = `${f[0]}|${f[1]}|${Math.round(f[2] / 0.004)}|${Math.floor(f[3] / 4)}|${Math.floor(f[5] / 4)}`;
       let a = buckets.get(k); if (!a) buckets.set(k, (a = [])); a.push(f);
     }
@@ -190,10 +254,10 @@ function titilan(fail) {
     const cajas = P.parts.filter((q) => q.t === 'box').map((q) => ({ b: q.a, m: q.m, ref: q, grupo: null }));
     for (const [A, B, e, s, pl, area] of encimadas(cajas)) {
       total++;
-      if (total <= 25) fail(`${etiqueta(name, opts)}: caras encimadas que titilan (${s > 0 ? '+' : '-'}${EJE[e]} en ${pl.toFixed(3)}, ${area.toFixed(2)} m²): ${desc(A.ref)} / ${desc(B.ref)}`);
+      if (total <= 25 || process.env.TODAS) fail(`${etiqueta(name, opts)}: caras encimadas que titilan (${s > 0 ? '+' : '-'}${EJE[e]} en ${pl.toFixed(3)}, ${area.toFixed(2)} m²): ${desc(A.ref)} / ${desc(B.ref)}`);
     }
   }
-  if (total > 25) fail(`... y ${total - 25} caras encimadas más`);
+  if (total > 25 && !process.env.TODAS) fail(`... y ${total - 25} caras encimadas más`);
   console.log('caras encimadas que titilan (dentro de cada estructura):', total);
 }
 
@@ -207,7 +271,7 @@ function cajaMundo(pl, b) {
 function titilanMundo(world, fail) {
   // entre estructuras vecinas
   const cajas = [];
-  world.placed.forEach((pl, k) => { for (const q of pl.P.parts) if (q.t === 'box') cajas.push({ b: cajaMundo(pl, q.a), m: q.m, ref: q, grupo: k, pl }); });
+  world.placed.forEach((pl, k) => { for (const q of pl.P.parts) if (q.t === 'box') cajas.push({ b: cajaMundo(pl, q.a), m: q.m, ref: q, grupo: k, pl, base: pl.y }); });
   let entre = 0;
   for (const [A, B, e, s, pl] of encimadas(cajas, { mismoGrupo: false })) {
     if (A.grupo === B.grupo) continue;
@@ -222,7 +286,7 @@ function titilanMundo(world, fail) {
       const [ax, az] = rb.pts[i], [bx, bz] = rb.pts[i + 1], L = Math.hypot(bx - ax, bz - az) || 1, nx = -(bz - az) / L, nz = (bx - ax) / L;
       for (let t = 0; t < 1; t += 0.34) for (let w = -rb.w / 2 + 0.25; w <= rb.w / 2 - 0.25; w += 0.5) {
         const x = ax + (bx - ax) * t + nx * w, z = az + (bz - az) * t + nz * w;
-        calles.push([x, z, world.terrainHeight(x, z) + off(rb, idx), rb.m]);
+        if (!world.enPuente(x, z)) calles.push([x, z, world.terrainHeight(x, z) + off(rb, idx), rb.m]); // sobre los puentes no se dibuja
       }
     }
   });
@@ -233,6 +297,7 @@ function titilanMundo(world, fail) {
   for (const c of cajas) {
     const b = c.b;
     if (b[4] - c.pl.y > 0.6) continue; // sólo caras bajas
+    const deEscalera = c.ref.tag === 'esc'; // el pie de una escalera se mete en el terreno (en la ciénaga, desparejo)
     // terreno: muestreo de la cara de arriba
     let cerca = 0, n = 0;
     for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
@@ -240,13 +305,13 @@ function titilanMundo(world, fail) {
       n++;
       if (Math.abs(b[4] - world.terrainHeight(x, z)) < 0.02) cerca++;
     }
-    if (cerca >= 2 && !vistosT.has(c.pl)) { vistosT.add(c.pl); terreno++; if (terreno <= 10) fail(`${c.pl.name} en (${c.pl.x.toFixed(0)}, ${c.pl.z.toFixed(0)}): cara de arriba al ras del terreno ${desc(c.ref)}`); }
+    if (cerca >= 2 && !deEscalera && !vistosT.has(c.pl)) { vistosT.add(c.pl); terreno++; if (terreno <= 10) fail(`${c.pl.name} en (${c.pl.x.toFixed(0)}, ${c.pl.z.toFixed(0)}): cara de arriba al ras del terreno ${desc(c.ref)}`); }
     // calles
     for (let i = Math.floor(b[0] / C); i <= Math.floor(b[3] / C); i++) for (let j = Math.floor(b[2] / C); j <= Math.floor(b[5] / C); j++) {
       for (const [x, z, y, m] of idx.get(i * 100003 + j) || []) {
         if (x <= b[0] + 0.05 || x >= b[3] - 0.05 || z <= b[2] + 0.05 || z >= b[5] - 0.05) continue;
-        // la calle se dibuja apenas encima de la cara (titila) o por encima de un piso (se ve adentro)
-        if (y > b[4] - 0.3 && y < b[4] + 0.025 && b[4] - b[1] > 0.05) {
+        // la calle se dibuja casi a la altura de la cara (titila) o por encima de un piso (se ve adentro)
+        if (y > b[4] - 0.02 && y < b[4] + 0.3 && b[4] - b[1] > 0.05) {
           const key = `${c.pl.name}@${c.pl.x.toFixed(0)},${c.pl.z.toFixed(0)}`;
           if (vistosC.has(key)) continue;
           vistosC.add(key); calle++;

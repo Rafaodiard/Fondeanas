@@ -165,7 +165,13 @@ export class World {
       for (const [name, opts, lx, lz, r, extra] of t.items) this.place(name, opts, t.x + lx, t.z + lz, r, extra || {}, t);
     }
     for (const [name, opts, x, z, r, extra] of SUELTOS) this.place(name, opts, x, z, r, extra || {}, null);
-    for (const b of this.bridges) this.place('puente', { L: b.L, w: b.w + 1, y: 0 }, b.x, b.z, b.rot, { pad: false, y: b.y }, null);
+    // puentes: el tablero va de orilla a orilla siguiendo la ruta (inclinado), 10 cm arriba del terreno en las puntas
+    for (const b of this.bridges) {
+      const [ax, az] = b.rot === 1 ? [1, 0] : [0, 1];
+      const e1 = this.terrainHeight(b.x + (ax * b.L) / 2, b.z + (az * b.L) / 2), e0 = this.terrainHeight(b.x - (ax * b.L) / 2, b.z - (az * b.L) / 2);
+      b.y = (e0 + e1) / 2 + 0.1; b.dy = e1 - e0;
+      this.place('puente', { L: b.L, w: b.w + 1, y: 0, dy: b.dy }, b.x, b.z, b.rot, { pad: false, y: b.y }, null);
+    }
     this.layoutPostes();
     // Teleférico: torres con dos cables y cabinas colgando.
     const torres = TELEFERICO.map(([x, z]) => {
@@ -339,6 +345,7 @@ export class World {
       const q = [rot2(s.x0, s.z0, r), rot2(s.x1, s.z1, r)];
       const w = { x0: x + Math.min(q[0][0], q[1][0]), x1: x + Math.max(q[0][0], q[1][0]), z0: z + Math.min(q[0][1], q[1][1]), z1: z + Math.max(q[0][1], q[1][1]), y0: base + s.y0, y1: base + s.y1 };
       if (s.up) { w.up = ROT_DIR[s.up][r & 3]; w.lo = base + (s.lo ?? s.y0); }
+      if (s.vidrio) w.vidrio = true; // ventanas: frenan al jugador, no a las balas ni a la cámara
       dePieza(this.sol.addBox(w, name), s.g);
     }
     for (const cy of P.cyls) {
@@ -700,6 +707,26 @@ export class World {
     scene.add(rm);
   }
 
+  // ¿El punto está sobre el tablero de un puente? (ahí no se dibuja la calle: el tablero la reemplaza)
+  enPuente(x, z, margen = 0) {
+    for (const b of this.bridges || []) {
+      const [ax, az] = b.rot === 1 ? [1, 0] : [0, 1], dx = x - b.x, dz = z - b.z;
+      if (Math.abs(dx * ax + dz * az) < b.L / 2 + margen && Math.abs(-dx * az + dz * ax) < (b.w + 1) / 2 + 0.5 + margen) return true;
+    }
+    return false;
+  }
+
+  // Tramo [t0, t1] del segmento i..i+1 de la cinta que queda fuera de los puentes (o null si está todo sobre uno).
+  tramoFueraDePuente(pts, i) {
+    const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
+    const ia = this.enPuente(ax, az), ib = this.enPuente(bx, bz);
+    if (!ia && !ib) return [0, 1];
+    if (ia && ib) return null;
+    let lo = 0, hi = 1; // bisección hasta el borde del puente
+    for (let k = 0; k < 20; k++) { const m = (lo + hi) / 2; if (this.enPuente(ax + (bx - ax) * m, az + (bz - az) * m) === ia) lo = m; else hi = m; }
+    return ia ? [hi, 1] : [0, lo];
+  }
+
   buildRoads(scene) {
     const pos = [], col = [];
     const c = new THREE.Color(), line = new THREE.Color('#f2efe6');
@@ -707,20 +734,31 @@ export class World {
       c.set(CALLE_COLOR[rb.m] || '#888');
       const off = rb.under ? 0.045 : 0.07 + (idx % 7) * 0.01;
       const pts = rb.pts;
-      const edge = (i, s) => {
-        const [px, pz] = pts[i];
-        const [ax, az] = pts[Math.max(0, i - 1)], [bx, bz] = pts[Math.min(pts.length - 1, i + 1)];
-        const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) || 1;
+      // borde de la cinta en el punto i (+t hacia i+1; con t > 0 usa la dirección del segmento)
+      const edge = (i, s, t = 0) => {
+        let px = pts[i][0], pz = pts[i][1], dx, dz;
+        if (t > 0) {
+          const [bx, bz] = pts[Math.min(pts.length - 1, i + 1)];
+          px += (bx - px) * t; pz += (bz - pz) * t; dx = bx - pts[i][0]; dz = bz - pts[i][1];
+        } else {
+          const [ax, az] = pts[Math.max(0, i - 1)], [bx, bz] = pts[Math.min(pts.length - 1, i + 1)];
+          dx = bx - ax; dz = bz - az;
+        }
+        const L = Math.hypot(dx, dz) || 1;
         const x = px + (-dz / L) * s, z = pz + (dx / L) * s;
         return [x, this.terrainHeight(x, z) + off, z];
       };
       for (let i = 0; i < pts.length - 1; i++) {
         const w = rb.w / 2;
-        const a = edge(i, w), b = edge(i, -w), d = edge(i + 1, -w), e = edge(i + 1, w);
+        const tr = this.tramoFueraDePuente(pts, i);
+        if (!tr) continue;
+        const [t0, t1] = tr;
+        const ea = (s) => (t0 > 0 ? edge(i, s, t0) : edge(i, s)), eb = (s) => (t1 < 1 ? edge(i, s, t1) : edge(i + 1, s));
+        const a = ea(w), b = ea(-w), d = eb(-w), e = eb(w);
         pos.push(...a, ...b, ...d, ...a, ...d, ...e);
         for (let k = 0; k < 6; k++) col.push(c.r, c.g, c.b);
         if (rb.m === 'asfalto' && rb.w >= 6 && i % 3 === 0) {
-          const a2 = edge(i, 0.12), b2 = edge(i, -0.12), d2 = edge(i + 1, -0.12), e2 = edge(i + 1, 0.12);
+          const a2 = ea(0.12), b2 = ea(-0.12), d2 = eb(-0.12), e2 = eb(0.12);
           for (const p of [a2, b2, d2, e2]) p[1] += 0.01;
           pos.push(...a2, ...b2, ...d2, ...a2, ...d2, ...e2);
           for (let k = 0; k < 6; k++) col.push(line.r, line.g, line.b);
@@ -765,7 +803,7 @@ export class World {
     const cols = new Map();
     const I = new THREE.Matrix4();
     for (const s of this.sol.list) {
-      if (s.dead) continue;
+      if (s.dead || s.vidrio) continue;
       const k = `${Math.floor(((s.x0 + s.x1) / 2) / CH)},${Math.floor(((s.z0 + s.z1) / 2) / CH)}`;
       if (!cols.has(k)) cols.set(k, new Lote({ porTri: true }));
       const L = cols.get(k);
