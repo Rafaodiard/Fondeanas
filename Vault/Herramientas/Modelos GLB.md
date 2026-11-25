@@ -12,7 +12,7 @@ Carpeta `public/models/`. Los carga [[assets.js]]; si alguno falla, [[models.js]
 | `bus.glb` | Bus volador | [[models.js]] | |
 | `planeador.glb` | Planeador | [[models.js]], [[rig.js]] | `Tela` |
 | `objetos.glb` | Objetos del piso (consumibles, munición, materiales) | [[models.js]] | `Tinte`, `Mat` |
-| `casa.glb` | Casa | [[world.js]] | `Pared`, `Techo` (tres combinaciones) |
+| `casa.glb` | Casa (vieja) | nadie: ya no se carga, las casas del mapa salen de [[planos.js]] | |
 | `cofre.glb` | Cofre | [[world.js]] | |
 | `pino.glb`, `arbol.glb` | Árboles (instanciados) | [[world.js]] | |
 | `roca.glb` | Roca (instanciada) | [[world.js]] | |

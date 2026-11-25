@@ -12,3 +12,4 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 - [[README siempre al día]]: actualizar el README en cada PR.
 - [[Graphify de la PC de Rafael]]: el grafo se genera en su compu.
 - [[Blender en la nube]]: los scripts de Blender se corren en la nube.
+- [[Pedido del mapa]]: qué pidió para el mapa de la isla.

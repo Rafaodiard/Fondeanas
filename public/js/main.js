@@ -1007,8 +1007,8 @@ function updateMe(dt) {
     me.vel.y -= GRAVITY * dt;
     if (!me.onGround) me.minVy = Math.min(me.minVy, me.vel.y);
   }
-  me.pos.addScaledVector(me.vel, dt);
-  world.collide(me.pos);
+  // pasos chicos con piso, techo y paredes: no se atraviesan techos ni pisos aunque se caiga rápido
+  world.moveBody(me.pos, me.vel, dt);
   const lim = world.size * 0.75;
   me.pos.x = Math.max(-lim, Math.min(lim, me.pos.x));
   me.pos.z = Math.max(-lim, Math.min(lim, me.pos.z));
@@ -1180,7 +1180,8 @@ function drawMinimap(s) {
   ctx.font = 'bold 9px system-ui';
   ctx.fillStyle = 'rgba(255,255,255,.9)';
   ctx.textAlign = 'center';
-  for (const p of world.pois) ctx.fillText(p.name, toM(p.x), toM(p.z) - 6);
+  ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+  for (const p of world.pois) { const lx = toM(p.x + (p.lx || 0)), ly = toM(p.z + (p.lz || 0)) - 6; ctx.strokeText(p.name, lx, ly); ctx.fillText(p.name, lx, ly); }
   if (s) {
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
     ctx.beginPath(); ctx.arc(toM(s.next.x), toM(s.next.z), (s.next.r / size) * W, 0, Math.PI * 2); ctx.stroke();

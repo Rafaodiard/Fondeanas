@@ -2,6 +2,10 @@
 // Todos los clientes de una sala generan exactamente el mismo mundo.
 import * as THREE from 'three';
 import { GRID, MATERIALS } from './items.js';
+import { PLANOS, Plano } from './planos.js';
+import { PUEBLOS, RUTAS, RIO, SUELTOS, TELEFERICO } from './isla.js';
+import { Solidos } from './colision.js';
+import { Lote, materialesMapa, terrainDetail } from './mallas.js';
 
 export function rng(seed) {
   let s = seed >>> 0;
@@ -41,61 +45,444 @@ export const SEA_LEVEL = 0;
 
 // Lo completa el cliente con los modelos de Blender (assets.js). El servidor no lo usa.
 export const MODEL = { clone: null, baked: null };
-const houseTints = [
-  { Pared: '#f2e6cf', Techo: '#d0563f' },
-  { Pared: '#cfe3f0', Techo: '#3d5a80' },
-  { Pared: '#f4c7a1', Techo: '#6b4a36' },
-];
+
+const MAP_SEED = 20261124; // el mapa es fijo: todos los partidos se juegan en la misma isla
+const ROT_DIR = {
+  '+x': ['+x', '-z', '-x', '+z'], '-x': ['-x', '+z', '+x', '-z'],
+  '+z': ['+z', '+x', '-z', '-x'], '-z': ['-z', '-x', '+z', '+x'],
+};
+const SIN_APLANAR = new Set(['jardin', 'seto', 'cerca', 'farol', 'banco', 'tacho', 'hidrante', 'buzon', 'cantero', 'cartel', 'auto', 'campo']);
+const CALLE_COLOR = { asfalto: '#4b4e54', vereda: '#cfc6b4', tierra: '#a8865a', arena: '#e2cb95', nieve: '#e9eff6' };
+
+// (x,z) local -> mundo, con rotación de a cuartos de vuelta (igual que rotation.y de Three.js).
+function rot2(x, z, r) {
+  switch (r & 3) {
+    case 1: return [z, -x];
+    case 2: return [-x, -z];
+    case 3: return [-z, x];
+    default: return [x, z];
+  }
+}
 
 export class World {
   constructor(seed, size) {
     this.seed = seed;
     this.size = size;
-    this.noise = makeNoise(seed);
-    this.res = 240; // celdas por lado
+    this.noise = makeNoise(MAP_SEED);
+    this.res = 300; // celdas por lado
     this.cell = size / this.res;
-    this.colliders = []; // cajas AABB {minX,maxX,minY,maxY,minZ,maxZ}
-    this.circles = []; // troncos y rocas {x,z,r,top}
-    this.floors = []; // pisos de casas {minX,maxX,minZ,maxZ,y}
+    this.sol = new Solidos();
+    this.circles = []; // troncos y rocas {x,z,r,top,bottom}
     this.solidMeshes = []; // para raycasts de disparo
+    this.camMeshes = []; // para que la cámara no atraviese paredes
     this.pois = [];
     this.structs = new Map(); // construcciones de los jugadores
     this.structMeshes = [];
-    this.camMeshes = []; // casas enteras, para que la cámara no las atraviese
-    this.buildHeights();
+    this.placed = []; // estructuras ubicadas {P, r, x, y, z, fp}
+    this.ribbons = []; // calles y rutas {pts, w, m}
+    this.chestSpots = [];
+    this.lootSpots = [];
+    this.trees = [];
+    this.rocks = [];
+    this.bushes = [];
+    this.cacti = [];
+    this.signs = [];
     this.layout();
   }
 
+  // ---------- Terreno base ----------
   rawHeight(x, z) {
     const n = this.noise;
     const half = this.size / 2;
-    const d = Math.sqrt(x * x + z * z) / (half * 0.92);
-    // Borde irregular de la isla.
+    const r = Math.hypot(x, z);
     const ang = Math.atan2(z, x);
-    const coast = 1 + 0.12 * n(Math.cos(ang) * 2 + 10, Math.sin(ang) * 2 + 10) * 4;
-    const mask = 1 - smoothstep(0.62 * coast, 1.0 * coast, d);
-    let h = 0;
-    h += n(x / 380, z / 380) * 40;
-    h += n(x / 140 + 7, z / 140 + 3) * 14;
-    h += n(x / 45 + 2, z / 45 + 9) * 3;
-    // Una montaña principal.
-    const mx = Math.sin(this.seed) * half * 0.35, mz = Math.cos(this.seed) * half * 0.35;
-    const md = Math.hypot(x - mx, z - mz);
-    h += Math.max(0, 1 - md / 180) ** 2 * 85;
-    h = 8 + h * 0.9;
-    // Mesetas suaves para que haya lugar donde construir pueblos.
-    h = h * mask + (-18) * (1 - mask);
+    const coastR = half * 0.84 + 70 * n(Math.cos(ang) * 1.2 + 3, Math.sin(ang) * 1.2 + 7) + 34 * n(Math.cos(ang) * 3 + 1, Math.sin(ang) * 3 + 5) + 10 * n(Math.cos(ang) * 9, Math.sin(ang) * 9)
+      + 60 * bump(Math.cos(ang), Math.sin(ang), 0.72, -0.69, 0.35) - 40 * bump(Math.cos(ang), Math.sin(ang), -0.98, -0.2, 0.3);
+    const land = 1 - smoothstep(coastR - 80, coastR + 6, r);
+    let h = 9 + n(x / 260, z / 260) * 22 + n(x / 90 + 4, z / 90 + 1) * 6 + n(x / 28 + 9, z / 28 + 3) * 1.2;
+    // Montaña nevada al noroeste y cerro del observatorio al norte.
+    h += bump(x, z, -310, -320, 235) ** 1.4 * 118;
+    h += bump(x, z, 140, -385, 150) ** 1.3 * 42;
+    h += bump(x, z, -90, -200, 140) ** 1.2 * 14; // lomas de la cantera
+    // Desierto al este: médanos suaves.
+    const des = this.desert(x, z);
+    if (des > 0) h = h * (1 - des * 0.6) + des * (5 + Math.abs(n(x / 40, z / 22)) * 9);
+    // Ciénaga al suroeste: casi a nivel del mar.
+    const sw = this.swamp(x, z);
+    if (sw > 0) h = h * (1 - smoothstep(0, 0.5, sw)) + smoothstep(0, 0.5, sw) * (-0.5 + n(x / 22, z / 22) * 3.2 + n(x / 7, z / 7) * 0.8);
+    h = h * land + -16 * (1 - land);
+    // Bahía del puerto.
+    const bay = 1 - smoothstep(0.75, 1.0, Math.hypot((x + 40) / 130, (z - 505) / 78));
+    if (bay > 0) h = h * (1 - bay) + -8 * bay;
     return h;
   }
 
-  buildHeights() {
-    const N = this.res + 1;
+  // Peso del desierto (este) y de la ciénaga (suroeste), con bordes irregulares.
+  desert(x, z) {
+    const d = Math.hypot(x - 430, (z - 110) * 0.75) + this.noise(x / 70 + 20, z / 70) * 70;
+    return 1 - smoothstep(150, 215, d);
+  }
+
+  swamp(x, z) {
+    const d = Math.hypot(x + 345, z - 290) + this.noise(x / 50 + 40, z / 50 + 10) * 55;
+    return 1 - smoothstep(70, 135, d);
+  }
+
+  biome(x, z, h) {
+    const des = this.desert(x, z);
+    const sw = this.swamp(x, z) * 1.1;
+    const snow = smoothstep(36, 54, h + this.noise(x / 45, z / 45) * 12 + this.noise(x / 11 + 3, z / 11) * 4) * (1 - smoothstep(170, 250, Math.hypot(x + 300, z + 300) + this.noise(x / 40, z / 40) * 30));
+    const quarry = bump(x, z, -95, -205, 48);
+    return { des, sw, snow, quarry };
+  }
+
+  // ---------- Disposición del mapa (sin Three.js: la usa también el servidor) ----------
+  layout() {
+    const N = this.res + 1, half = this.size / 2;
+    this.N = N;
     this.heights = new Float32Array(N * N);
-    const half = this.size / 2;
-    for (let j = 0; j < N; j++) {
-      for (let i = 0; i < N; i++) {
-        this.heights[j * N + i] = this.rawHeight(-half + i * this.cell, -half + j * this.cell);
+    this.locked = new Uint8Array(N * N);
+    this.roadDist = new Float32Array(N * N).fill(1e9);
+    this.riverDist = new Float32Array(N * N).fill(1e9);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) this.heights[j * N + i] = this.rawHeight(-half + i * this.cell, -half + j * this.cell);
+    // 1) pueblos: meseta plana (o pozo de la cantera)
+    for (const t of PUEBLOS) this.stampTown(t);
+    // 2) calles y rutas
+    for (const t of PUEBLOS) for (const c of t.calles) {
+      const pts = c.p.map(([x, z]) => [t.x + x, t.z + z]);
+      if (c.m === 'asfalto' && t.tema !== 'ciencia') this.ribbons.push({ pts: resample(pts, 3), w: c.w + 5, m: 'vereda', under: true });
+      this.stampRoad(pts, c.w, c.m, false);
+    }
+    for (const r of RUTAS) this.stampRoad(r.p, r.w, r.m, true);
+    // 3) río (y puentes donde lo cruza una ruta)
+    this.stampRiver();
+    // 4) estructuras
+    for (const t of PUEBLOS) {
+      this.pois.push({ name: t.name, x: t.x, z: t.z, r: t.r, id: t.id, lx: t.etiqueta?.[0], lz: t.etiqueta?.[1] });
+      for (const [name, opts, lx, lz, r, extra] of t.items) this.place(name, opts, t.x + lx, t.z + lz, r, extra || {}, t);
+    }
+    for (const [name, opts, x, z, r, extra] of SUELTOS) this.place(name, opts, x, z, r, extra || {}, null);
+    for (const b of this.bridges) this.place('puente', { L: b.L, w: b.w + 1, y: 0 }, b.x, b.z, b.rot, { pad: false, y: b.y }, null);
+    this.layoutPostes();
+    // Teleférico: torres con dos cables y cabinas colgando.
+    const torres = TELEFERICO.map(([x, z]) => {
+      this.place('torreTeleferico', {}, x, z, 0, { pad: false }, null);
+      const t = this.placed[this.placed.length - 1];
+      t.aisl = [[x - 3.6, t.y + 13.85, z], [x + 3.6, t.y + 13.85, z]];
+      return t;
+    });
+    for (let i = 0; i < torres.length - 1; i++) this.cable(torres[i], torres[i + 1], { sagK: 0.008, r: 0.035, cabina: i % 2 ? 0.62 : 0.38 });
+    // 5) vegetación y rocas
+    const rand = rng(MAP_SEED ^ 0x9e3779b9);
+    this.layoutTrees(rand);
+    this.layoutRocks(rand);
+    // Loot suelto en la naturaleza (poquito).
+    for (let k = 0; k < 4000 && this.lootSpots.length < this.baseLoot + 40; k++) {
+      const x = (rand() - 0.5) * this.size * 0.85, z = (rand() - 0.5) * this.size * 0.85;
+      const h = this.terrainHeight(x, z);
+      if (h < 2 || this.slopeAt(x, z) > 0.4 || this.nearSolid(x, z, 3) || this.inTown(x, z, 0)) continue;
+      this.lootSpots.push({ x, y: h, z });
+    }
+  }
+
+  gi(x) { return Math.round((x + this.size / 2) / this.cell); }
+
+  // Recorre los vértices de la grilla en un rectángulo.
+  eachVertex(x0, z0, x1, z1, fn) {
+    const N = this.N, half = this.size / 2;
+    const i0 = Math.max(0, Math.floor((x0 + half) / this.cell)), i1 = Math.min(N - 1, Math.ceil((x1 + half) / this.cell));
+    const j0 = Math.max(0, Math.floor((z0 + half) / this.cell)), j1 = Math.min(N - 1, Math.ceil((z1 + half) / this.cell));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) fn(j * N + i, -half + i * this.cell, -half + j * this.cell);
+  }
+
+  stampTown(t) {
+    const R = t.r, F = t.borde || 50;
+    if (t.h === 'auto') t.h0 = this.rawHeight(t.x, t.z) + (t.hOff || 0);
+    this.eachVertex(t.x - R - F, t.z - R - F, t.x + R + F, t.z + R + F, (k, x, z) => {
+      const lx = x - t.x, lz = z - t.z, d = Math.hypot(lx, lz);
+      let w = 1 - smoothstep(R, R + F, d);
+      if (t.corte !== undefined) w *= 1 - smoothstep(t.corte - 2, t.corte + 5, lz);
+      if (w <= 0) return;
+      let target = t.h === 'auto' ? t.h0 : t.h;
+      if (t.ruido) target += (this.noise(x / 14, z / 14) * 2.6 + this.noise(x / 5, z / 5) * 0.5) * t.ruido + 0.2;
+      if (t.pozo) {
+        const q = 1 - smoothstep(t.pozo.r * 0.35, t.pozo.r, d);
+        const steps = 3, s = q * steps, f = s - Math.floor(s);
+        const terr = (Math.floor(s) + smoothstep(0.45, 1, f)) / steps;
+        target -= t.pozo.prof * terr;
       }
+      this.heights[k] = this.heights[k] * (1 - w) + target * w;
+    });
+  }
+
+  // Suaviza y aplana el terreno a lo largo de una calle. smooth = ruta (perfil suavizado).
+  stampRoad(pts, w, m, smooth) {
+    const path = smooth ? catmull(pts, 3) : resample(pts, 3);
+    const prof = path.map(([x, z]) => this.terrainHeight(x, z));
+    if (smooth) for (let pass = 0; pass < 3; pass++) {
+      const cp = prof.slice();
+      for (let i = 0; i < prof.length; i++) {
+        let s = 0, c = 0;
+        for (let k = -6; k <= 6; k++) { const v = cp[i + k]; if (v !== undefined) { s += v; c++; } }
+        prof[i] = s / c;
+      }
+    }
+    for (let i = 0; i < prof.length; i++) prof[i] = Math.max(prof[i], 0.9);
+    const hw = w / 2 + 0.8, F = 9;
+    const best = new Map();
+    path.forEach(([px, pz], idx) => {
+      this.eachVertex(px - hw - F, pz - hw - F, px + hw + F, pz + hw + F, (k, x, z) => {
+        const d = Math.hypot(x - px, z - pz);
+        if (d > hw + F) return;
+        const b = best.get(k);
+        if (!b || d < b.d) best.set(k, { d, h: prof[idx] });
+      });
+    });
+    for (const [k, b] of best) {
+      if (b.d < this.roadDist[k]) this.roadDist[k] = b.d - w / 2;
+      if (this.locked[k]) continue;
+      const t = 1 - smoothstep(hw, hw + F, b.d);
+      this.heights[k] = this.heights[k] * (1 - t) + b.h * t;
+    }
+    this.ribbons.push({ pts: path, w, m });
+  }
+
+  stampRiver() {
+    const path = catmull(RIO.p, 3);
+    const prof = path.map(([x, z]) => this.terrainHeight(x, z));
+    for (let i = 1; i < prof.length; i++) prof[i] = Math.min(prof[i], prof[i - 1]);
+    for (let pass = 0; pass < 2; pass++) for (let i = 1; i < prof.length - 1; i++) prof[i] = (prof[i - 1] + prof[i] + prof[i + 1]) / 3;
+    this.river = { path, water: prof.map((h) => h - 0.55) };
+    // Puentes: donde una ruta cruza el río.
+    this.bridges = [];
+    for (const rb of this.ribbons) {
+      if (rb.m !== 'asfalto' && rb.m !== 'tierra') continue;
+      for (let i = 0; i < rb.pts.length - 1; i += 1) {
+        const [ax, az] = rb.pts[i];
+        let hit = -1;
+        for (let k = 0; k < path.length; k++) if (Math.hypot(path[k][0] - ax, path[k][1] - az) < 2.2) { hit = k; break; }
+        if (hit < 0 || this.bridges.some((b) => Math.hypot(b.x - ax, b.z - az) < 30)) continue;
+        const [bx, bz] = rb.pts[Math.min(rb.pts.length - 1, i + 2)], [cx, cz] = rb.pts[Math.max(0, i - 2)];
+        const along = Math.abs(bx - cx) > Math.abs(bz - cz) ? 'x' : 'z';
+        this.bridges.push({ x: ax, z: az, rot: along === 'x' ? 1 : 0, L: 28, w: rb.w, y: this.terrainHeight(ax, az) });
+      }
+    }
+    const hw = RIO.w / 2, F = 8;
+    const best = new Map();
+    path.forEach(([px, pz], idx) => {
+      this.eachVertex(px - hw - F, pz - hw - F, px + hw + F, pz + hw + F, (k, x, z) => {
+        const d = Math.hypot(x - px, z - pz);
+        const b = best.get(k);
+        if (!b || d < b.d) best.set(k, { d, h: prof[idx] });
+      });
+    });
+    for (const [k, b] of best) {
+      this.riverDist[k] = Math.min(this.riverDist[k], b.d);
+      const bed = b.h - 1.7;
+      const t = 1 - smoothstep(hw * 0.5, hw + F, b.d);
+      const target = bed * t + this.heights[k] * (1 - t);
+      this.heights[k] = Math.min(this.heights[k], target);
+    }
+  }
+
+  // Ubica una estructura: calcula su base, aplana el terreno debajo y registra sólidos y loot.
+  place(name, opts, x, z, r, extra, town) {
+    if (name === 'arbol' || name === 'pino' || name === 'alamo') {
+      const h = this.terrainHeight(x, z), sc = opts.s || 1;
+      const tree = { x, z, y: h, s: sc, r: (x * 7.1 + z * 3.3) % 6.28, pine: name === 'pino', sy: name === 'alamo' ? 1.9 : 1, sxz: name === 'alamo' ? 0.62 : 1, alive: true, town: true };
+      tree.circle = { x, z, r: 0.45 * sc, bottom: h - 1, top: h + 7 * sc * tree.sy };
+      this.circles.push(tree.circle);
+      this.trees.push(tree);
+      return;
+    }
+    const fn = PLANOS[name];
+    if (!fn) return;
+    if (opts.jardin) {
+      const [jx, jz] = rot2(0, (opts.d || 8) / 2, r);
+      this.place('jardin', { w: (opts.w || 9) + 3, d: opts.jardin }, x + jx, z + jz, r, {}, town);
+    }
+    const P = fn(opts);
+    const b = P.bounds();
+    const c = [rot2(b.x0, b.z0, r), rot2(b.x1, b.z1, r)];
+    const fp = { x0: x + Math.min(c[0][0], c[1][0]), x1: x + Math.max(c[0][0], c[1][0]), z0: z + Math.min(c[0][1], c[1][1]), z1: z + Math.max(c[0][1], c[1][1]) };
+    let base = extra.y;
+    if (base === undefined) {
+      if (town && extra.pad !== false) base = this.terrainHeight(x, z);
+      else {
+        const s = [[x, z], [fp.x0, fp.z0], [fp.x1, fp.z0], [fp.x0, fp.z1], [fp.x1, fp.z1]].map(([a, bb]) => this.terrainHeight(a, bb));
+        base = extra.pad === false ? Math.min(...s) : s.reduce((a, bb) => a + bb, 0) / s.length;
+      }
+    }
+    base += extra.dy || 0;
+    if (extra.pad !== false && !extra.dy && !SIN_APLANAR.has(name)) this.flatten(fp, base, town ? 5 : 9);
+    // sólidos en coordenadas del mundo
+    for (const s of P.solids) {
+      const q = [rot2(s.x0, s.z0, r), rot2(s.x1, s.z1, r)];
+      const w = { x0: x + Math.min(q[0][0], q[1][0]), x1: x + Math.max(q[0][0], q[1][0]), z0: z + Math.min(q[0][1], q[1][1]), z1: z + Math.max(q[0][1], q[1][1]), y0: base + s.y0, y1: base + s.y1 };
+      if (s.up) { w.up = ROT_DIR[s.up][r & 3]; w.lo = base + (s.lo ?? s.y0); }
+      this.sol.addBox(w, name);
+    }
+    for (const cy of P.cyls) {
+      const [cx, cz] = rot2(cy.x, cy.z, r);
+      this.sol.addCyl(x + cx, z + cz, cy.r, base + cy.y0, base + cy.y1, name);
+    }
+    for (const l of P.loot) { const [lx, lz] = rot2(l.x, l.z, r); this.lootSpots.push({ x: x + lx, y: base + l.y, z: z + lz }); }
+    for (const g of P.signs || []) { const [lx, lz] = rot2(g.x, g.z, r); this.signs.push({ ...g, x: x + lx, y: base + g.y, z: z + lz, r }); }
+    for (const ch of P.chests) { const [lx, lz] = rot2(ch.x, ch.z, r); this.chestSpots.push({ x: x + lx, y: base + ch.y, z: z + lz, rot: ((ch.rot + r) * Math.PI) / 2 }); }
+    this.baseLoot = this.lootSpots.length;
+    this.placed.push({ name, P, r, x, y: base, z, fp, town: town?.id });
+  }
+
+  // Postes de luz con cables a lo largo de las rutas asfaltadas, e indicadores a la salida de los pueblos.
+  layoutPostes() {
+    const libre = (x, z, minRoad) => {
+      if (this.inTown(x, z, 4) || this.terrainHeight(x, z) < 0.8 || this.slopeAt(x, z) > 0.5) return false;
+      if (this.gridVal(this.riverDist, x, z) < 10 || this.nearSolid(x, z, 1.6)) return false;
+      if (this.bridges.some((b) => Math.hypot(b.x - x, b.z - z) < 22)) return false;
+      for (const rb of this.ribbons) for (const [px, pz] of rb.pts) if (Math.hypot(px - x, pz - z) - rb.w / 2 < minRoad) return false;
+      return true;
+    };
+    const cerca = (x, z) => {
+      let best = null, bd = Infinity;
+      for (const t of PUEBLOS) { const d = Math.hypot(t.x - x, t.z - z) - t.r; if (d < bd) { bd = d; best = t; } }
+      return bd < 45 ? best : null;
+    };
+    const flecha = (dx, dz) => (Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 1 : 3) : dz > 0 ? 0 : 2);
+    const indicadores = [];
+    for (const ru of RUTAS) {
+      const path = catmull(ru.p, 3);
+      const tan = (i) => { const [ax, az] = path[Math.max(0, i - 2)], [bx, bz] = path[Math.min(path.length - 1, i + 2)]; const L = Math.hypot(bx - ax, bz - az) || 1; return [(bx - ax) / L, (bz - az) / L]; };
+      // indicadores en los dos extremos, del lado izquierdo de la ruta
+      const ini = cerca(...path[0]), fin = cerca(...path[path.length - 1]);
+      for (const [from, to, dirSign, order] of [[ini, fin, 1, path.map((_, i) => i)], [fin, ini, -1, path.map((_, i) => path.length - 1 - i)]]) {
+        if (!from || !to || from === to) continue;
+        for (const i of order) {
+          const [px, pz] = path[i];
+          if (this.inTown(px, pz, 8)) continue;
+          const [tx, tz] = tan(i), sx = tx * dirSign, sz = tz * dirSign;
+          const x = px + sz * (ru.w / 2 + 2.2), z = pz - sx * (ru.w / 2 + 2.2);
+          if (indicadores.some((q) => Math.hypot(q[0] - x, q[1] - z) < 30) || !libre(x, z, 1.2)) break;
+          indicadores.push([x, z]);
+          this.place('indicador', { textos: [[to.name, flecha(sx, sz)], [from.name, flecha(-sx, -sz)]] }, x, z, 0, { pad: false }, null);
+          break;
+        }
+      }
+      if (ru.m !== 'asfalto') continue;
+      // postes cada ~38 m del lado derecho, con cables entre vecinos
+      let prev = null, acc = 0;
+      for (let i = 1; i < path.length; i++) {
+        acc += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+        if (acc < 38) continue;
+        acc = 0;
+        const [tx, tz] = tan(i), off = ru.w / 2 + 2.6;
+        const x = path[i][0] - tz * off, z = path[i][1] + tx * off;
+        if (!libre(x, z, 1.8)) { prev = null; continue; }
+        const r = Math.abs(tx) > Math.abs(tz) ? 1 : 0;
+        this.place('poste', {}, x, z, r, { pad: false }, null);
+        const cur = this.placed[this.placed.length - 1];
+        cur.aisl = [-0.9, 0, 0.9].map((lx) => { const [ax, az] = rot2(lx, 0, r); return [x + ax, cur.y + 7.62, z + az]; });
+        if (prev && Math.hypot(prev.x - x, prev.z - z) < 60) this.cable(prev, cur);
+        prev = cur;
+      }
+    }
+  }
+
+  // Cables con comba entre los puntos de amarre de dos postes (o torres). cabina: dónde cuelga una cabina (0..1).
+  cable(A, B, { sagK = 0.018, r = 0.022, cabina = null } = {}) {
+    const ux = B.x - A.x, uz = B.z - A.z, L = Math.hypot(ux, uz);
+    const nx = -uz / L, nz = ux / L;
+    const ord = (arr) => arr.slice().sort((p, q) => (p[0] * nx + p[2] * nz) - (q[0] * nx + q[2] * nz));
+    const a = ord(A.aisl), b = ord(B.aisl);
+    const P = new Plano();
+    const sag = sagK * L, n = Math.max(10, Math.ceil(L / 4));
+    const at = (w, t) => [a[w][0] + (b[w][0] - a[w][0]) * t - A.x, a[w][1] + (b[w][1] - a[w][1]) * t - 4 * sag * t * (1 - t) - A.y, a[w][2] + (b[w][2] - a[w][2]) * t - A.z];
+    for (let w = 0; w < a.length; w++) {
+      let last = null;
+      for (let k = 0; k <= n; k++) {
+        const p = at(w, k / n);
+        if (last) P.tube(last, p, r, 'negro', 4);
+        last = p;
+      }
+    }
+    if (cabina !== null) {
+      const [cx, cy, cz] = at(0, cabina);
+      P.tube([cx, cy, cz], [cx, cy - 2.2, cz], 0.06, 'metal_osc', 5);
+      P.cbox(cx, cy - 2.4, cz, 0.9, 0.2, 0.9, 'metal_osc', false);
+      P.cbox(cx, cy - 4.5, cz, 2.0, 2.1, 1.8, 'rojo', false);
+      P.cbox(cx, cy - 3.6, cz, 2.06, 0.8, 1.86, 'vidrio', false);
+      P.cbox(cx, cy - 2.4 - 0.05, cz, 2.1, 0.12, 1.9, 'blanco', false);
+    }
+    this.placed.push({ name: 'cables', P, r: 0, x: A.x, y: A.y, z: A.z, fp: { x0: Math.min(A.x, B.x), x1: Math.max(A.x, B.x), z0: Math.min(A.z, B.z), z1: Math.max(A.z, B.z) } });
+  }
+
+  // Aplana exactamente la huella (así la puerta queda al ras del piso) y suaviza alrededor.
+  flatten(fp, base, F) {
+    const m = this.cell * 1.01;
+    this.eachVertex(fp.x0 - m - F, fp.z0 - m - F, fp.x1 + m + F, fp.z1 + m + F, (k, x, z) => {
+      const dx = Math.max(fp.x0 - m - x, 0, x - fp.x1 - m), dz = Math.max(fp.z0 - m - z, 0, z - fp.z1 - m);
+      const d = Math.hypot(dx, dz);
+      if (d <= 0) { this.heights[k] = base; this.locked[k] = 1; return; }
+      if (this.locked[k]) return;
+      const t = 1 - smoothstep(0, F, d);
+      this.heights[k] = this.heights[k] * (1 - t) + base * t;
+    });
+  }
+
+  inTown(x, z, pad = 0) { return this.pois.some((t) => Math.hypot(t.x - x, t.z - z) < t.r + pad); }
+  nearSolid(x, z, rad) { let hit = false; this.sol.near(x, z, rad, (s) => { if (!hit && x > s.x0 - rad && x < s.x1 + rad && z > s.z0 - rad && z < s.z1 + rad) hit = true; }); return hit; }
+  gridVal(arr, x, z) {
+    const i = Math.min(this.N - 1, Math.max(0, this.gi(x))), j = Math.min(this.N - 1, Math.max(0, this.gi(z)));
+    return arr[j * this.N + i];
+  }
+
+  layoutTrees(rand) {
+    const half = this.size / 2;
+    for (let k = 0; k < 30000 && this.trees.length < 1300; k++) {
+      const x = (rand() - 0.5) * this.size, z = (rand() - 0.5) * this.size;
+      const s = 0.8 + rand() * 0.7, r = rand() * Math.PI * 2, kind = rand();
+      if (Math.hypot(x, z) > half) continue;
+      const h = this.terrainHeight(x, z);
+      if (h < 2.5 || h > 92 || this.slopeAt(x, z) > 0.55) continue;
+      if (this.gridVal(this.roadDist, x, z) < 4 || this.gridVal(this.riverDist, x, z) < 7) continue;
+      if (this.inTown(x, z, -6) || this.nearSolid(x, z, 4)) continue;
+      const bio = this.biome(x, z, h);
+      if (bio.des > 0.5) {
+        if (this.cacti.length < 140 && kind < 0.5) this.cacti.push({ x, z, y: h, s: 0.8 + rand() * 0.6, r });
+        continue;
+      }
+      if (bio.quarry > 0.2) continue;
+      const forest = this.noise(x / 110 + 50, z / 110 + 50);
+      if (forest < -0.05 && kind > 0.1) { if (this.bushes.length < 900 && kind < 0.5) this.bushes.push({ x, z, y: h, s: 0.6 + rand() * 0.8, r }); continue; }
+      const tree = { x, z, y: h, s, r, pine: bio.snow > 0.2 || h > 38 || (kind < 0.35 && bio.sw < 0.2), alive: true };
+      tree.circle = { x, z, r: 0.45 * s, bottom: h - 1, top: h + 7 * s };
+      this.circles.push(tree.circle);
+      this.trees.push(tree);
+    }
+    // arbustos en los bordes de los pueblos
+    for (let k = 0; k < 6000 && this.bushes.length < 1300; k++) {
+      const x = (rand() - 0.5) * this.size, z = (rand() - 0.5) * this.size;
+      const h = this.terrainHeight(x, z);
+      if (h < 2 || this.slopeAt(x, z) > 0.5 || this.gridVal(this.roadDist, x, z) < 2 || this.nearSolid(x, z, 1.5)) continue;
+      const bio = this.biome(x, z, h);
+      if (bio.des > 0.5 || bio.snow > 0.5 || bio.quarry > 0.3) continue;
+      this.bushes.push({ x, z, y: h, s: 0.5 + rand() * 0.7, r: rand() * 6 });
+    }
+    for (const c of this.cacti) { c.circle = { x: c.x, z: c.z, r: 0.35 * c.s, bottom: c.y - 1, top: c.y + 3.2 * c.s }; this.circles.push(c.circle); }
+  }
+
+  layoutRocks(rand) {
+    for (let k = 0; k < 6000 && this.rocks.length < 320; k++) {
+      const x = (rand() - 0.5) * this.size, z = (rand() - 0.5) * this.size;
+      const s = 0.6 + rand() * 2.2, r = rand() * 6;
+      const h = this.terrainHeight(x, z);
+      if (h < 1 || this.gridVal(this.roadDist, x, z) < 3 || this.gridVal(this.riverDist, x, z) < 5) continue;
+      if (this.inTown(x, z, -10) || this.nearSolid(x, z, s + 2)) continue;
+      const bio = this.biome(x, z, h);
+      if (rand() > 0.35 + bio.snow * 0.4 + bio.quarry * 0.6) continue;
+      const rock = { x, z, y: h, s, r, alive: true };
+      rock.circle = { x, z, r: s * 1.1, bottom: h - s, top: h + s * 0.75 };
+      this.circles.push(rock.circle);
+      this.rocks.push(rock);
     }
   }
 
@@ -109,138 +496,97 @@ export class World {
     const u = Math.min(1, Math.max(0, fx - i)), v = Math.min(1, Math.max(0, fz - j));
     const h00 = this.heights[j * N + i], h10 = this.heights[j * N + i + 1];
     const h01 = this.heights[(j + 1) * N + i], h11 = this.heights[(j + 1) * N + i + 1];
-    // Triangulación: (00,01,10) y (01,11,10)
     if (u + v <= 1) return h00 + (h10 - h00) * u + (h01 - h00) * v;
     return h11 + (h01 - h11) * (1 - u) + (h10 - h11) * (1 - v);
   }
 
+  // Piso más alto debajo de (x,z) que se puede pisar desde la altura y (terreno, edificios o construcciones).
   groundHeight(x, z, y = Infinity) {
     let h = this.terrainHeight(x, z);
-    for (const f of this.floors) {
-      if (x > f.minX && x < f.maxX && z > f.minZ && z < f.maxZ && y >= f.y - 2.5) h = Math.max(h, f.y);
-    }
-    for (const s of this.structs.values()) {
-      if (s.type === 'pared') continue;
-      const x0 = s.i * GRID, z0 = s.j * GRID;
+    const s = this.sol.ground(x, z, y);
+    if (s > h) h = s;
+    for (const st of this.structs.values()) {
+      if (st.type === 'pared') continue;
+      const x0 = st.i * GRID, z0 = st.j * GRID;
       if (x < x0 || x > x0 + GRID || z < z0 || z > z0 + GRID) continue;
-      let top = s.y;
-      if (s.type === 'rampa') {
-        const t = s.dir === 0 ? z0 + GRID - z : s.dir === 2 ? z - z0 : s.dir === 1 ? x - x0 : x0 + GRID - x;
-        top = s.y + t;
+      let top = st.y;
+      if (st.type === 'rampa') {
+        const t = st.dir === 0 ? z0 + GRID - z : st.dir === 2 ? z - z0 : st.dir === 1 ? x - x0 : x0 + GRID - x;
+        top = st.y + t;
       }
       if (y >= top - 1.2 && top > h) h = top;
     }
     return h;
   }
 
-  // ---------- Disposición (sin Three.js: la usa también el servidor) ----------
-  layout() {
-    const rand = rng(this.seed ^ 0x9e3779b9);
-    this.houses = [];
-    this.trees = [];
-    this.rocks = [];
-    this.chestSpots = [];
-    this.lootSpots = [];
-    this.layoutTowns(rand);
-    this.layoutTrees(rand);
-    this.layoutRocks(rand);
-    // Loot suelto por la isla, además del de las casas.
-    for (let k = 0; k < 4000 && this.lootSpots.length < this.houses.length * 2 + 70; k++) {
-      const x = (rand() - 0.5) * this.size, z = (rand() - 0.5) * this.size;
-      const h = this.terrainHeight(x, z);
-      if (h < 2 || this.slopeAt(x, z) > 0.4 || this.insideHouse(x, z, 2)) continue;
-      this.lootSpots.push({ x, y: h, z });
-    }
-  }
+  ceilingHeight(x, z, feet) { return this.sol.ceiling(x, z, feet); }
 
-  layoutTowns(rand) {
-    const names = ['Puerto Bruma', 'Villa Cardo', 'Loma Ventosa', 'Barrio Faro', 'Los Pinares', 'Cantera Roja', 'Bahía Quieta'];
-    const half = this.size / 2;
-    let placed = 0, tries = 0;
-    while (placed < names.length && tries < 400) {
-      tries++;
-      const x = (rand() - 0.5) * half * 1.3, z = (rand() - 0.5) * half * 1.3;
-      const h = this.terrainHeight(x, z);
-      if (h < 5 || h > 55 || this.slopeAt(x, z) > 0.25) continue;
-      if (this.pois.some((p) => Math.hypot(p.x - x, p.z - z) < 170)) continue;
-      this.pois.push({ name: names[placed], x, z });
-      placed++;
-      const houses = 4 + Math.floor(rand() * 5);
-      for (let k = 0; k < houses; k++) {
-        const hx = x + (rand() - 0.5) * 70, hz = z + (rand() - 0.5) * 70;
-        const w = 8 + rand() * 5, d = 8 + rand() * 4, style = Math.floor(rand() * 3), chest = rand() < 0.6;
-        if (this.slopeAt(hx, hz) > 0.35) continue;
-        if (this.floors.some((f) => hx > f.minX - 6 && hx < f.maxX + 6 && hz > f.minZ - 6 && hz < f.maxZ + 6)) continue;
-        this.layoutHouse(hx, hz, w, d, style, chest);
+  // Mueve un cuerpo (pies en pos) en pasos chicos: nunca atraviesa pisos, techos ni paredes aunque vaya rápido.
+  moveBody(pos, vel, dt, radius = 0.45, height = 1.8) {
+    const n = Math.min(40, Math.max(1, Math.ceil((Math.hypot(vel.x, vel.y, vel.z) * dt) / 0.25)));
+    const h = dt / n;
+    for (let k = 0; k < n; k++) {
+      const prevY = pos.y;
+      pos.x += vel.x * h; pos.y += vel.y * h; pos.z += vel.z * h;
+      if (vel.y > 0) {
+        const c = this.sol.ceiling(pos.x, pos.z, prevY);
+        if (pos.y + height > c) { pos.y = Math.max(prevY, c - height); vel.y = 0; }
       }
+      const g = this.groundHeight(pos.x, pos.z, Math.max(prevY, pos.y));
+      if (pos.y < g) pos.y = g;
+      this.collide(pos, radius, height);
     }
   }
 
-  layoutHouse(cx, cz, w, d, style, chest) {
-    const t = 0.4, H = 4;
-    const hs = [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2]].map(([dx, dz]) => this.terrainHeight(cx + dx, cz + dz));
-    const base = Math.max(...hs) + 0.25;
-    const minBase = Math.min(...hs) - 2;
-    const wy = base + H / 2, door = 2.2, side = (w - door) / 2;
-    const walls = [
-      [cx, wy, cz - d / 2, w, H, t],
-      [cx - w / 2, wy, cz, t, H, d],
-      [cx + w / 2, wy, cz, t, H, d],
-      [cx - w / 2 + side / 2, wy, cz + d / 2, side, H, t],
-      [cx + w / 2 - side / 2, wy, cz + d / 2, side, H, t],
-      [cx, base + H - 0.6, cz + d / 2, door, 1.2, t],
-    ];
-    for (const [x, y, z, sx, sy, sz] of walls) {
-      this.colliders.push({ minX: x - sx / 2, maxX: x + sx / 2, minY: y - sy / 2, maxY: y + sy / 2, minZ: z - sz / 2, maxZ: z + sz / 2 });
-    }
-    this.colliders.push({ minX: cx - w / 2, maxX: cx + w / 2, minY: base + H, maxY: base + H + 0.5, minZ: cz - d / 2, maxZ: cz + d / 2 });
-    this.floors.push({ minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, y: base });
-    this.houses.push({ cx, cz, w, d, base, minBase, style, walls });
-    this.lootSpots.push({ x: cx - w / 4, y: base, z: cz });
-    if (chest) this.chestSpots.push({ x: cx + w / 2 - 1.2, y: base, z: cz - d / 2 + 1.2, rot: 0 });
-    else this.lootSpots.push({ x: cx + w / 4, y: base, z: cz - d / 4 });
+  slopeAt(x, z) {
+    const s = 4;
+    const dx = this.terrainHeight(x + s, z) - this.terrainHeight(x - s, z);
+    const dz = this.terrainHeight(x, z + s) - this.terrainHeight(x, z - s);
+    return Math.hypot(dx, dz) / (2 * s);
   }
 
-  layoutTrees(rand) {
-    const half = this.size / 2;
-    for (let k = 0; k < 9000 && this.trees.length < 900; k++) {
-      const x = (rand() - 0.5) * this.size, z = (rand() - 0.5) * this.size;
-      const s = 0.8 + rand() * 0.7, r = rand() * Math.PI * 2, kind = rand();
-      if (Math.hypot(x, z) > half) continue;
-      const h = this.terrainHeight(x, z);
-      if (h < 3.5 || h > 75 || this.slopeAt(x, z) > 0.5) continue;
-      const forest = this.noise(x / 120 + 50, z / 120 + 50);
-      if (forest < -0.02 && kind > 0.12) continue;
-      if (this.insideHouse(x, z, 4)) continue;
-      const tree = { x, z, y: h, s, r, pine: h > 35 || kind < 0.4, alive: true };
-      tree.circle = { x, z, r: 0.45 * s, bottom: h - 1, top: h + 7 * s };
-      this.circles.push(tree.circle);
-      this.trees.push(tree);
-    }
-  }
-
-  layoutRocks(rand) {
-    for (let k = 0; k < 3000 && this.rocks.length < 260; k++) {
-      const x = (rand() - 0.5) * this.size, z = (rand() - 0.5) * this.size;
-      const s = 0.6 + rand() * 2.2, r = rand() * 6;
-      const h = this.terrainHeight(x, z);
-      if (h < 1 || this.insideHouse(x, z, 3)) continue;
-      const rock = { x, z, y: h, s, r, alive: true };
-      rock.circle = { x, z, r: s * 1.1, bottom: h - s, top: h + s * 0.75 };
-      this.circles.push(rock.circle);
-      this.rocks.push(rock);
-    }
-  }
+  insideHouse(x, z, pad = 3) { return this.nearSolid(x, z, pad); }
 
   // ---------- Mallas (sólo cliente) ----------
   build(scene) {
     this.scene = scene;
     this.buildTerrain(scene);
     this.buildWater(scene);
-    this.buildHouses(scene);
+    this.buildRoads(scene);
+    this.buildStructures(scene);
     this.buildTrees(scene);
+    this.buildPlants(scene);
     this.buildRocks(scene);
     this.buildChests(scene);
+    this.buildSigns(scene);
+  }
+
+  terrainColor(x, z, y, slope, c) {
+    const n = this.noise(x / 9, z / 9) * 0.5 + 0.5;
+    const bio = this.biome(x, z, y);
+    const road = this.gridVal(this.roadDist, x, z), river = this.gridVal(this.riverDist, x, z);
+    if (y < -1.2 && bio.sw < 0.3) c.copy(COL.seabed);
+    else if (y < 2.2 && bio.sw < 0.3) c.copy(COL.sand);
+    else {
+      c.copy(COL.grass).lerp(COL.grass2, n);
+      if (bio.sw > 0) c.lerp(COL.mud, smoothstep(0.2, 0.6, bio.sw) * (0.5 + n * 0.5));
+      if (bio.des > 0) c.lerp(COL.desert, smoothstep(0.2, 0.7, bio.des)).lerp(COL.desert2, bio.des * n * 0.5);
+      if (y > 24) c.lerp(COL.alpine, smoothstep(24, 60, y) * 0.45 * (1 - bio.snow));
+      if (slope > 0.42) c.lerp(bio.quarry > 0.2 ? COL.redrock : COL.rock, smoothstep(0.42, 0.62, slope));
+      if (bio.quarry > 0) c.lerp(n > 0.5 ? COL.redrock : COL.redrock2, smoothstep(0, 0.5, bio.quarry));
+      if (bio.snow > 0) {
+        // nieve con matices: zonas azuladas (viento y sombra) y, lejos de las casas, algunas rocas que asoman
+        const v = this.noise(x / 26 - 9, z / 26 + 2), r = this.noise(x / 22 + 7, z / 22 - 4);
+        const lejos = smoothstep(0, 25, Math.min(...this.pois.map((t) => Math.hypot(t.x - x, t.z - z) - t.r)));
+        c.lerp(COL.snow, bio.snow * (0.8 + 0.2 * smoothstep(0.3, 0.7, n + bio.snow - 0.5)));
+        c.lerp(COL.snowsh, bio.snow * smoothstep(-0.08, 0.12, v) * 0.8);
+        c.lerp(n > 0.5 ? COL.rock : COL.rock2, bio.snow * Math.max(smoothstep(0.7, 1.1, slope), smoothstep(0.17, 0.23, r) * 0.85 * lejos));
+      }
+      if (road < 2.5) c.lerp(COL.dirt, (1 - smoothstep(0, 2.5, road)) * 0.3);
+      if (river < 7) c.lerp(COL.mud, (1 - smoothstep(3, 7, river)) * 0.8);
+    }
+    c.offsetHSL(0, 0, (n - 0.5) * 0.04);
+    return c;
   }
 
   buildTerrain(scene) {
@@ -249,8 +595,6 @@ export class World {
     const positions = [];
     const colors = [];
     const c = new THREE.Color();
-    const sand = new THREE.Color('#e8d39a'), grass = new THREE.Color('#6cbf4b'), grass2 = new THREE.Color('#4f9e3a');
-    const rock = new THREE.Color('#8a8576'), snow = new THREE.Color('#f4f7fb'), seabed = new THREE.Color('#c9b98a');
     const v = (i, j) => [-half + i * this.cell, this.heights[j * N + i], -half + j * this.cell];
     const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), nrm = new THREE.Vector3();
     for (let j = 0; j < this.res; j++) {
@@ -261,13 +605,8 @@ export class World {
           e1.set(tri[1][0] - tri[0][0], tri[1][1] - tri[0][1], tri[1][2] - tri[0][2]);
           e2.set(tri[2][0] - tri[0][0], tri[2][1] - tri[0][1], tri[2][2] - tri[0][2]);
           nrm.crossVectors(e1, e2).normalize();
-          const slope = 1 - Math.abs(nrm.y);
-          const jitter = this.noise(tri[0][0] / 9, tri[0][2] / 9) * 0.5 + 0.5;
-          if (y < -1) c.copy(seabed);
-          else if (y < 2.5) c.copy(sand);
-          else if (slope > 0.35 || y > 70) c.copy(rock).lerp(snow, y > 95 ? 1 : 0);
-          else c.copy(grass).lerp(grass2, jitter);
-          c.offsetHSL(0, 0, (jitter - 0.5) * 0.04);
+          const cx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3, cz = (tri[0][2] + tri[1][2] + tri[2][2]) / 3;
+          this.terrainColor(cx, cz, y, 1 - Math.abs(nrm.y), c);
           for (const p of tri) { positions.push(...p); colors.push(c.r, c.g, c.b); }
         }
       }
@@ -276,7 +615,7 @@ export class World {
     geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 }));
+    const mesh = new THREE.Mesh(geo, terrainDetail(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 })));
     mesh.receiveShadow = true;
     scene.add(mesh);
     this.terrainMesh = mesh;
@@ -285,71 +624,150 @@ export class World {
   buildWater(scene) {
     const geo = new THREE.PlaneGeometry(this.size * 6, this.size * 6, 1, 1);
     geo.rotateX(-Math.PI / 2);
-    const mat = new THREE.MeshStandardMaterial({ color: '#2a9fd6', transparent: true, opacity: 0.82, roughness: 0.2, metalness: 0.1 });
+    const mat = new THREE.MeshStandardMaterial({ color: '#2a9fd6', transparent: true, opacity: 0.82, roughness: 0.14, metalness: 0.05 });
+    // Profundidad (R) y ciénaga (G) por vértice de la grilla: color según profundidad y espuma en la orilla.
+    const N = this.N, data = new Uint8Array(N * N * 4), half = this.size / 2;
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const k = j * N + i, d = Math.min(20, Math.max(-4, -this.heights[k]));
+      data[k * 4] = Math.round(((d + 4) / 24) * 255);
+      data[k * 4 + 1] = Math.round(Math.min(1, this.swamp(-half + i * this.cell, -half + j * this.cell) * 1.3) * 255);
+      data[k * 4 + 3] = 255;
+    }
+    const htex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+    htex.magFilter = THREE.LinearFilter; htex.minFilter = THREE.LinearFilter; htex.needsUpdate = true;
+    const time = { value: 0 };
+    aguaShader(mat, { time, htex, half, cell: this.cell, N, mar: true });
     this.water = new THREE.Mesh(geo, mat);
     this.water.position.y = SEA_LEVEL;
+    this.water.onBeforeRender = () => { time.value = performance.now() / 1000; };
     scene.add(this.water);
+    // río: cinta de agua siguiendo el cauce
+    const { path, water } = this.river;
+    const pos = [];
+    for (let i = 0; i < path.length - 1; i++) {
+      const [ax, az] = path[i], [bx, bz] = path[i + 1];
+      const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) || 1, nx = -dz / L, nz = dx / L, w = RIO.w * 0.62;
+      const ya = Math.max(water[i], 0.05), yb = Math.max(water[i + 1], 0.05);
+      const p0 = [ax + nx * w, ya, az + nz * w], p1 = [ax - nx * w, ya, az - nz * w], p2 = [bx - nx * w, yb, bz - nz * w], p3 = [bx + nx * w, yb, bz + nz * w];
+      pos.push(...p0, ...p1, ...p2, ...p0, ...p2, ...p3);
+    }
+    const rg = new THREE.BufferGeometry();
+    rg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    rg.computeVertexNormals();
+    const rmat = new THREE.MeshStandardMaterial({ color: '#45b6e3', transparent: true, opacity: 0.8, roughness: 0.12, side: THREE.DoubleSide });
+    aguaShader(rmat, { time, mar: false });
+    const rm = new THREE.Mesh(rg, rmat);
+    scene.add(rm);
   }
 
-  slopeAt(x, z) {
-    const s = 4;
-    const dx = this.terrainHeight(x + s, z) - this.terrainHeight(x - s, z);
-    const dz = this.terrainHeight(x, z + s) - this.terrainHeight(x, z - s);
-    return Math.hypot(dx, dz) / (2 * s);
+  buildRoads(scene) {
+    const pos = [], col = [];
+    const c = new THREE.Color(), line = new THREE.Color('#f2efe6');
+    this.ribbons.forEach((rb, idx) => {
+      c.set(CALLE_COLOR[rb.m] || '#888');
+      const off = rb.under ? 0.045 : 0.07 + (idx % 7) * 0.01;
+      const pts = rb.pts;
+      const edge = (i, s) => {
+        const [px, pz] = pts[i];
+        const [ax, az] = pts[Math.max(0, i - 1)], [bx, bz] = pts[Math.min(pts.length - 1, i + 1)];
+        const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz) || 1;
+        const x = px + (-dz / L) * s, z = pz + (dx / L) * s;
+        return [x, this.terrainHeight(x, z) + off, z];
+      };
+      for (let i = 0; i < pts.length - 1; i++) {
+        const w = rb.w / 2;
+        const a = edge(i, w), b = edge(i, -w), d = edge(i + 1, -w), e = edge(i + 1, w);
+        pos.push(...a, ...b, ...d, ...a, ...d, ...e);
+        for (let k = 0; k < 6; k++) col.push(c.r, c.g, c.b);
+        if (rb.m === 'asfalto' && rb.w >= 6 && i % 3 === 0) {
+          const a2 = edge(i, 0.12), b2 = edge(i, -0.12), d2 = edge(i + 1, -0.12), e2 = edge(i + 1, 0.12);
+          for (const p of [a2, b2, d2, e2]) p[1] += 0.01;
+          pos.push(...a2, ...b2, ...d2, ...a2, ...d2, ...e2);
+          for (let k = 0; k < 6; k++) col.push(line.r, line.g, line.b);
+        }
+      }
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g, terrainDetail(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide })));
+    m.receiveShadow = true;
+    scene.add(m);
   }
 
-  buildHouses(scene) {
-    const wallMat = [new THREE.MeshStandardMaterial({ color: '#f2e6cf', roughness: 0.9 }),
-      new THREE.MeshStandardMaterial({ color: '#cfe3f0', roughness: 0.9 }),
-      new THREE.MeshStandardMaterial({ color: '#f4c7a1', roughness: 0.9 })];
-    const roofMat = [new THREE.MeshStandardMaterial({ color: '#c0503c', flatShading: true }),
-      new THREE.MeshStandardMaterial({ color: '#3d5a80', flatShading: true }),
-      new THREE.MeshStandardMaterial({ color: '#5b4636', flatShading: true })];
-    const floorMat = new THREE.MeshStandardMaterial({ color: '#9c7b55' });
-    const glass = new THREE.MeshStandardMaterial({ color: '#9bd3ff', emissive: '#1d3d55', roughness: 0.1 });
-    const hiddenMat = new THREE.MeshBasicMaterial({ visible: false });
-    for (const h of this.houses) {
-      const group = new THREE.Group();
-      this.camMeshes.push(group);
-      const { cx, cz, w, d, base, minBase } = h;
-      const foundH = base - minBase;
-      const found = new THREE.Mesh(new THREE.BoxGeometry(w, foundH - 0.3, d), floorMat);
-      found.position.set(cx, minBase + foundH / 2 - 0.15, cz);
-      found.receiveShadow = true;
-      group.add(found);
-      const glb = MODEL.clone?.('casa', null, houseTints[h.style]);
-      if (glb) {
-        glb.position.set(cx, base - 0.02, cz);
-        glb.scale.set(w / 10, 1, d / 10);
-        group.add(glb);
-      }
-      for (const [x, y, z, sx, sy, sz] of h.walls) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), glb ? hiddenMat : wallMat[h.style]);
-        m.position.set(x, y, z);
-        m.castShadow = true; m.receiveShadow = true;
-        m.userData.harvest = { kind: 'house' };
-        group.add(m);
-        this.solidMeshes.push(m);
-      }
-      if (glb) { scene.add(group); continue; }
-      const roofGeo = new THREE.CylinderGeometry(0.01, Math.max(w, d) * 0.75, 3, 4, 1);
-      roofGeo.rotateY(Math.PI / 4);
-      roofGeo.scale(w / Math.max(w, d), 1, d / Math.max(w, d));
-      const roof = new THREE.Mesh(roofGeo, roofMat[h.style]);
-      roof.position.set(cx, base + 5.5, cz);
-      roof.castShadow = true;
-      group.add(roof);
-      for (const sx of [-1, 1]) {
-        const win = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.2, 1.6), glass);
-        win.position.set(cx + sx * (w / 2 + 0.16), base + 2.3, cz);
-        group.add(win);
-      }
-      scene.add(group);
+  buildStructures(scene) {
+    const mats = materialesMapa();
+    const CH = 160;
+    const chunks = new Map();
+    const lote = (x, z) => {
+      const k = `${Math.floor(x / CH)},${Math.floor(z / CH)}`;
+      if (!chunks.has(k)) chunks.set(k, new Lote());
+      return chunks.get(k);
+    };
+    const M = new THREE.Matrix4(), R = new THREE.Matrix4();
+    const rand = rng(MAP_SEED + 7);
+    for (const p of this.placed) {
+      M.makeTranslation(p.x, p.y, p.z).multiply(R.makeRotationY((p.r * Math.PI) / 2));
+      lote(p.x, p.z).plano(p.P, M, { jitter: (rand() - 0.5) * 0.04 });
+    }
+    for (const L of chunks.values()) for (const m of L.meshes(mats)) scene.add(m);
+    // Malla invisible con los sólidos exactos: la usan los disparos y la cámara.
+    const hidden = new THREE.MeshBasicMaterial({ visible: false });
+    const cols = new Map();
+    const I = new THREE.Matrix4();
+    for (const s of this.sol.list) {
+      const k = `${Math.floor(((s.x0 + s.x1) / 2) / CH)},${Math.floor(((s.z0 + s.z1) / 2) / CH)}`;
+      if (!cols.has(k)) cols.set(k, new Lote());
+      const L = cols.get(k);
+      if (s.cyl) L.part({ t: 'cyl', x: s.x, y: s.y0, z: s.z, r: s.r, r2: s.r, h: s.y1 - s.y0, seg: 10, m: 'hormigon' }, I, 0);
+      else if (s.up) L.part({ t: 'ramp', a: [s.x0, s.y0, s.z0, s.x1, s.y1, s.z1], up: s.up, lo: s.lo, m: 'hormigon' }, I, 0);
+      else L.part({ t: 'box', a: [s.x0, s.y0, s.z0, s.x1, s.y1, s.z1], m: 'hormigon' }, I, 0);
+    }
+    for (const L of cols.values()) for (const m of L.meshes({ s: hidden, m: hidden, v: hidden, e: hidden })) {
+      m.castShadow = false; m.receiveShadow = false;
+      m.userData.harvest = { kind: 'house' };
+      scene.add(m);
+      this.solidMeshes.push(m);
+      this.camMeshes.push(m);
     }
   }
 
-  insideHouse(x, z, pad = 3) {
-    return this.floors.some((f) => x > f.minX - pad && x < f.maxX + pad && z > f.minZ - pad && z < f.maxZ + pad);
+  // Carteles (nombres de pueblos e indicadores de caminos): texto dibujado en un canvas, en las dos caras.
+  buildSigns(scene) {
+    if (typeof document === 'undefined') return;
+    const tex = (g, flip) => {
+      const cv = document.createElement('canvas');
+      cv.width = 512; cv.height = Math.max(64, Math.round((512 * g.h) / g.w));
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = g.color; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.strokeStyle = g.ink; ctx.globalAlpha = 0.85; ctx.lineWidth = Math.max(4, cv.height * 0.05);
+      ctx.strokeRect(ctx.lineWidth, ctx.lineWidth, cv.width - ctx.lineWidth * 2, cv.height - ctx.lineWidth * 2);
+      ctx.globalAlpha = 1; ctx.fillStyle = g.ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      let text = g.text;
+      if (g.dir) text = flip ? `◀  ${text}` : `${text}  ▶`;
+      let fs = Math.round(cv.height * 0.55);
+      ctx.font = `bold ${fs}px system-ui, sans-serif`;
+      while (ctx.measureText(text).width > cv.width - 50 && fs > 14) { fs -= 2; ctx.font = `bold ${fs}px system-ui, sans-serif`; }
+      ctx.fillText(text, cv.width / 2, cv.height / 2 + fs * 0.06);
+      const t = new THREE.CanvasTexture(cv);
+      t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+      return t;
+    };
+    for (const g of this.signs) {
+      const ang = ((g.r + (g.face || 0)) * Math.PI) / 2;
+      const nx = Math.sin(ang), nz = Math.cos(ang); // normal de la cara del frente
+      // ¿la flecha del frente apunta a la derecha? (derecha de quien mira el frente = (cos, -sin))
+      let right = true;
+      if (g.dir) { const [wx, wz] = rot2(g.dir[0], g.dir[1], g.r); right = wx * Math.cos(ang) - wz * Math.sin(ang) > 0; }
+      for (const side of [1, -1]) {
+        const flip = g.dir ? (side === 1 ? !right : right) : false;
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(g.w, g.h), new THREE.MeshStandardMaterial({ map: tex(g, flip), roughness: 0.8 }));
+        mesh.position.set(g.x + nx * (g.d + 0.01) * side, g.y - g.h / 2, g.z + nz * (g.d + 0.01) * side);
+        mesh.rotation.y = ang + (side === 1 ? 0 : Math.PI);
+        scene.add(mesh);
+      }
+    }
   }
 
   buildTrees(scene) {
@@ -375,20 +793,58 @@ export class World {
     this.rounds = new THREE.InstancedMesh(roundGeoG, roundMat, list.filter((t) => !t.pine).length);
     this.pineToTree = []; this.roundToTree = [];
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), eu = new THREE.Euler();
+    const tint = new THREE.Color();
     list.forEach((t, i) => {
       q.setFromEuler(eu.set(0, t.r, 0));
-      sc.set(t.s, t.s, t.s);
+      sc.set(t.s * (t.sxz || 1), t.s * (t.sy || 1), t.s * (t.sxz || 1));
       p.set(t.x, t.y - 0.2, t.z);
       m.compose(p, q, sc);
       t.matrix = m.clone();
       this.trunks.setMatrixAt(i, m);
-      if (t.pine) { t.fol = [this.pines, this.pineToTree.length]; this.pines.setMatrixAt(this.pineToTree.length, m); this.pineToTree.push(i); }
-      else { t.fol = [this.rounds, this.roundToTree.length]; this.rounds.setMatrixAt(this.roundToTree.length, m); this.roundToTree.push(i); }
+      const bio = this.biome(t.x, t.z, t.y);
+      tint.setRGB(1, 1, 1).lerp(new THREE.Color(bio.snow > 0.3 ? '#dfe9ee' : bio.sw > 0.3 ? '#a8b070' : '#ffffff'), Math.max(bio.snow, bio.sw) * 0.8);
+      tint.offsetHSL((this.noise(t.x / 60, t.z / 60)) * 0.03, 0, (this.noise(t.z / 25, t.x / 25)) * 0.08);
+      if (t.pine) { t.fol = [this.pines, this.pineToTree.length]; this.pines.setMatrixAt(this.pineToTree.length, m); this.pines.setColorAt(this.pineToTree.length, tint); this.pineToTree.push(i); }
+      else { t.fol = [this.rounds, this.roundToTree.length]; this.rounds.setMatrixAt(this.roundToTree.length, m); this.rounds.setColorAt(this.roundToTree.length, tint); this.roundToTree.push(i); }
     });
     this.trunks.userData.harvest = { kind: 'tree', map: null };
     this.pines.userData.harvest = { kind: 'tree', map: this.pineToTree };
     this.rounds.userData.harvest = { kind: 'tree', map: this.roundToTree };
     for (const im of [this.trunks, this.pines, this.rounds]) { im.castShadow = true; im.receiveShadow = true; scene.add(im); this.solidMeshes.push(im); }
+  }
+
+  // Arbustos (decorativos) y cactus del desierto.
+  buildPlants(scene) {
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(), p = new THREE.Vector3();
+    const bushGeo = new THREE.IcosahedronGeometry(1, 0);
+    bushGeo.scale(1.2, 0.8, 1.2); bushGeo.translate(0, 0.45, 0);
+    const bush = new THREE.InstancedMesh(bushGeo, new THREE.MeshStandardMaterial({ color: '#5aa33c', flatShading: true, roughness: 0.9 }), this.bushes.length);
+    const tint = new THREE.Color();
+    this.bushes.forEach((b, i) => {
+      m.compose(p.set(b.x, b.y - 0.15, b.z), q.setFromEuler(e.set(0, b.r, 0)), s.set(b.s, b.s, b.s));
+      bush.setMatrixAt(i, m);
+      const bio = this.biome(b.x, b.z, b.y);
+      tint.set(bio.sw > 0.3 ? '#9aa860' : '#ffffff').offsetHSL(this.noise(b.x / 40, b.z / 40) * 0.04, 0, this.noise(b.z / 15, b.x / 15) * 0.1);
+      bush.setColorAt(i, tint);
+    });
+    bush.receiveShadow = true; bush.castShadow = true;
+    scene.add(bush);
+    // cactus: tronco + dos brazos
+    const L = new Lote();
+    const I = new THREE.Matrix4();
+    const parts = [
+      { t: 'cyl', x: 0, y: 0, z: 0, r: 0.38, r2: 0.32, h: 3.0, seg: 8, m: 'hoja' },
+      { t: 'sph', x: 0, y: 3.0, z: 0, r: 0.32, m: 'hoja', half: true, seg: 8, sy: 1 },
+      { t: 'tube', a: [0, 1.3, 0], b: [0.9, 1.3, 0], r: 0.22, m: 'hoja', seg: 6 },
+      { t: 'cyl', x: 0.9, y: 1.1, z: 0, r: 0.22, r2: 0.2, h: 1.1, seg: 6, m: 'hoja' },
+      { t: 'tube', a: [0, 1.9, 0], b: [-0.75, 1.9, 0], r: 0.2, m: 'hoja', seg: 6 },
+      { t: 'cyl', x: -0.75, y: 1.7, z: 0, r: 0.2, r2: 0.18, h: 0.9, seg: 6, m: 'hoja' },
+    ];
+    for (const c of this.cacti) {
+      I.compose(p.set(c.x, c.y - 0.1, c.z), q.setFromEuler(e.set(0, c.r, 0)), s.set(c.s, c.s, c.s));
+      for (const part of parts) L.part(part, I, 0);
+    }
+    for (const mesh of L.meshes(materialesMapa())) { scene.add(mesh); this.solidMeshes.push(mesh); }
   }
 
   buildRocks(scene) {
@@ -399,10 +855,14 @@ export class World {
     if (roca) ({ geometry: geo, material: mat } = roca[0]);
     this.rockMesh = new THREE.InstancedMesh(geo, mat, this.rocks.length);
     const m = new THREE.Matrix4();
+    const tint = new THREE.Color();
     this.rocks.forEach((r, i) => {
       m.compose(new THREE.Vector3(r.x, r.y, r.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(r.r, r.r * 2, 0)), new THREE.Vector3(r.s, r.s, r.s));
       r.matrix = m.clone();
       this.rockMesh.setMatrixAt(i, m);
+      const bio = this.biome(r.x, r.z, r.y);
+      tint.set('#ffffff').lerp(new THREE.Color('#d98a6a'), bio.quarry * 0.8).lerp(new THREE.Color('#e8d2a8'), bio.des * 0.6);
+      this.rockMesh.setColorAt(i, tint);
     });
     this.rockMesh.userData.harvest = { kind: 'rock', map: null };
     this.rockMesh.castShadow = true; this.rockMesh.receiveShadow = true;
@@ -530,17 +990,16 @@ export class World {
       if (k >= 1) s.grown = true;
     }
   }
-
-  // Mueve una cápsula (pos = pies) resolviendo choques con paredes, árboles y rocas.
+  // Mueve una cápsula (pos = pies) resolviendo choques con paredes, árboles, rocas y construcciones.
   collide(pos, radius = 0.45, height = 1.8) {
     for (const c of this.circles) {
       if (pos.y > c.top || pos.y + height < c.bottom) continue;
       const dx = pos.x - c.x, dz = pos.z - c.z;
+      if (Math.abs(dx) > 6 || Math.abs(dz) > 6) continue;
       const d = Math.hypot(dx, dz), min = c.r + radius;
       if (d < min && d > 1e-4) { pos.x = c.x + (dx / d) * min; pos.z = c.z + (dz / d) * min; }
     }
-    const boxes = this.colliders;
-    for (let k = 0; k < boxes.length; k++) pushOut(pos, boxes[k], radius, height);
+    this.sol.push(pos, radius, height);
     for (const s of this.structs.values()) if (s.box) pushOut(pos, s.box, radius, height);
   }
 
@@ -563,36 +1022,123 @@ export class World {
     return Infinity;
   }
 
-  // Mapa de alturas pequeño para el minimapa.
+  // Mapa para el minimapa: terreno con biomas, río, calles y techos.
   minimapImage(px = 200) {
     const cv = document.createElement('canvas');
     cv.width = cv.height = px;
     const ctx = cv.getContext('2d');
     const img = ctx.createImageData(px, px);
     const half = this.size / 2;
+    const c = new THREE.Color();
     for (let j = 0; j < px; j++) for (let i = 0; i < px; i++) {
-      const x = -half + (i / px) * this.size, z = -half + (j / px) * this.size;
+      const x = -half + ((i + 0.5) / px) * this.size, z = -half + ((j + 0.5) / px) * this.size;
       const h = this.terrainHeight(x, z);
-      let col;
-      if (h < 0) col = [42, 140, 200];
-      else if (h < 2.5) col = [232, 211, 154];
-      else if (h > 70) col = [200, 200, 200];
-      else { const k = Math.min(1, h / 70); col = [100 - k * 30, 180 - k * 50, 70 - k * 20]; }
+      if (h < 0) c.set(h < -4 ? '#2a86c4' : '#3aa6d8');
+      else { this.terrainColor(x, z, h, this.slopeAt(x, z) * 0.7, c); c.offsetHSL(0, -0.05, -Math.min(0.1, h / 900)); }
+      c.convertLinearToSRGB();
       const o = (j * px + i) * 4;
-      img.data[o] = col[0]; img.data[o + 1] = col[1]; img.data[o + 2] = col[2]; img.data[o + 3] = 255;
+      img.data[o] = c.r * 255; img.data[o + 1] = c.g * 255; img.data[o + 2] = c.b * 255; img.data[o + 3] = 255;
     }
     ctx.putImageData(img, 0, 0);
-    ctx.fillStyle = '#5b4636';
-    for (const f of this.floors) {
-      ctx.fillRect(((f.minX + half) / this.size) * px, ((f.minZ + half) / this.size) * px, Math.max(2, ((f.maxX - f.minX) / this.size) * px), Math.max(2, ((f.maxZ - f.minZ) / this.size) * px));
+    const toM = (v) => ((v + half) / this.size) * px;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#3fb0e0'; ctx.lineWidth = Math.max(1.5, (RIO.w / this.size) * px * 1.4);
+    ctx.beginPath(); this.river.path.forEach(([x, z], k) => (k ? ctx.lineTo(toM(x), toM(z)) : ctx.moveTo(toM(x), toM(z)))); ctx.stroke();
+    for (const rb of this.ribbons) {
+      ctx.strokeStyle = rb.m === 'asfalto' ? '#5a5d63' : rb.m === 'vereda' ? '#d9d2c2' : '#b0905f';
+      ctx.lineWidth = Math.max(1, (rb.w / this.size) * px * 1.6);
+      ctx.beginPath(); rb.pts.forEach(([x, z], k) => (k ? ctx.lineTo(toM(x), toM(z)) : ctx.moveTo(toM(x), toM(z)))); ctx.stroke();
+    }
+    for (const p of this.placed) {
+      if (['farol', 'cerca', 'auto', 'caja3', 'barriles', 'fogon', 'campo', 'tractor', 'puesto', 'carpa', 'pasarela', 'muelle', 'malecon', 'puente', 'montanaRusa', 'rueda', 'poste', 'cables', 'indicador', 'torreTeleferico', 'banco', 'tacho', 'hidrante', 'buzon', 'cartel', 'cantero', 'seto', 'jardin'].includes(p.name)) continue;
+      const f = p.fp;
+      ctx.fillStyle = 'rgba(70,45,35,.85)';
+      ctx.fillRect(toM(f.x0), toM(f.z0), Math.max(1.5, toM(f.x1) - toM(f.x0)), Math.max(1.5, toM(f.z1) - toM(f.z0)));
     }
     return cv;
   }
 }
 
+// Agua con olitas (normales animadas) y, en el mar, color según profundidad y espuma en la orilla.
+function aguaShader(mat, { time, htex, half = 0, cell = 1, N = 1, mar }) {
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uTime = time;
+    if (mar) { sh.uniforms.uHeight = { value: htex }; sh.uniforms.uHalf = { value: half }; sh.uniforms.uCell = { value: cell }; sh.uniforms.uN = { value: N }; }
+    sh.vertexShader = 'varying vec3 vAgW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vAgW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    let head = 'varying vec3 vAgW;\nuniform float uTime;\n';
+    if (mar) head += 'uniform sampler2D uHeight; uniform float uHalf, uCell, uN;\n';
+    let col = '';
+    if (mar) col = `
+      vec2 wuv = ((vAgW.xz + uHalf) / uCell + 0.5) / uN;
+      float inside = step(0.0, wuv.x) * step(wuv.x, 1.0) * step(0.0, wuv.y) * step(wuv.y, 1.0);
+      vec4 hs = texture2D(uHeight, clamp(wuv, 0.0, 1.0));
+      float depth = mix(20.0, hs.r * 24.0 - 4.0, inside);
+      float swampW = hs.g * inside;
+      vec3 deep = vec3(0.012, 0.16, 0.42), shallow = vec3(0.07, 0.55, 0.62), murky = vec3(0.12, 0.2, 0.07);
+      vec3 wc = mix(shallow, deep, smoothstep(0.2, 10.0, depth));
+      wc = mix(wc, murky, swampW * 0.7);
+      float fN = sin(vAgW.x * 0.9 + uTime * 1.7) * sin(vAgW.z * 0.8 - uTime * 1.3) * 0.5 + 0.5;
+      float edge = 1.0 - smoothstep(0.0, 0.3 + 0.18 * sin(uTime * 0.9 + vAgW.x * 0.07 + vAgW.z * 0.05), depth);
+      float foam = clamp(edge * (0.6 + 0.4 * fN), 0.0, 1.0) * (1.0 - swampW);
+      diffuseColor.rgb = mix(wc, vec3(0.92, 0.96, 1.0), foam * 0.85);
+      diffuseColor.a = clamp(mix(0.6, 0.92, smoothstep(0.0, 6.0, depth)) + foam * 0.35, 0.0, 1.0);`;
+    sh.fragmentShader = head + sh.fragmentShader
+      .replace('#include <color_fragment>', '#include <color_fragment>' + col)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      {
+        vec2 p = vAgW.xz; float t = uTime;
+        float fade = 1.0 - smoothstep(50.0, 400.0, length(vViewPosition));
+        vec2 g = vec2(0.0);
+        g += vec2(0.31, 0.12) * cos(dot(p, vec2(0.31, 0.12)) + t * 1.5) * 0.32;
+        g += vec2(-0.11, 0.38) * cos(dot(p, vec2(-0.11, 0.38)) + t * 1.8) * 0.26;
+        g += (vec2(0.95, 0.62) * cos(dot(p, vec2(0.95, 0.62)) - t * 2.6) * 0.06 + vec2(-0.7, 1.15) * cos(dot(p, vec2(-0.7, 1.15)) + t * 3.0) * 0.05) * fade;
+        vec3 nW = normalize(vec3(-g.x, 1.0, -g.y));
+        normal = normalize((viewMatrix * vec4(nW, 0.0)).xyz);
+      }`);
+  };
+}
+
+const COL = {
+  sand: new THREE.Color('#e8d39a'), grass: new THREE.Color('#6cbf4b'), grass2: new THREE.Color('#58a83f'),
+  rock: new THREE.Color('#8a8576'), rock2: new THREE.Color('#6f6c66'), snow: new THREE.Color('#f2f6fa'), snowsh: new THREE.Color('#cddbeb'), seabed: new THREE.Color('#c9b98a'),
+  mud: new THREE.Color('#6f7a3e'), desert: new THREE.Color('#e3c78f'), desert2: new THREE.Color('#d6ae72'),
+  redrock: new THREE.Color('#b8603f'), redrock2: new THREE.Color('#9c4e34'), alpine: new THREE.Color('#7f9f58'), dirt: new THREE.Color('#9c8458'),
+};
+
+function bump(x, z, cx, cz, r) {
+  const d = Math.hypot(x - cx, z - cz) / r;
+  return d >= 1 ? 0 : (1 - d * d) ** 2;
+}
+
 function smoothstep(a, b, x) {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
+}
+
+// Reparte puntos cada `step` metros a lo largo de una polilínea.
+function resample(pts, step) {
+  const out = [pts[0]];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
+    const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(L / step));
+    for (let k = 1; k <= n; k++) out.push([ax + ((bx - ax) * k) / n, az + ((bz - az) * k) / n]);
+  }
+  return out;
+}
+
+// Curva suave (Catmull-Rom) por los puntos de control, remuestreada cada `step` metros.
+function catmull(pts, step) {
+  const dense = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    for (let k = 0; k < 16; k++) {
+      const t = k / 16, t2 = t * t, t3 = t2 * t;
+      const f = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+      dense.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]);
+    }
+  }
+  dense.push(pts[pts.length - 1]);
+  return resample(dense, 0.5).filter((_, k, arr) => k % Math.round(step / 0.5) === 0 || k === arr.length - 1);
 }
 
 function mergeCones(defs) {
