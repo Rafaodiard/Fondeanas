@@ -14,7 +14,7 @@
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- Ropa, cabeza, rig y export del héroe
+- Ropa, cabeza y texturas de cara del héroe
 - Clips del héroe
 - Servidor y datos compartidos
 - Recargas de armas
@@ -24,8 +24,8 @@
 - Mundo e isla
 - Cliente: escena y estado
 - Materiales del héroe
-- Animación base y export
-- Malla del juego del héroe
+- Rig y animación base del héroe
+- Malla del juego y export (héroe y armas)
 - Cliente: bucle y controles
 - Cliente: red y mensajes
 - Planos de estructuras
@@ -75,7 +75,7 @@
 
 ## Communities (32 total, 2 thin omitted)
 
-### Community 0 - "Ropa, cabeza, rig y export del héroe"
+### Community 0 - "Ropa, cabeza y texturas de cara del héroe"
 Cohesion: 0.07
 Nodes (42): antiparras(), _az(), bufanda(), hairline(), pelo(), height(), strands(), xw() (+34 more)
 
@@ -115,11 +115,11 @@ Nodes (35): btns, camera, camRay, camTarget, canvas, CAUSES, _cd, clock (+27 mor
 Cohesion: 0.24
 Nodes (15): bufanda(), _c(), chaleco(), correa(), cuero(), G, lisa(), ojos() (+7 more)
 
-### Community 10 - "Animación base y export"
+### Community 10 - "Rig y animación base del héroe"
 Cohesion: 0.12
 Nodes (11): Pose, rec(), q_eje(), rad(), bm_rigid_head(), cuerpo_pesos(), reglas(), _sel() (+3 more)
 
-### Community 11 - "Malla del juego del héroe"
+### Community 11 - "Malla del juego y export (héroe y armas)"
 Cohesion: 0.10
 Nodes (32): exportar_armas(), exportar_clips(), pistas_piezas(), reposo_piezas(), _seleccion(), _ver_colecciones(), _fcurves(), coleccion_low() (+24 more)
 
@@ -203,7 +203,7 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `World` connect `Mundo e isla` to `Servidor y datos compartidos`, `Cliente: escena y estado`, `Cliente: red y mensajes`, `Datos de la isla y estructuras`, `Terreno y armado del mapa`, `Colisión y sólidos`, `Pruebas del mapa`?**
   _High betweenness centrality (0.053) - this node is a cross-community bridge._
-- **Should `Ropa, cabeza, rig y export del héroe` be split into smaller, more focused modules?**
+- **Should `Ropa, cabeza y texturas de cara del héroe` be split into smaller, more focused modules?**
   _Cohesion score 0.06836055656382335 - nodes in this community are weakly interconnected._
 - **Why does `Plano` connect `Planos de estructuras` to `Mundo e isla`, `Datos de la isla y estructuras`, `Planos: casas y muebles`, `Planos: piezas básicas`, `Planos: muelle y galpón`, `Planos: jardín y locales`?**
   _High betweenness centrality (0.051) - this node is a cross-community bridge._
