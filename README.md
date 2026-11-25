@@ -42,7 +42,7 @@ Para recorrer la isla sin jugar, con el servidor levantado abrí http://localhos
 
 - **Bus volador, caída libre y planeador.**
 - **Loot** en el piso y en **cofres**, con cinco rarezas (común, poco común, rara, épica y legendaria) que suben el daño y bajan el tiempo de recarga.
-- **Armas:** pistola, subfusil, rifle de asalto, escopeta, francotirador con mira y lanzacohetes con daño en área. Cada una usa su tipo de munición.
+- **Armas:** pistola, subfusil, rifle de asalto, escopeta, francotirador con mira y lanzacohetes con daño en área. Cada una usa su tipo de munición. Cada arma tiene su propio retroceso al disparar (sube, patea y se corre hacia atrás) y sus recargas animadas, revisadas para que el arma no atraviese el cuerpo.
 - **Inventario** con 5 slots y el pico fijo.
 - **Pico:** saca madera de los árboles, piedra de las rocas y metal de las paredes de los edificios. Los árboles y las rocas se rompen.
 - **Construcción:** paredes, pisos y rampas en una grilla de 4 m, en madera, piedra o metal, con vida propia. Se pueden romper a tiros o con el pico.
@@ -82,9 +82,9 @@ Para recorrer la isla sin jugar, con el servidor levantado abrí http://localhos
 - `public/models/*.glb`: modelos 3D hechos en Blender (personaje, bus volador, planeador, armas y pico, pino, árbol, roca, cofre y objetos del piso). El color de la ropa y de las rarezas se tiñe en el juego.
 - `public/js/assets.js`: carga los GLB. Si alguno no carga, el juego usa los modelos procedurales de `models.js`.
 - `public/js/models.js`: arma los personajes, el bus, el planeador, las armas y los objetos del piso a partir de los GLB. Si un GLB no carga, usa modelos low-poly hechos con primitivas como respaldo.
-- `public/js/rig.js`: anima el personaje con su esqueleto (capas de piernas y torso, mezcla de locomoción, poses de armas, recargas y bombeo).
+- `public/js/rig.js`: anima el personaje con su esqueleto (capas de piernas y torso, mezcla de locomoción, poses de armas, recargas, bombeo y retroceso por arma).
 - `public/visor.html`: visor del personaje para revisar sus animaciones (`/visor.html`).
-- `tools/blender/`: scripts de Blender que generan el personaje (`heroe_*.py`), las armas (`armas_*.py`) y sus animaciones. `tools/texturas/`: máscaras de la cara y el tatuaje.
+- `tools/blender/`: scripts de Blender que generan el personaje (`heroe_*.py`), las armas (`armas_*.py`) y sus animaciones. `recargas_control.py` y `armas_choque.py` revisan las animaciones sin renderizar (brazos, saltos entre cuadros y cuánto se mete el arma en el cuerpo). `tools/texturas/`: máscaras de la cara y el tatuaje.
 - `Vault/`: vault de Obsidian que documenta el proyecto (empezar por `Vault/Inicio.md`) y grafo del código generado con graphify en `Vault/graphify-out`.
 - `public/js/main.js`: el juego en sí (cámara en tercera persona, física, disparo, HUD, minimapa, red).
 

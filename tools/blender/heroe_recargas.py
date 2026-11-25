@@ -241,6 +241,14 @@ PECHO_L = V(0.10, -0.17, 1.30)           # bolsillo del chaleco
 ESPALDA_L = V(0.13, 0.17, 1.62)          # por encima del hombro izquierdo (cohetes a la espalda)
 
 
+def vuelta(base, **extra):
+    # clave de regreso a la pose del juego (ARMAS[base]): arma, giro e inclinación del torso, cabeza y polos
+    G, d, u, tipo, pR, pL, cab, col, hR = ARMAS[base]
+    k = dict(G=G, d=d, u=u, giro=col[0], incl=col[1], cab=cab, hR=hR, poloR=pR, poloL=pL)
+    k.update(extra)
+    return k
+
+
 def a_arma(G, d, u, P):
     # punto del personaje al espacio de un arma puesta en (G, d, u)
     return marco(G, d, u).inverted() @ Vector(P)
@@ -278,26 +286,29 @@ def poner_sueltas(claves, tabla, lado='L'):
 # Rifle y subfusil: suelta el cargador (cae), saca otro del cinturón, lo calza con un golpe y tira de la manija.
 # Diseñado en 53 cuadros (2,2 s); otras duraciones escalan las claves.
 def recarga_cargador(nombre, arma, T, piv_carg, salida, ag_carg, piv_cerr, ag_man, tirar, previa, alto=1.25,
-                     G2=V(-0.05, -0.31, 1.23)):
-    # G2: dónde queda el arma mientras se tira de la manija (lejos del pecho para que la mano no se meta en el chaleco)
+                     G1=None, d1=V(0.766, -0.643, 0.02), rol1=-30.0, giro1=-32.0, incl1=9.0,
+                     G2=V(-0.16, -0.36, 1.22), d2=V(0.643, -0.766, 0.02), rol2=-12.0, giro2=-28.0, incl2=5.0):
+    # G1/d1/rol1: el arma mientras se cambia el cargador (rol1 = giro sobre el cañón, para mostrar el pozo del
+    # cargador a la mano izquierda); G2/d2/rol2: mientras se tira de la manija (lejos del pecho para que la mano
+    # no se meta en el chaleco). giro/incl: torso en cada tramo.
+    # El arma cruza el pecho con el cañón 50° a la izquierda y el puño a la derecha: así la culata queda afuera del
+    # costado derecho (con el arma de frente, la culata se metía hasta 18 cm en el chaleco).
     k = T / 53.0
     G0, d0, u0 = ARMAS['Rifle'][:3]
-    G1 = V(0.0, -0.23, alto)
-    d1 = V(0.32, -1, 0.02)
-    u1 = girar(V(0, 0, 1), d1, -30)
-    d2 = V(0.15, -1, 0.02)
-    u2 = girar(V(0, 0, 1), d2, -12)
+    G1 = V(-0.16, -0.28, alto) if G1 is None else Vector(G1)
+    u1 = girar(V(0, 0, 1), d1, rol1)
+    u2 = girar(V(0, 0, 1), d2, rol2)
     claves = {
         0: dict(),
-        6: dict(G=G1, d=d1, u=u1, giro=-20.0, incl=9.0, cab=(20.0, 10.0, 0.0), poloL=V(0.7, 0.2, -1.0)),
+        6: dict(G=G1, d=d1, u=u1, giro=giro1, incl=incl1, cab=(20.0, 10.0, 0.0), poloL=V(0.7, 0.2, -1.0)),
         10: dict(G=G1 + V(0, 0, -0.012)),
         13: dict(G=G1),
-        29: dict(G=G1, d=d1, u=u1, giro=-20.0, incl=9.0, cab=(20.0, 10.0, 0.0)),
+        29: dict(G=G1, d=d1, u=u1, giro=giro1, incl=incl1, cab=(20.0, 10.0, 0.0)),
         31: dict(G=G1 + V(0, 0, 0.018)),
-        34: dict(G=G2, d=d2, u=u2, giro=-14.0, incl=5.0, cab=(10.0, 2.0, 0.0), poloL=V(0.9, -0.2, -0.6)),
+        34: dict(G=G2, d=d2, u=u2, giro=giro2, incl=incl2, cab=(10.0, 2.0, 0.0), poloL=V(0.9, -0.2, -0.6)),
         40: dict(G=G2 + V(0.0, 0.012, 0.0)),
         43: dict(G=G2),
-        48: dict(G=G0, d=d0, u=u0, giro=-18.0, incl=3.0, cab=(3.0, 0.0, 0.0), poloL=V(0.4, 0.0, -1.0)),
+        48: vuelta('Rifle'),
         53: dict(),
     }
     # pesos de la mano izquierda: a = guardamanos, x = suelta (objetivo propio), c = cargador, m = manija
@@ -355,35 +366,34 @@ def recarga_rifle(**kw):
         (0, -0.055, 0), (V(-0.07, -0.02, 0.17), V(0.6, -0.2, -0.6), V(-0.3, -0.8, 0.4)), **kw)
 
 
-def recarga_subfusil():
+def recarga_subfusil(**kw):
     # manija al costado izquierdo, adelante: la mano la pellizca desde afuera y la tira hacia atrás
     return recarga_cargador(
         'RecargaSubfusil', 'subfusil', 48, (0, 0.097, -0.01), (0, 0.0, -0.115),
         Agarre(V(0, 0.0, -0.085), rot_agarre('L', V(1, 0.35, 0), V(0, 0, 1)), OFF_PUNO),
         (-0.031, 0.165, 0.080), Agarre(V(-0.018, 0.004, 0.0), rot_mano(V(0.15, 1, -0.35), V(-1, 0, 0.1)), OFF_PUNO),
-        (0, -0.045, 0), (V(-0.10, 0.21, 0.10), V(0.15, 1, -0.35), V(-1, 0, 0.1)), alto=1.27)
+        (0, -0.045, 0), (V(-0.10, 0.21, 0.10), V(0.15, 1, -0.35), V(-1, 0, 0.1)), **kw)
 
 
 # ---------------------------------------------------------------------------
 # Pistola (31 cuadros, 1,3 s): el cargador cae solo, la izquierda trae otro, lo calza, y monta la corredera.
-def recarga_pistola():
+def recarga_pistola(G1=V(-0.02, -0.29, 1.27), d1=V(0.22, -1, 0.30), rol1=-25.0, giro1=-6.0, incl1=11.0,
+                    G2=V(-0.05, -0.31, 1.20), d2=V(0.12, -1, 0.15), rol2=18.0, giro2=-8.0, incl2=10.0):
+    # la pistola 4 cm más adelante que antes y el torso inclinado: la cola de la corredera ya no toca el chaleco
     T = 31
     G0, d0, u0 = ARMAS['Pistola'][:3]
-    G1 = V(-0.01, -0.25, 1.25)
-    d1 = V(0.22, -1, 0.30)
-    u1 = girar(V(0, 0.2, 1), d1, -25)
-    G2 = V(-0.03, -0.27, 1.20)
-    d2 = V(0.12, -1, 0.15)
-    u2 = girar(V(0, 0.1, 1), d2, 18)
+    G1, G2 = Vector(G1), Vector(G2)
+    u1 = girar(V(0, 0.2, 1), d1, rol1)
+    u2 = girar(V(0, 0.1, 1), d2, rol2)
     claves = {
         0: dict(),
-        4: dict(G=G1, d=d1, u=u1, giro=-6.0, incl=6.0, cab=(16.0, 6.0, 0.0), poloL=V(0.8, 0.3, -1.0)),
+        4: dict(G=G1, d=d1, u=u1, giro=giro1, incl=incl1, cab=(16.0, 6.0, 0.0), poloL=V(0.8, 0.3, -1.0)),
         19: dict(G=G1, d=d1, u=u1),
         21: dict(G=G1 + V(0, 0, 0.015)),
-        24: dict(G=G2, d=d2, u=u2, giro=-8.0, incl=5.0, cab=(10.0, 2.0, 0.0), poloL=V(0.9, 0.0, -0.8)),
+        24: dict(G=G2, d=d2, u=u2, giro=giro2, incl=incl2, cab=(10.0, 2.0, 0.0), poloL=V(0.9, 0.0, -0.8)),
         26: dict(G=G2 + V(0, 0.012, -0.004)),
         28: dict(G=G2),
-        31: dict(G=G0, d=d0, u=u0, giro=0.0, incl=3.0, cab=(4.0, 0.0, 0.0), poloL=V(0.6, 0.3, -1.0)),
+        31: vuelta('Pistola'),
     }
     # pesos de la izquierda: p = envolviendo la mano derecha, x = suelta, c = cargador, s = corredera
     poner_pesos(claves, {0: (1, 0, 0, 0), 2: (0.4, 0.6, 0, 0), 8: (0, 1, 0, 0), 9: (0, 0, 1, 0), 18: (0, 0, 1, 0),
@@ -433,21 +443,21 @@ def recarga_pistola():
 
 # ---------------------------------------------------------------------------
 # Escopeta (62 cuadros, 2,6 s): la gira de costado, mete cuatro cartuchos de a uno desde el portacartuchos y bombea.
-def recarga_escopeta():
+def recarga_escopeta(G1=V(-0.13, -0.30, 1.20), d1=V(0.766, -0.643, 0.06), rol1=-55.0, giro1=-32.0, incl1=9.0):
+    # como el rifle: cruzada al pecho con el cañón 50° a la izquierda para que la culata quede afuera del costado
     T = 66
     G0, d0, u0 = ARMAS['Rifle'][:3]
-    G1 = V(-0.01, -0.25, 1.22)
-    d1 = V(0.35, -1, 0.06)
-    u1 = girar(V(0, 0, 1), d1, -55)
+    G1 = Vector(G1)
+    u1 = girar(V(0, 0, 1), d1, rol1)
     claves = {
         0: dict(),
-        6: dict(G=G1, d=d1, u=u1, giro=-18.0, incl=9.0, cab=(18.0, 8.0, 0.0), poloL=V(0.8, 0.2, -0.8)),
-        54: dict(G=G1, d=d1, u=u1, giro=-18.0, incl=9.0, cab=(18.0, 8.0, 0.0)),
-        59: dict(G=G0 + V(0.0, -0.02, 0.03), d=d0, u=u0, giro=-18.0, incl=4.0, cab=(6.0, 2.0, 0.0),
+        6: dict(G=G1, d=d1, u=u1, giro=giro1, incl=incl1, cab=(18.0, 8.0, 0.0), poloL=V(0.8, 0.2, -0.8)),
+        54: dict(G=G1, d=d1, u=u1, giro=giro1, incl=incl1, cab=(18.0, 8.0, 0.0)),
+        59: dict(G=G0 + V(0.0, -0.02, 0.03), d=d0, u=u0, giro=ARMAS['Rifle'][7][0], incl=4.0, cab=(6.0, 2.0, 0.0),
                  poloL=V(0.4, 0.0, -1.0)),
         61: dict(G=G0 + V(0.0, -0.01, 0.03)),
         63: dict(G=G0 + V(0.0, -0.02, 0.03)),
-        66: dict(G=G0, d=d0, u=u0, giro=-18.0, incl=3.0, cab=(3.0, 0.0, 0.0)),
+        66: vuelta('Rifle'),
     }
     pesos_t = {0: (1, 0, 0, 0), 4: (0.2, 0.8, 0, 0)}
     sueltas = {4: (V(-0.06, 0.10, 0.0), V(0.3, 0.6, -0.6), V(-1, 0, 0.2), (25.0, 12.0, 6.0))}
@@ -503,7 +513,8 @@ def bombeo_escopeta(apunta=False):
     base = 'RifleApunta' if apunta else 'Rifle'
     G0, d0, u0 = ARMAS[base][:3]
     dz = girar(Vector(d0), Vector(d0).cross(Vector(u0)), 5)
-    claves = {0: dict(wm=1.0), 2: dict(G=Vector(G0) + V(0, 0.02, 0.01), d=dz), 6: dict(G=Vector(G0) + V(0, 0.015, 0.0)),
+    atras = 0.008 if apunta else 0.02     # apuntando, la culata ya está contra el hombro: casi no puede ir atrás
+    claves = {0: dict(wm=1.0), 2: dict(G=Vector(G0) + V(0, atras, 0.01), d=dz), 6: dict(G=Vector(G0) + V(0, atras * 0.75, 0.0)),
               10: dict(G=G0, d=d0), 14: dict()}
     bomba = Pieza(V(0, 0.28, 0.030), {0: dict(), 3: dict(), 6: dict(dp=(0, -0.075, 0)), 7: dict(dp=(0, -0.075, 0)),
                                        10: dict(dp=(0, 0, 0))})
@@ -519,17 +530,17 @@ def bombeo_escopeta(apunta=False):
 # ---------------------------------------------------------------------------
 # Francotirador (58 cuadros, 2,4 s): la derecha abre el cerrojo, saca una bala del chaleco, la mete y cierra.
 # La izquierda sostiene el arma por el guardamanos todo el tiempo.
-def recarga_francotirador():
+def recarga_francotirador(G1=V(-0.10, -0.32, 1.22), d1=V(0.530, -0.848, 0.05), rol1=22.0, giro1=-28.0, incl1=7.0):
+    # el arma adelante y con el cañón 32° a la izquierda: la culata pasa por afuera del costado derecho
     T = 58
     G0, d0, u0 = ARMAS['Rifle'][:3]
-    G1 = V(-0.07, -0.26, 1.22)
-    d1 = V(0.18, -1, 0.05)
-    u1 = girar(V(0, 0, 1), d1, 22)
+    G1 = Vector(G1)
+    u1 = girar(V(0, 0, 1), d1, rol1)
     claves = {
         0: dict(),
-        6: dict(G=G1, d=d1, u=u1, giro=-12.0, incl=7.0, cab=(16.0, 4.0, 0.0), poloR=V(-1.0, 0.3, -0.5)),
-        50: dict(G=G1, d=d1, u=u1, giro=-12.0, incl=7.0, cab=(16.0, 4.0, 0.0)),
-        56: dict(G=G0, d=d0, u=u0, giro=-18.0, incl=3.0, cab=(3.0, 0.0, 0.0), poloR=V(-0.8, 0.4, -0.6)),
+        6: dict(G=G1, d=d1, u=u1, giro=giro1, incl=incl1, cab=(16.0, 4.0, 0.0), poloR=V(-1.0, 0.3, -0.5)),
+        50: dict(G=G1, d=d1, u=u1, giro=giro1, incl=incl1, cab=(16.0, 4.0, 0.0)),
+        56: vuelta('Rifle'),
         58: dict(),
     }
     # pesos de la derecha: e = empuñadura, x = suelta, c = cerrojo, b = bala
@@ -588,27 +599,33 @@ ANIMA_FRANCO = 0.068
 # ---------------------------------------------------------------------------
 # Lanzacohetes (67 cuadros, 2,8 s): lo baja del hombro y lo para, saca un cohete de la espalda por encima del
 # hombro izquierdo, lo mete por la boca hasta el fondo y lo vuelve a subir al hombro.
-def recarga_lanzacohetes(G1=V(-0.08, -0.26, 1.12), d1=V(0.47, -0.06, 0.88), giro=-22.0, poloR=V(-1.0, 0.4, -0.2),
-                         giro2=-12.0, agarra=57, arriba=V(0.28, -0.02, 1.75), f_arriba=11):
-    # G1/d1: el lanzacohetes parado durante la carga (empuñadura y dirección del tubo, espacio del personaje). La
-    # empuñadura queda a la derecha y adelante para que el brazo derecho no cruce el pecho; el tubo se inclina a la
-    # izquierda para que la boca quede al alcance de la mano izquierda. 'arriba': por dónde pasa la mano izquierda
-    # camino a la espalda; 'agarra': cuadro en que vuelve a tomar la empuñadura delantera.
+def recarga_lanzacohetes(G1=V(-0.21, -0.30, 1.16), d1=V(0.70, 0.05, 0.70), u1=V(0.1, -1, 0.0), giro=-22.0, incl1=-2.0,
+                         poloR=V(-1.0, 0.4, -0.2), giro2=-12.0, agarra=57, arriba=V(0.28, -0.02, 1.75), f_arriba=11,
+                         despega=V(0, 0, 0.03), f_despega=(3, 55)):
+    # G1/d1/u1: el lanzacohetes parado durante la carga (empuñadura, dirección del tubo y "arriba" del arma, espacio
+    # del personaje). La empuñadura queda a la derecha y adelante, con el tubo por delante de la mano (u1 hacia
+    # adelante) y cruzado 45° hacia el hombro izquierdo: así el tubo no toca el pecho y la boca queda al alcance de
+    # la mano izquierda. 'arriba': por dónde pasa la mano izquierda camino a la espalda; 'agarra': cuadro en que
+    # vuelve a tomar la empuñadura delantera.
     T = 67
     G0, d0, u0 = ARMAS['Lanzacohetes'][:3]
     Tz = 0.120
-    u1 = V(-0.2, 1, 0.1)
     claves = {
         0: dict(),
-        10: dict(G=G1, d=d1, u=u1, giro=giro, incl=-2.0, cab=(-14.0, 8.0, 0.0), hR=0.0, poloL=V(0.6, 0.6, -0.6),
+        10: dict(G=G1, d=d1, u=u1, giro=giro, incl=incl1, cab=(-14.0, 8.0, 0.0), hR=0.0, poloL=V(0.6, 0.6, -0.6),
                  poloR=poloR),
         32: dict(G=G1 + V(0, 0, 0.01)),
-        42: dict(G=G1 + V(0, 0, -0.02), d=d1, u=u1, giro=giro, incl=0.0, cab=(-10.0, 8.0, 0.0)),
+        42: dict(G=G1 + V(0, 0, -0.02), d=d1, u=u1, giro=giro, incl=incl1 + 2.0, cab=(-10.0, 8.0, 0.0)),
         46: dict(G=G1),
         58: dict(G=G0, d=d0, u=u0, giro=giro2, incl=3.0, cab=(7.0, -3.0, 6.0), hR=5.0, poloL=V(0.4, 0.1, -1.0),
                  poloR=V(-0.9, 0.3, -0.5)),
         67: dict(),
     }
+    if despega is not None:
+        # al sacarlo del hombro y al volver a apoyarlo, el tubo sube un poco: si bajara derecho, la cola se hundiría en
+        # el hombro en los cuadros de transición
+        for f in f_despega:
+            claves[f] = dict(G=G0 + despega)
     poner_pesos(claves, {0: (1, 0, 0), 4: (0.3, 0.7, 0), 15: (0, 1, 0), 17: (0, 0, 1), 42: (0, 0, 1), 44: (0, 1, 0),
                          52: (0, 1, 0), agarra: (1, 0, 0)}, ('wa', 'wx', 'wc'))
     espalda = a_arma(G1, d1, u1, ESPALDA_L)

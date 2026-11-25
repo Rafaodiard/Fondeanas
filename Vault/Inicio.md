@@ -4,7 +4,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 
 - Repo: https://github.com/Rafaodiard/Fondeanas
 - Stack: Node (`server.js` con `ws`) + Three.js 0.170 como ES modules sin bundler. `npm start` levanta todo en el puerto 3000 (`PORT` lo cambia).
-- Vault actualizado con el mapa nuevo (rama `claude/project-thread-vbeczu`, 2026-11-25), sobre el commit `97f62a5` de `main`.
+- Vault actualizado con el mapa nuevo (rama `claude/project-thread-vbeczu`, 2026-11-25), sobre el commit `0578969` de `main`.
 
 ## Cómo está armado
 
