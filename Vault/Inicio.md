@@ -6,6 +6,10 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 - Stack: Node (`server.js` con `ws`) + Three.js 0.170 como ES modules sin bundler. `npm start` levanta todo en el puerto 3000 (`PORT` lo cambia).
 - Vault actualizado con los autos manejables (rama `claude/project-thread-pnmtbf`, 2026-11-26), además de la construcción estilo battle royale, el cofre y los objetos del piso modelados, y la caída libre, el paracaídas y deslizarse. El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
 
+## Planes
+
+- [[Cuentas, lobby, casino y tienda]]: login, lobby, pavos, casino y tienda de skins (sin implementar).
+
 ## Cómo está armado
 
 - [[Arquitectura]]: quién decide qué (cliente vs. servidor) y cómo se conectan las piezas.
