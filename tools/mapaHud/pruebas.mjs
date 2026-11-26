@@ -148,6 +148,23 @@ try {
   ok(mini.colores > 25, `el minimapa muestra la isla (${mini.colores} colores distintos)`);
   ok(mini.amarillo > 0, 'en el centro del minimapa está la flecha del jugador');
   ok(mini.brujula, 'la brújula se ve a pie');
+  // marcar mirando al piso (tecla de marcar sin el mapa); antes de lo demás, que la tormenta no espera
+  ok((await page.evaluate(() => window.__game.me.state)) === 'ground', 'el jugador sigue vivo y parado');
+  await page.evaluate(() => { const g = window.__game; g.me.pitch = -0.55; g.me.yaw = 0.3; });
+  await espera(1800);
+  const ping = await page.evaluate(() => {
+    const g = window.__game, hizo = g.mapa.marcar();
+    const m = [...g.mapa.marcas.values()][0];
+    return { hizo, d: m ? Math.hypot(m.x - g.me.pos.x, m.z - g.me.pos.z) : -1, y: m?.y, suelo: m ? g.world.groundHeight(m.x, m.z, m.y + 1) : 0 };
+  });
+  ok(ping.hizo && ping.d > 1 && ping.d < 60 && Math.abs(ping.y - ping.suelo) < 1.5, `marcar mirando al piso pone la marca ahí (a ${ping.d.toFixed(1)} m, altura ${ping.y?.toFixed(1)} sobre suelo ${ping.suelo.toFixed(1)})`);
+  await espera(1500);
+  const et = await page.evaluate(() => { const e = document.querySelector('.marca-et'); return e ? { texto: e.innerText.replace(/\s+/g, ' ').trim(), r: e.querySelector('.mc').getBoundingClientRect().toJSON() } : null; });
+  ok(et && /\d+ m/.test(et.texto) && et.r.top > 0 && et.r.bottom < 720, `etiqueta con la distancia en pantalla ("${et?.texto}")`);
+  await page.evaluate(() => window.__game.mapa.marcar());
+  await espera(300);
+  ok((await page.evaluate(() => window.__game.mapa.marcas.size)) === 0, 'marcar otra vez el mismo lugar la saca');
+  await page.evaluate(() => { window.__game.me.pitch = -0.15; window.__game.me.yaw = 0; });
   if (CAPTURAS) {
     await page.evaluate(() => window.__game.mapa.marcarEn(window.__game.me.pos.x + 60, window.__game.me.pos.z - 70));
     await espera(2500);
@@ -227,22 +244,6 @@ try {
   await page.keyboard.press('KeyM'); await espera(300);
   ok(!(await page.evaluate(() => window.__game.mapa.abierto)), 'M lo abre y lo vuelve a cerrar');
 
-  // marcar mirando al piso (tecla de marcar sin el mapa)
-  ok((await page.evaluate(() => window.__game.me.state)) === 'ground', 'el jugador sigue vivo y parado');
-  await page.evaluate(() => { const g = window.__game; g.me.pitch = -0.55; g.me.yaw = 0.3; });
-  await espera(1800);
-  const ping = await page.evaluate(() => {
-    const g = window.__game, hizo = g.mapa.marcar();
-    const m = [...g.mapa.marcas.values()][0];
-    return { hizo, d: m ? Math.hypot(m.x - g.me.pos.x, m.z - g.me.pos.z) : -1, y: m?.y, suelo: m ? g.world.groundHeight(m.x, m.z, m.y + 1) : 0 };
-  });
-  ok(ping.hizo && ping.d > 1 && ping.d < 60 && Math.abs(ping.y - ping.suelo) < 1.5, `marcar mirando al piso pone la marca ahí (a ${ping.d.toFixed(1)} m, altura ${ping.y?.toFixed(1)} sobre suelo ${ping.suelo.toFixed(1)})`);
-  await espera(1500);
-  const et = await page.evaluate(() => { const e = document.querySelector('.marca-et'); return e ? { texto: e.innerText.replace(/\s+/g, ' ').trim(), r: e.querySelector('.mc').getBoundingClientRect().toJSON() } : null; });
-  ok(et && /\d+ m/.test(et.texto) && et.r.top > 0 && et.r.bottom < 720, `etiqueta con la distancia en pantalla ("${et?.texto}")`);
-  await page.evaluate(() => window.__game.mapa.marcar());
-  await espera(300);
-  ok((await page.evaluate(() => window.__game.mapa.marcas.size)) === 0, 'marcar otra vez el mismo lugar la saca');
   ok(errores.length === 0, `sin errores en la página${errores.length ? ': ' + errores.join(' | ') : ''}`);
 } finally {
   await browser.close();
