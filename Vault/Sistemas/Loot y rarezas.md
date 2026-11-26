@@ -7,4 +7,5 @@ Volver a [[Inicio]] · datos en [[items.js]], reparto en [[server.js]]
 - **Cofres**: al abrirlos (`chest`, a menos de `PICKUP_RANGE + 1`) dan un arma con munición, un consumible, 30 de madera y a veces munición extra. Pesos de rareza en cofre: 10/30/34/19/7.
 - **Inventario**: 5 slots más el pico. Si está lleno y agarrás un arma, se cambia por la del slot elegido.
 - **Tirar** (`drop`): deja el objeto del slot en el piso.
+- **Cómo se ve** ([[loot.js]]): cada objeto flota y gira despacio sobre un anillo del color del objeto (la rareza en las armas). Las armas suman un haz de luz que mira siempre a la cámara, más alto y ancho cuanto más rara, y chispas que suben (4 + 4 por nivel de rareza). Los cofres cerrados tienen aura dorada que late y motas; al abrirse la tapa salta con rebote, hay un destello y una ráfaga de chispas, el fondo brilla y se apaga, y lo que sale del cofre vuela en arco desde el cofre hasta donde lo puso el servidor. Modelos: [[Pipeline del loot]]. Vitrina: [[loot.html]].
 - Las armas tienen rarezas permitidas: el francotirador y el lanzacohetes solo salen de rara para arriba; la pistola no sale legendaria.

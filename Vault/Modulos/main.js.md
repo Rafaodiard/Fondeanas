@@ -13,7 +13,7 @@ Archivo: `public/js/main.js`. Es el juego en el cliente; lo carga [[index.html]]
 - Combate: `tryShoot` (raycasts contra jugadores, estructuras y terreno), `trySwing` (pico), `startReload`, retícula y mira (`updateCrosshair`), efectos (`addTracer`, `addRocket`, `explosionFx`, `sparks`, `addDmgNum`).
 - Estructuras del mapa: `castRay` sabe qué pieza tocó por `userData.triPz` de la malla de choque, el pico y los disparos le mandan el id al servidor, y `pzRota` la saca del mundo y tira escombros de su color (`escombros`). Ver [[Estructuras rompibles]].
 - Construcción: `setBuild`, `buildTarget`, `updateBuild` (fantasma de la pieza). Ver [[Construcción]].
-- Otros jugadores (`updateOthers`), loot del piso (`updateItems`), bus (`updateBus`), tormenta (`updateStorm`), espectador (`startSpectating`).
+- Otros jugadores (`updateOthers`), loot del piso y cofres (`updateItems` llama a `animarLoot` de [[loot.js]]), bus (`updateBus`), tormenta (`updateStorm`), espectador (`startSpectating`).
 - Entrada: todas las teclas pasan por [[controles.js]] (`pulsar` → `accionesDe` → `hacer`), y las opciones (sensibilidad, FOV, calidad, volumen, color de mira, FPS…) se aplican con `aplicarOpciones` / `aplicarVideo`. Esc abre [[configuracion.js]]. Ver [[Configuración y controles]].
 - Bucle principal: `frame()` (también cuenta los FPS).
 
@@ -23,6 +23,6 @@ Archivo: `public/js/main.js`. Es el juego en el cliente; lo carga [[index.html]]
 
 ## Usa
 
-[[world.js]] · [[assets.js]] · [[models.js]] · [[items.js]] · [[audio.js]] · [[rig.js]] (`setRigEnv`) · [[controles.js]] · [[configuracion.js]]
+[[world.js]] · [[assets.js]] · [[models.js]] · [[items.js]] · [[audio.js]] · [[rig.js]] (`setRigEnv`) · [[loot.js]] (`luzLoot`, `animarLoot`, `createChest`, `abrirCofre`) · [[controles.js]] · [[configuracion.js]]
 
 Al arrancar completa `MODEL.clone` y `MODEL.baked` de [[world.js]] con las funciones de [[assets.js]].

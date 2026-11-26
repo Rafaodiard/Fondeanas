@@ -11,9 +11,9 @@ Carpeta `public/models/`. Los carga [[assets.js]]; si alguno falla, [[models.js]
 | `armas.glb` | Seis armas + pico (nodo por arma, piezas móviles como nodos propios) | [[models.js]], [[rig.js]] | `Rareza` |
 | `bus.glb` | Bus volador: nodos `Carroceria`, `Helice_D`, `Helice_I` bajo `Bus` | [[models.js]] | (ninguno; `Baliza` y `Destello` destellan) |
 | `planeador.glb` | Planeador | [[models.js]], [[rig.js]] | `Tela` |
-| `objetos.glb` | Objetos del piso (consumibles, munición, materiales) | [[models.js]] | `Tinte`, `Mat` |
+| `objetos.glb` | Objetos del piso: un nodo `objetos_<nombre>` por objeto (vendas, botiquín, frasco, bidón, `municion_<tipo>` ×5, `material_<material>` ×3) | [[loot.js]] | `Tinte` (franja de la munición y banda del cohete) |
 | `casa.glb` | Casa (vieja) | nadie: ya no se carga, las casas del mapa salen de [[planos.js]] | |
-| `cofre.glb` | Cofre | [[world.js]] | |
+| `cofre.glb` | Cofre: `cofre_cuerpo` y `cofre_tapa` (pivote en la bisagra, abre girando sobre X) | [[loot.js]] | `BrilloCofre` (se clona para apagarlo por cofre) |
 | `pino.glb`, `arbol.glb` | Árboles (instanciados) | [[world.js]] | |
 | `roca.glb` | Roca (instanciada) | [[world.js]] | |
 
@@ -22,7 +22,8 @@ Carpeta `public/models/`. Los carga [[assets.js]]; si alguno falla, [[models.js]
 - `personaje.glb`: `heroe_export.py` → [[Pipeline del héroe]].
 - `armas.glb` y `animaciones_armas.glb`: `armas_export.py` → [[Pipeline de armas]].
 - `bus.glb`: `bus.py` → [[Pipeline del bus]].
-- Planeador, casa, cofre, árboles, roca y objetos: no hay script en el repo que los genere; están solo los GLB.
+- `cofre.glb` y `objetos.glb`: `loot_modelos.py` + `loot_export.py` → [[Pipeline del loot]].
+- Planeador, casa, árboles y roca: no hay script en el repo que los genere; están solo los GLB.
 
 ## Convenciones (según los comentarios de los scripts)
 

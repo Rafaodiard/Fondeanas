@@ -12,7 +12,7 @@ Archivo: `public/js/models.js`. Arma los objetos 3D del juego. Si el GLB corresp
 - `createBus()`: clona `bus.glb`, guarda las hélices en `userData.props`, le pone a cada material un cielo de reflejo (`cieloBus`, un cubo de degradés hecho con canvas) y hace destellar los materiales `Baliza` (1 vez por segundo) y `Destello` (doble flash) con `onBeforeRender`. Sin el GLB arma un bus de cajas. Ver [[Pipeline del bus]].
 - `createWeaponModel(type, color)`: nodo `type` de `armas.glb`, con `Rareza` teñido; `createPickaxe()`: nodo `pico`.
 - `setHeld(char, what, color)`: lo que tiene en la mano.
-- `createItemMesh(item, color)`: objeto del piso (`objetos.glb`, materiales `Tinte`/`Mat`).
+- `createItemMesh(item, color)`: lo reexporta desde [[loot.js]] (ahí están los objetos del piso y sus efectos).
 - Reexporta de [[rig.js]]: `weaponAction`, `stopWeaponAction`, `weaponShot`.
 
 Usa [[assets.js]] y [[rig.js]]. Lo usan [[main.js]] y [[visor.html]].

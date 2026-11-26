@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Salto Final · Vitrina del loot</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #7cc8ff; color: #fff; font: 14px system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; }
+  #panel { position: fixed; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.55); padding: 10px 12px; border-radius: 10px; max-width: 300px; }
+  #panel h1 { font-size: 15px; margin: 0 0 8px; }
+  #panel button { margin: 2px 4px 2px 0; }
+  #info { margin-top: 8px; color: #cde; font-size: 12px; line-height: 1.4; }
+</style>
+<script type="importmap">
+  { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="panel">
+  <h1>Vitrina del loot</h1>
+  <button id="abrir">Abrir cofres</button><button id="cerrar">Cofres nuevos</button>
+  <div id="info">Los cofres y todo lo que se agarra del piso, con los mismos efectos que en la partida. Arrastrá para girar y rueda para acercar.</div>
+</div>
+<script type="module">
+// Vitrina para revisar el loot: una fila de cofres, las seis armas en las cinco rarezas y todos los objetos.
+// window.LOOT sirve para capturas automáticas (Playwright).
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { loadAssets } from './js/assets.js';
+import { createChest, abrirCofre, animarLoot, createItemMesh, luzLoot } from './js/loot.js';
+import { setRigEnv } from './js/rig.js';
+import { WEAPONS, AMMO, CONSUMABLES, MATERIALS, RARITIES, itemColor } from './js/items.js';
+
+await loadAssets();
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.appendChild(renderer.domElement);
+setRigEnv(renderer);
+luzLoot(renderer);
+const scene = new THREE.Scene();
+const SKY = new THREE.Color('#7cc8ff');
+scene.background = SKY;
+scene.fog = new THREE.Fog(SKY, 60, 220);
+scene.add(new THREE.HemisphereLight('#e6f6ff', '#4f8a3a', 1.25));
+const sun = new THREE.DirectionalLight('#fff1d6', 2.4);
+sun.position.set(12, 22, 9);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20, near: 1, far: 80 });
+sun.shadow.bias = -0.0004;
+scene.add(sun);
+const piso = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: '#6c9a4a', roughness: 1 }));
+piso.rotation.x = -Math.PI / 2;
+piso.receiveShadow = true;
+scene.add(piso);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 500);
+const controls = new OrbitControls(camera, renderer.domElement);
+camera.position.set(0, 7, 15);
+controls.target.set(0, 0.6, 0);
+
+// cofres adelante
+let cofres = [];
+function ponerCofres() {
+  for (const c of cofres) scene.remove(c);
+  cofres = [-4, 0, 4].map((x, i) => {
+    const c = createChest();
+    c.position.set(x, 0, 4.5);
+    c.rotation.y = [0.5, 0, -0.5][i] + Math.PI;
+    scene.add(c);
+    return c;
+  });
+}
+ponerCofres();
+
+// armas: una fila por arma, una columna por rareza
+const items = new Map();
+let id = 1;
+function poner(it, x, z) {
+  const m = createItemMesh(it, itemColor(it));
+  m.position.set(x, 0, z);
+  scene.add(m);
+  items.set(id++, { it, mesh: m });
+}
+Object.keys(WEAPONS).forEach((w, f) => {
+  RARITIES.forEach((r, k) => poner({ kind: 'weapon', w, rarity: k, mag: 1 }, (k - 2) * 2.4, -2 - f * 2.2));
+});
+// objetos: atrás de todo
+const objs = [
+  ...Object.keys(CONSUMABLES).map((c) => ({ kind: 'consumable', c, count: 1 })),
+  ...Object.keys(AMMO).map((a) => ({ kind: 'ammo', a, count: 1 })),
+  ...Object.keys(MATERIALS).map((m) => ({ kind: 'mat', m, count: 30 })),
+];
+objs.forEach((it, k) => poner(it, (k - (objs.length - 1) / 2) * 1.5, 1.6));
+
+function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+function abrir() { for (const c of cofres) if (!c.userData.open) abrirCofre(c, true); }
+document.getElementById('abrir').onclick = abrir;
+document.getElementById('cerrar').onclick = ponerCofres;
+function frame() {
+  controls.update();
+  animarLoot(items, cofres, performance.now(), camera);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.LOOT = {
+  scene, camera, controls, renderer, items, get cofres() { return cofres; }, abrir, ponerCofres,
+  animar: () => animarLoot(items, cofres, performance.now(), camera),
+  view(px, py, pz, tx, ty, tz) { camera.position.set(px, py, pz); controls.target.set(tx, ty, tz); controls.update(); },
+  // soltar un cofre y sus cosas como en la partida (el loot sale volando del cofre)
+  soltar(i = 1) {
+    const c = cofres[i];
+    abrirCofre(c, true);
+    const loot = [{ kind: 'weapon', w: 'rifle', rarity: 3, mag: 30 }, { kind: 'ammo', a: 'media', count: 20 }, { kind: 'consumable', c: 'frasco', count: 3 }, { kind: 'mat', m: 'madera', count: 30 }];
+    loot.forEach((it, k) => setTimeout(() => {
+      const a = (k / loot.length) * Math.PI * 2;
+      poner(it, c.position.x + Math.cos(a) * 1.7, c.position.z + 2.2 + Math.sin(a) * 0.9);
+    }, 60));
+  },
+  ready: true,
+};
+</script>
+</body>
+</html>

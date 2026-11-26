@@ -15,6 +15,7 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 - [[Pedido del mapa]]: qué pidió para el mapa de la isla.
 - [[Errores del mapa]]: los errores que encontró al probar el mapa y que todo se rompa.
 - [[Brazos sin atravesar el cuerpo]]: el pedido, cómo se revisa y la tolerancia.
+- [[Cofres y loot]]: el pedido de modelar el loot y qué se decidió.
 - [[Panel de configuración]]: el pedido del panel y quién eligió cada opción.
 - [[Pedido del bus]]: el bus volador modelado por script.
 - [[Caminos prolijos]]: ninguna calle se corta de golpe; remates y la prueba de caminos.

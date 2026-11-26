@@ -4,7 +4,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 
 - Repo: https://github.com/Rafaodiard/Fondeanas
 - Stack: Node (`server.js` con `ws`) + Three.js 0.170 como ES modules sin bundler. `npm start` levanta todo en el puerto 3000 (`PORT` lo cambia).
-- Vault actualizado con el panel de configuración y el registro central de controles (rama `claude/project-thread-xxn59g`, 2026-11-25), sobre el commit `8de7b6c` de `main`.
+- Vault actualizado con el cofre y los objetos del piso modelados y sus efectos (rama `claude/project-thread-cw9rz0`, 2026-11-26), sobre el commit `5398592` de `main`. El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
 
 ## Cómo está armado
 
@@ -25,7 +25,8 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 | [[mallas.js]] | `public/js/mallas.js` | Junta los planos en pocas mallas y les da texturas procedurales |
 | [[items.js]] | `public/js/items.js` | Armas, rarezas, munición, consumibles, materiales, construcciones (compartido) |
 | [[assets.js]] | `public/js/assets.js` | Carga de los GLB y clonado con tintes |
-| [[models.js]] | `public/js/models.js` | Personajes, bus, armas y objetos (GLB o primitivas de respaldo) |
+| [[models.js]] | `public/js/models.js` | Personajes, bus y armas (GLB o primitivas de respaldo) |
+| [[loot.js]] | `public/js/loot.js` | Objetos del piso y cofres en el juego, con sus efectos y animaciones |
 | [[rig.js]] | `public/js/rig.js` | Esqueleto y animaciones del personaje por capas |
 | [[audio.js]] | `public/js/audio.js` | Sonidos sintetizados con WebAudio y volumen general |
 | [[controles.js]] | `public/js/controles.js` | Registro central de teclas (acciones con contexto) y opciones del juego, guardados en `localStorage` |
@@ -36,6 +37,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 - [[index.html]]: menú, sala de espera y HUD del juego.
 - [[visor.html]]: visor del personaje para revisar animaciones.
 - [[mapa.html]]: visor del mapa para recorrer la isla.
+- [[loot.html]]: vitrina del loot (cofres, armas por rareza y objetos).
 
 ## Sistemas del juego
 
@@ -45,6 +47,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 
 - [[Modelos GLB]]: los archivos de `public/models` y quién los usa.
 - [[Pipeline del héroe]]: scripts de Blender del personaje (malla, ropa, rig, clips, export).
+- [[Pipeline del loot]]: scripts de Blender del cofre y los objetos del piso.
 - [[Pipeline de armas]]: scripts de Blender de las armas (modelado, horneado, recargas, export).
 - [[Pipeline del bus]]: script de Blender del bus volador (modelado, fotos y export).
 - [[sf_tools.py]]: herramientas base de modelado por script.

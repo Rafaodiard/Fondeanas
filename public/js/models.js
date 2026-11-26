@@ -311,53 +311,8 @@ export function setHeld(char, what, color = '#b8bcc4') {
 }
 
 // Objeto tirado en el piso: modelo + haz de luz del color de la rareza.
-export function createItemMesh(item, color) {
-  const g = new THREE.Group();
-  const spin = new THREE.Group();
-  spin.position.y = 0.45;
-  g.add(spin);
-  const propName = item.kind === 'ammo' ? 'municion' : item.kind === 'mat' ? 'material' : item.kind === 'consumable' ? item.c : null;
-  const prop = propName && cloneAsset('objetos', propName, { Tinte: color, Mat: color });
-  if (item.kind === 'weapon') {
-    const w = createWeaponModel(item.w, color, true);
-    if (!w.userData.glb) w.rotation.z = Math.PI / 2;
-    else {
-      // centrado sobre el haz: el origen del modelo es el puño, no el medio del arma
-      const b = new THREE.Box3().setFromObject(w);
-      w.position.set(-(b.min.x + b.max.x) / 2, -(b.min.y + b.max.y) / 2, -(b.min.z + b.max.z) / 2);
-    }
-    spin.add(w);
-  } else if (prop) {
-    spin.add(prop);
-  } else if (item.kind === 'ammo') {
-    spin.add(box(0.45, 0.3, 0.3, std('#4b5320')));
-    spin.add(box(0.47, 0.08, 0.32, std(color, { emissive: color, emissiveIntensity: 0.4 }), 0, 0.05, 0));
-  } else if (item.kind === 'mat') {
-    for (let k = 0; k < 3; k++) spin.add(box(0.5, 0.12, 0.25, std(color), 0, k * 0.13 - 0.13, 0));
-  } else if (item.kind === 'consumable') {
-    if (item.c === 'frasco' || item.c === 'bidon') {
-      const big = item.c === 'bidon';
-      const b = new THREE.Mesh(new THREE.CylinderGeometry(big ? 0.18 : 0.12, big ? 0.22 : 0.14, big ? 0.5 : 0.3, 10), std(color, { emissive: color, emissiveIntensity: 0.5, transparent: true, opacity: 0.85 }));
-      spin.add(b);
-      spin.add(box(0.1, 0.1, 0.1, std('#ffffff'), 0, big ? 0.3 : 0.2, 0));
-    } else {
-      spin.add(box(0.4, item.c === 'botiquin' ? 0.3 : 0.15, 0.3, std('#ffffff')));
-      spin.add(box(0.12, item.c === 'botiquin' ? 0.32 : 0.17, 0.05, std('#ff3b3b'), 0, 0, 0.14));
-      spin.add(box(0.05, item.c === 'botiquin' ? 0.32 : 0.17, 0.12, std('#ff3b3b'), 0, 0, 0.14));
-    }
-  }
-  if (item.kind === 'weapon') {
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.25, 4, 8, 1, true),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide }));
-    beam.position.y = 2;
-    g.add(beam);
-  }
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.5, 20), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, depthWrite: false }));
-  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03;
-  g.add(ring);
-  g.userData.spin = spin;
-  return g;
-}
+// Los objetos del piso (y sus efectos) están en loot.js.
+export { createItemMesh } from './loot.js';
 
 // En el esqueleto el arma cuelga del hueso Arma.R: origen en el puño, cañón hacia -Z y arriba +Y
 // (igual que los modelos de armas.glb). El pico usa la misma convención: mango hacia +Y y la punta hacia -Z.

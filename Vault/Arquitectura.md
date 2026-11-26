@@ -26,10 +26,11 @@ El servidor crea `new World(seed, ISLAND_SIZE)` y cada cliente `new World(room.s
 public/models/*.glb ──► assets.js (loadAssets, cloneAsset, bakedParts)
                           │
                           ├─► models.js ──► rig.js (personaje con esqueleto)
-                          └─► world.js vía MODEL.clone / MODEL.baked (árboles, rocas, cofres)
+                          ├─► loot.js (objetos del piso y cofres, con efectos)
+                          └─► world.js vía MODEL.clone / MODEL.baked (árboles, rocas) y MODEL.cofre / MODEL.abrirCofre (loot.js)
 ```
 
-`main.js` completa `MODEL.clone = cloneAsset; MODEL.baked = bakedParts;` para que `world.js` pueda usar los GLB sin importar `assets.js` (así el servidor puede importar `world.js` sin Three cargando modelos). Si un GLB no carga, se usan los modelos procedurales de [[models.js]].
+`main.js` (y [[mapa.html]]) completa `MODEL.clone = cloneAsset; MODEL.baked = bakedParts; MODEL.cofre = createChest; MODEL.abrirCofre = abrirCofre;` para que `world.js` pueda usar los GLB sin importar `assets.js` (así el servidor puede importar `world.js` sin Three cargando modelos). Si un GLB no carga, se usan los modelos procedurales de [[models.js]].
 
 ## Dependencias entre módulos (imports)
 

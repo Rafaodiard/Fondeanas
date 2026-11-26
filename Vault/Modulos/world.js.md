@@ -22,7 +22,8 @@ Arma la isla de Salto Final. El mapa es **fijo**: usa `MAP_SEED = 20261124` para
 - **Consultas**: `terrainHeight`, `groundHeight(x, z, y)` (piso más alto bajo los pies: terreno, estructuras o construcciones), `ceilingHeight`, `slopeAt`, `insideHouse`, `inTown`, `nearSolid`.
 - **Movimiento**: `moveBody(pos, vel, dt)` mueve al jugador en pasos de 25 cm como máximo, con techo, piso y paredes en cada paso, así no se atraviesan techos ni pisos aunque se caiga rápido. `collide` empuja la cápsula fuera de troncos, rocas, sólidos de [[colision.js]] y construcciones.
 - **Escena** (solo cliente): `build(scene)` → `buildTerrain` (colores por bioma en `terrainColor`: la nieve tiene zonas azuladas y manchones de roca lejos de los pueblos; detalle de [[mallas.js]]), `buildWater` (mar con olas animadas, color según profundidad, espuma en la orilla, agua turbia en la ciénaga; río), `buildRoads` (arma la malla con `trisCalles()`, que no usa Three.js y la prueban las pruebas de caminos: cintas en celdas de 1,5 m a lo largo y 2 m a lo ancho para seguir el terreno, cortadas donde empieza un puente con `enPuente` y `tramoFueraDePuente`, más los discos de `discosCalles()`: plazoletas de remate, puntas y esquinas redondeadas), `buildStructures` (mallas por bloque de 160 m con [[mallas.js]] y una malla invisible con los sólidos para disparos y cámara, sin los sólidos `vidrio` ni los de piezas rotas, con el id de pieza de cada triángulo en `userData.triPz`), `buildTrees`, `buildPlants`, `buildRocks`, `buildChests`, `buildSigns` (carteles con texto dibujado en canvas, en las dos caras).
-- **Estado de partida**: `openChest`, `destroyResource`, `shakeResource`, `moveChest(idx, y)` (baja un cofre cuando se rompe el piso donde estaba).
+- **Cofres**: `buildChests` pone un cofre de `MODEL.cofre` ([[loot.js]]) en cada `chestSpots`, girado con `chestFacing(c)`: el frente (-Z del modelo) va hacia el lado con más lugar libre (rayo de [[colision.js]] a 0,4 m del piso); si el giro del plano ya deja 2 m libres adelante se respeta. Con el giro de los planos 82 de los 88 cofres quedaban con la cerradura contra la pared.
+- **Estado de partida**: `openChest(idx, animar)` (con `animar` la tapa salta y el loot sale volando: lo hace `MODEL.abrirCofre`; sin animar, como en el snapshot al entrar, queda abierto de una), `destroyResource`, `shakeResource`, `moveChest(idx, y)` (baja un cofre cuando se rompe el piso donde estaba).
 - **Piezas rompibles**: `romperPieza(id)` saca sus sólidos de [[colision.js]] y esconde sus triángulos (`lotePz`, `lotesChoque` con `ocultar` de [[mallas.js]]); `piezasSinApoyo(id)` devuelve las de la misma estructura que quedaron en el aire.
 - **Construcciones de jugadores**: `structs` (Map), `addStruct`, `removeStruct`, `updateStructs`; malla con `makeStructMesh` (exportada). Ver [[Construcción]].
 - `rayTerrain`, `minimapImage` (terreno, río, calles, plazoletas y techos).
@@ -31,7 +32,7 @@ Arma la isla de Salto Final. El mapa es **fijo**: usa `MAP_SEED = 20261124` para
 
 ## Modelos
 
-`MODEL = { clone, baked }` lo completa el cliente con [[assets.js]]. El mapa usa los GLB de árboles (`pino`, `arbol`), rocas (`roca`) y cofres (`cofre`); las casas y demás estructuras ya no salen de `casa.glb`, se modelan con [[planos.js]]. Ver [[Modelos GLB]].
+`MODEL = { clone, baked, cofre, abrirCofre }` lo completa el cliente con [[assets.js]] y [[loot.js]]. El mapa usa los GLB de árboles (`pino`, `arbol`) y rocas (`roca`); los cofres los arma `MODEL.cofre` ([[loot.js]], con `cofre.glb`); las casas y demás estructuras ya no salen de `casa.glb`, se modelan con [[planos.js]]. Ver [[Modelos GLB]].
 
 ## Usa
 

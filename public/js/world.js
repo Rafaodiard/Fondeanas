@@ -44,7 +44,7 @@ function makeNoise(seed) {
 export const SEA_LEVEL = 0;
 
 // Lo completa el cliente con los modelos de Blender (assets.js). El servidor no lo usa.
-export const MODEL = { clone: null, baked: null };
+export const MODEL = { clone: null, baked: null, cofre: null, abrirCofre: null };
 
 const MAP_SEED = 20261124; // el mapa es fijo: todos los partidos se juegan en la misma isla
 const ROT_DIR = {
@@ -1099,46 +1099,34 @@ export class World {
     this.solidMeshes.push(this.rockMesh);
   }
 
+  // Los cofres los arma loot.js (MODEL.cofre, lo inyectan main.js y mapa.html): modelo, aura y animación.
   buildChests(scene) {
     this.chestMeshes = this.chestSpots.map((c, idx) => {
-      const g = new THREE.Group();
-      const glbChest = MODEL.clone?.('cofre');
-      if (glbChest) {
-        g.add(glbChest);
-        const glow = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffd76a', transparent: true, opacity: 0.18, depthWrite: false, blending: THREE.AdditiveBlending }));
-        glow.position.y = 0.5;
-        g.add(glow);
-        g.position.set(c.x, c.y, c.z);
-        g.rotation.y = c.rot;
-        g.userData = { lid: glbChest.getObjectByName('Tapa'), glow, idx, open: false };
-        scene.add(g);
-        return g;
-      }
-      const wood = new THREE.MeshStandardMaterial({ color: '#8a5a2b', flatShading: true });
-      const trim = new THREE.MeshStandardMaterial({ color: '#ffcf4a', metalness: 0.6, roughness: 0.3, emissive: '#5a3c00' });
-      const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 0.8), wood);
-      body.position.y = 0.3;
-      g.add(body);
-      for (const x of [-0.5, 0.5]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.62, 0.82), trim); b.position.set(x, 0.3, 0); g.add(b); }
-      const lidG = new THREE.Group();
-      lidG.position.set(0, 0.6, 0.4);
-      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.2, 8, 1, false, 0, Math.PI), wood);
-      lid.rotation.z = Math.PI / 2; lid.position.z = -0.4;
-      lidG.add(lid);
-      const lock = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.08), trim);
-      lock.position.set(0, 0, 0.02);
-      lidG.add(lock);
-      g.add(lidG);
-      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffd76a', transparent: true, opacity: 0.18, depthWrite: false, blending: THREE.AdditiveBlending }));
-      glow.position.y = 0.5;
-      g.add(glow);
+      const g = MODEL.cofre ? MODEL.cofre() : new THREE.Group();
       g.position.set(c.x, c.y, c.z);
-      g.rotation.y = c.rot;
-      g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-      g.userData = { lid: lidG, glow, idx, open: false };
+      g.rotation.y = this.chestFacing(c);
+      g.userData.idx = idx;
+      g.userData.open = false;
       scene.add(g);
       return g;
     });
+  }
+
+  // Hacia dónde mira el cofre: el frente (-Z del modelo) hacia el lado con más lugar libre, así no queda con la
+  // cerradura contra la pared. Si el giro del plano ya deja 2 m libres adelante, se respeta.
+  chestFacing(c) {
+    const libre = (rot) => {
+      const d = { x: -Math.sin(rot), y: 0, z: -Math.cos(rot) };
+      return Math.min(4, this.sol.ray({ x: c.x + d.x * 0.45, y: c.y + 0.4, z: c.z + d.z * 0.45 }, d, 4));
+    };
+    if (libre(c.rot) >= 2) return c.rot;
+    let mejor = c.rot, max = -1;
+    for (let k = 0; k < 4; k++) {
+      const rot = c.rot + (k * Math.PI) / 2;
+      const l = libre(rot);
+      if (l > max + 0.05) { max = l; mejor = rot; }
+    }
+    return mejor;
   }
 
   // Baja un cofre (se rompió el piso donde estaba).
@@ -1150,12 +1138,12 @@ export class World {
     if (m) m.position.y = y;
   }
 
-  openChest(idx) {
+  // animar: alguien lo acaba de abrir (la tapa salta y sale el loot); si no, queda abierto de una (snapshot).
+  openChest(idx, animar = false) {
     const c = this.chestMeshes?.[idx];
     if (!c || c.userData.open) return;
     c.userData.open = true;
-    c.userData.lid.rotation.x = 1.9;
-    c.remove(c.userData.glow);
+    MODEL.abrirCofre?.(c, animar);
   }
 
   destroyResource(kind, idx) {

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { World, makeStructMesh, MODEL } from './world.js';
 import { loadAssets, cloneAsset, bakedParts } from './assets.js';
+import { createChest, abrirCofre, animarLoot, luzLoot } from './loot.js';
 import { createCharacter, animateCharacter, createBus, createNameTag, createItemMesh, setHeld, weaponAction, stopWeaponAction, weaponShot } from './models.js';
 import {
   WEAPONS, CONSUMABLES, AMMO, MATERIALS, MAT_ORDER, RARITIES, BUILD_COST, PICKAXE, SLOTS, GRID, DIRS,
@@ -33,7 +34,7 @@ const btns = [$('btnCreate'), $('btnJoin')];
 btns.forEach((b) => { b.disabled = true; });
 ui.menuError.textContent = 'Cargando modelos…';
 await loadAssets((k) => { ui.menuError.textContent = `Cargando modelos… ${Math.round(k * 100)}%`; });
-MODEL.clone = cloneAsset; MODEL.baked = bakedParts;
+MODEL.clone = cloneAsset; MODEL.baked = bakedParts; MODEL.cofre = createChest; MODEL.abrirCofre = abrirCofre;
 btns.forEach((b) => { b.disabled = false; });
 ui.menuError.textContent = '';
 function storageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
@@ -47,6 +48,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 setRigEnv(renderer);
+luzLoot(renderer);
 
 const scene = new THREE.Scene();
 const SKY = new THREE.Color('#7cc8ff');
@@ -242,7 +244,7 @@ function handle(m) {
     case 'inv': onInventory(m); break;
     case 'itemsAdd': for (const it of m.items) addItem(it); break;
     case 'itemsDel': for (const id of m.ids) removeItem(id); break;
-    case 'chestOpen': world.openChest(m.idx); if (world.chestSpots[m.idx] && me.pos.distanceTo(v3(world.chestSpots[m.idx])) < 15) sfx.chest(); break;
+    case 'chestOpen': world.openChest(m.idx, true); if (world.chestSpots[m.idx] && me.pos.distanceTo(v3(world.chestSpots[m.idx])) < 15) sfx.chest(); break;
     case 'resHit': world.shakeResource(m.res, m.idx); break;
     case 'resGone': world.destroyResource(m.res, m.idx); break;
     case 'structAdd':
@@ -1200,12 +1202,7 @@ function updateOthers(dt) {
 }
 
 function updateItems(t) {
-  for (const { mesh } of items.values()) {
-    if (mesh.position.distanceToSquared(camera.position) > 160 * 160) { mesh.visible = false; continue; }
-    mesh.visible = true;
-    mesh.userData.spin.rotation.y = t / 700;
-    mesh.userData.spin.position.y = 0.45 + Math.sin(t / 400) * 0.08;
-  }
+  animarLoot(items, world.chestMeshes, t, camera);
 }
 
 const camTarget = new THREE.Vector3();
