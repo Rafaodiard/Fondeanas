@@ -745,6 +745,7 @@ function liberar(code) {
   soltar(code);
   for (const a of accionesDe(code)) {
     if (a === 'disparar' && !activa('disparar')) mouseDown = false;
+    if (a === 'editar') cons.soltarEditar(); // "Confirmar la edición al soltar"
     if (a === 'apuntar' && !opcion('apuntarAlternar') && !activa('apuntar')) { rmbDown = false; me.aiming = false; }
   }
 }

@@ -1,18 +1,22 @@
 // Construcción en el cliente: modo construcción, vista previa, colocar piezas, edición y su parte del HUD.
 // main.js le pasa las acciones (ya resueltas por controles.js) y la llama en cada cuadro.
 import * as THREE from 'three';
-import { GRID, DIRS, MATERIALS, MAT_ORDER, BUILD_COST, structKey } from './items.js';
+import { MATERIALS, MAT_ORDER, BUILD_COST } from './items.js';
 import {
-  TIPOS, NOMBRES, normalizar, tieneApoyo, rayoEdicion, marcasIniciales, resultadoEdicion, ALCANCE_EDICION, cajaPieza,
+  TIPOS, NOMBRES, objetivoPieza, motivoNoEncaja, MOTIVOS, superficie, rayoEdicion, marcasIniciales, resultadoEdicion, ALCANCE_EDICION, cajaPieza,
 } from './construccion.js';
 import { makeStructMesh, pintarFantasma, grillaEdicion, pintarGrilla, liberarGrilla, liberar } from './construccion3d.js';
-import { registrarAccion, teclaDe } from './controles.js';
+import { registrarAccion, registrarOpcion, opcion, teclaDe } from './controles.js';
 
 // Controles propios de la construcción (los demás ya están en controles.js). cambiarMaterial va antes que el techo para que V no quede en las dos.
 registrarAccion('cambiarMaterial', 'Cambiar material', 'Construcción', ['Mouse2'], 'construccion');
 registrarAccion('construirTecho', 'Construir techo', 'Construcción', ['KeyV'], 'todos');
 registrarAccion('editar', 'Editar construcción', 'Construcción', ['KeyF'], 'todos');
 registrarAccion('girar', 'Girar pieza', 'Construcción', ['KeyR'], 'construccion');
+// Opciones de construcción que hacen todo más rápido (como en el género).
+registrarOpcion({ id: 'editarAlSoltar', nombre: 'Confirmar la edición al soltar la tecla', ayuda: 'Mantené apretada la tecla de editar, marcá las partes y soltala para confirmar. Un toque corto sigue dejando la edición abierta', grupo: 'Juego', tipo: 'si-no', def: true });
+registrarOpcion({ id: 'reiniciarPieza', nombre: 'Volver a la pared al entrar a construir', ayuda: 'Si está apagado, entrar a construir elige la última pieza que usaste', grupo: 'Juego', tipo: 'si-no', def: false });
+registrarOpcion({ id: 'construirSeguido', nombre: 'Construir seguido manteniendo el clic', grupo: 'Juego', tipo: 'si-no', def: true });
 
 const ACCION_PIEZA = { pared: 'construirPared', piso: 'construirPiso', rampa: 'construirRampa', techo: 'construirTecho' };
 const PIEZA_ACCION = Object.fromEntries(Object.entries(ACCION_PIEZA).map(([k, v]) => [v, k]));
@@ -28,7 +32,7 @@ const ICONOS = {
 export function crearConstruccion({ scene, camera, me, getWorld, getMyId, sendMsg, ui, sfx, feed }) {
   let ultima = 'pared'; // pieza que vuelve a elegir Q
   let giro = 0; // vueltas extra de la rampa (R)
-  let fantasma = null, fantasmaKey = '', objetivoActual = null, ultimaColocada = '', tColocada = 0;
+  let fantasma = null, fantasmaKey = '', objetivoActual = null, ultimaColocada = '', tColocada = 0, motivo = null, clicSuelto = true;
   let edit = null; // { s, grilla, marcas, camino, pinta, hover, valida }
   const _o = new THREE.Vector3(), _d = new THREE.Vector3();
 
@@ -83,7 +87,7 @@ export function crearConstruccion({ scene, camera, me, getWorld, getMyId, sendMs
   function accion(id) {
     if (PIEZA_ACCION[id]) { entrar(PIEZA_ACCION[id]); return true; }
     switch (id) {
-      case 'modoConstruccion': if (edit && !me.build) { confirmarEdicion(); return true; } if (me.build) salir(); else entrar(ultima); return true;
+      case 'modoConstruccion': if (edit && !me.build) { confirmarEdicion(); return true; } if (me.build) salir(); else entrar(opcion('reiniciarPieza') ? 'pared' : ultima); return true;
       case 'cambiarMaterial': if (edit) { restablecerEdicion(); return true; } if (me.build) { cambiarMaterial(); return true; } return false;
       case 'girar': if (me.build && !edit) { giro = (giro + 1) % 4; fantasmaKey = ''; return true; } return false;
       case 'editar': if (edit) confirmarEdicion(); else empezarEdicion(); return true;
@@ -92,60 +96,14 @@ export function crearConstruccion({ scene, camera, me, getWorld, getMyId, sendMs
   }
 
   // ---------- A dónde va la pieza ----------
-  function nivelYApoyo(world, d) {
-    const ci = Math.floor(me.pos.x / GRID), cj = Math.floor(me.pos.z / GRID);
-    let level = Math.floor(me.pos.y * 2) / 2, sube = false;
-    // parado sobre una pieza propia: usar su nivel para que todo encaje
-    for (const s of world.structs.values()) {
-      if (s.type === 'pared' || s.i !== ci || s.j !== cj) continue;
-      if (me.pos.y < s.y - 0.3 || me.pos.y > s.y + (s.type === 'rampa' ? GRID : 1.7) + 0.6) continue;
-      if (s.type === 'rampa') {
-        if (s.dir === d) { level = s.y; sube = true; } // la rampa sube hacia donde miro: lo de adelante va arriba
-        else level = me.pos.y > s.y + GRID * 0.5 ? s.y + GRID : s.y;
-      } else level = s.y;
-      return { ci, cj, level, sube, fijo: true };
-    }
-    // si hay construcciones cerca, alinear el nivel con ellas (la grilla de altura es la misma para todas)
-    let ref = null, mejor = Infinity;
-    for (const s of world.structs.values()) {
-      const dd = Math.hypot(s.i - ci, s.j - cj);
-      if (dd <= 2 && dd < mejor) { mejor = dd; ref = s; }
-    }
-    if (ref) {
-      const k = Math.round((level - ref.y) / GRID), alin = ref.y + k * GRID;
-      if (Math.abs(level - alin) < 1.3) level = alin;
-    }
-    return { ci, cj, level, sube, fijo: false };
-  }
-
-  function objetivo(world, tipo) {
-    const d = Math.round(((-me.yaw / (Math.PI / 2)) % 4 + 4) % 4) % 4; // 0=-Z,1=+X,2=+Z,3=-X
-    const { ci, cj, level, sube } = nivelYApoyo(world, d);
-    const [dx, dz] = DIRS[d];
-    const p = me.pitch, arriba = sube ? GRID : 0;
-    let t;
-    if (tipo === 'pared') t = { i: ci, j: cj, y: level + (p > 0.8 ? GRID : sube && p > 0.1 ? GRID : 0), dir: d };
-    else if (tipo === 'piso') {
-      if (p > 0.45) t = { i: ci, j: cj, y: level + GRID, dir: d };
-      else if (p < -0.6) t = { i: ci, j: cj, y: sube ? level + GRID : level, dir: d };
-      else t = { i: ci + dx, j: cj + dz, y: level + arriba, dir: d };
-    } else if (tipo === 'rampa') {
-      const dir = (d + giro) % 4;
-      if (p < -0.55 && !sube) t = { i: ci, j: cj, y: level, dir };
-      else t = { i: ci + dx, j: cj + dz, y: level + arriba, dir };
-    } else {
-      if (p > 0.3) t = { i: ci, j: cj, y: level + GRID, dir: d };
-      else t = { i: ci + dx, j: cj + dz, y: level + arriba, dir: d };
-    }
-    return normalizar({ type: tipo, ...t, mat: me.mat, e: 0 });
-  }
+  // La grilla de encastre y las reglas (qué pieza va en qué borde) están en construccion.js, las mismas que valida el servidor.
+  const objetivo = (world, tipo) => objetivoPieza(world, me, tipo, giro);
 
   function limpiarFantasma() { if (fantasma) { scene.remove(fantasma); liberar(fantasma); fantasma = null; fantasmaKey = ''; } objetivoActual = null; }
 
   function actualizarFantasma(world, mouseDown) {
-    if (!me.build || !puede()) { limpiarFantasma(); return; }
+    if (!me.build || !puede()) { limpiarFantasma(); ponerMotivo(null); return; }
     const t = objetivo(world, me.build);
-    t.key = structKey(t);
     const k = `${t.key}:${t.dir}:${t.mat}`;
     if (k !== fantasmaKey) {
       limpiarFantasma();
@@ -154,17 +112,28 @@ export function crearConstruccion({ scene, camera, me, getWorld, getMyId, sendMs
       fantasmaKey = k;
     }
     objetivoActual = t;
+    // verde = encaja en la grilla (en el borde de otra pieza o en el piso) y alcanza el material; rojo = no
     const libre = !world.structs.has(t.key);
     const alcanza = (me.mats[me.mat] || 0) >= BUILD_COST;
-    const ok = libre && alcanza && tieneApoyo(world, t);
+    const por = motivoNoEncaja(world, t);
+    const ok = alcanza && !por;
     pintarFantasma(fantasma, ok);
     fantasma.visible = libre;
-    // mantener apretado construye seguido (cada pieza una vez)
+    ponerMotivo(libre && por && por !== 'ocupado' ? por : null);
+    // mantener apretado construye seguido (cada pieza una vez); con "construir seguido" apagado, un clic = una pieza
     const ahora = performance.now();
-    if (mouseDown && ok && ahora - tColocada > 90 && (t.key !== ultimaColocada || ahora - tColocada > 400)) {
-      tColocada = ahora; ultimaColocada = t.key;
+    if (!mouseDown) clicSuelto = true;
+    const seguido = opcion('construirSeguido') !== false;
+    if (mouseDown && ok && (seguido || clicSuelto) && ahora - tColocada > 90 && (t.key !== ultimaColocada || ahora - tColocada > 400)) {
+      tColocada = ahora; ultimaColocada = t.key; clicSuelto = false;
       sendMsg({ t: 'build', type: t.type, i: t.i, j: t.j, y: t.y, dir: t.dir, mat: t.mat });
     }
+  }
+  // Cartel corto en la ayuda de construcción cuando la pieza no encaja (por qué está roja).
+  function ponerMotivo(m) {
+    if (m === motivo) return;
+    motivo = m;
+    hud();
   }
 
   // ---------- Edición ----------
@@ -194,7 +163,7 @@ export function crearConstruccion({ scene, camera, me, getWorld, getMyId, sendMs
     const grilla = grillaEdicion(s);
     scene.add(grilla);
     if (s.mesh) s.mesh.visible = false;
-    edit = { s, grilla, marcas: marcasIniciales(s), camino: [], pinta: null, hover: -1, valida: true };
+    edit = { s, grilla, marcas: marcasIniciales(s), camino: [], pinta: null, hover: -1, valida: true, desde: performance.now() };
     limpiarFantasma();
     sfx.click();
     me.onBuildChange?.();
@@ -221,6 +190,12 @@ export function crearConstruccion({ scene, camera, me, getWorld, getMyId, sendMs
     const r = resultadoEdicion(edit.s, edit.marcas, edit.camino);
     if (r) aplicarEdicion(r.e, r.dir);
     terminarEdicion();
+  }
+  // Soltar la tecla de editar (opción "Confirmar la edición al soltar"): si se la mantuvo apretada o ya se marcó algo, confirma.
+  function soltarEditar() {
+    if (!edit || !opcion('editarAlSoltar')) return;
+    const toque = performance.now() - edit.desde < 250 && edit.marcas === marcasIniciales(edit.s);
+    if (!toque) confirmarEdicion();
   }
   function restablecerEdicion() {
     if (!edit) return;
@@ -272,7 +247,7 @@ export function crearConstruccion({ scene, camera, me, getWorld, getMyId, sendMs
       const que = { pared: 'Marcá las partes a sacar', piso: 'Marcá las partes a sacar', rampa: 'Arrastrá hacia donde sube', techo: 'Marcá las esquinas a levantar' }[edit.s.type];
       ayuda = `<span>${que}</span><span>${k('editar')} Confirmar</span><span>${k('cambiarMaterial')} Restablecer</span>`;
     } else if (me.build) {
-      ayuda = `<span>${k('editar')} Editar</span>${me.build === 'rampa' ? `<span>${k('girar')} Girar</span>` : ''}<span>${k('cambiarMaterial')} Material</span><span>${k('modoConstruccion')} Salir</span>`;
+      ayuda = (motivo ? `<span class="no">${MOTIVOS[motivo]}</span>` : '') + `<span>${k('editar')} Editar</span>${me.build === 'rampa' ? `<span>${k('girar')} Girar</span>` : ''}<span>${k('cambiarMaterial')} Material</span><span>${k('modoConstruccion')} Salir</span>`;
     }
     ui.buildhint.innerHTML = ayuda;
     ui.buildhint.classList.toggle('hidden', !ayuda);
@@ -282,6 +257,10 @@ export function crearConstruccion({ scene, camera, me, getWorld, getMyId, sendMs
   function alAgregar(s) {
     s.recibido = performance.now();
     s.creceHasta = s.recibido + (s.crece || 0) * 1000;
+    // como en el género: una rampa o un piso que aparece donde estoy parado me sube arriba (no quedo adentro)
+    if (me.state !== 'ground' || s.type === 'pared') return;
+    const top = superficie(s, me.pos.x, me.pos.z);
+    if (top !== null && top > me.pos.y && top < me.pos.y + 2.2) { me.pos.y = top; if (me.vel.y < 0) me.vel.y = 0; }
   }
   function alCambiarVida(s, hp) { s.hp = hp; s.recibido = performance.now(); }
 
@@ -290,6 +269,7 @@ export function crearConstruccion({ scene, camera, me, getWorld, getMyId, sendMs
   return {
     accion, update, hud, contexto, cancelar, salir, autoMaterial, alAgregar, alCambiarVida,
     get editando() { return !!edit; },
-    confirmarEdicion,
+    get objetivo() { return objetivoActual; },
+    confirmarEdicion, soltarEditar,
   };
 }

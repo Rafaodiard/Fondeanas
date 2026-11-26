@@ -95,10 +95,12 @@ Para recorrer la isla sin jugar, con el servidor levantado abrí http://localhos
 Como en los battle royale del género:
 
 - **Cuatro piezas:** pared, piso, rampa y techo (una pirámide baja). Cada una cuesta 10 del material. Arriba del inventario está la barra con las cuatro piezas y la tecla de cada una, y el material que estás usando con cuánto te queda.
-- **Vista previa:** la pieza aparece como un holograma azul donde va a ir (rojo si no se puede: ya hay una, no alcanza el material o no tiene apoyo). Se ubica sola según hacia dónde mirás: la pared en el borde de tu celda, el piso adelante (mirando arriba, sobre tu cabeza; mirando abajo, bajo los pies), la rampa adelante subiendo hacia donde mirás (R la gira) y el techo adelante o sobre tu cabeza. Parado en una rampa, la pieza de adelante va un nivel más arriba, así se sube construyendo rampas seguidas. Manteniendo el clic se construye seguido.
+- **Grilla de encastre:** todas las piezas van en una grilla de celdas de 4 × 4 × 4 m, y cada una tiene que arrancar donde termina otra, como en el juego original. Las paredes van en los lados de una celda, los pisos en su cara de abajo, y la rampa o el techo (uno de los dos) adentro. Un piso solo se puede poner en el suelo, en el borde de arriba (o de abajo) de una pared, en el borde alto o bajo de una rampa o pegado al borde de otro piso; nunca a media pared. El techo va arriba de un piso o de paredes; las paredes, una arriba de otra o de costado. Dos piezas se sostienen cuando comparten un borde entero de la grilla (tocarse en una punta no alcanza), y todo lo que se arma cerca de una construcción queda en su misma grilla de altura. El servidor revisa las mismas reglas, así que un cliente tramposo no puede meter piezas corridas.
+- **Vista previa:** la pieza aparece como un holograma azul donde va a ir, y en rojo si no se puede, con el motivo en la ayuda de construcción (no encaja con la grilla de al lado, no tiene apoyo o no alcanza el material). Se ubica sola según hacia dónde mirás: la pared en el borde de tu celda, el piso adelante (mirando arriba, sobre tu cabeza; mirando abajo, bajo los pies), la rampa adelante subiendo hacia donde mirás (R la gira) y el techo adelante o sobre tu cabeza. Parado en una rampa, la pieza de adelante va un nivel más arriba, así se sube construyendo rampas seguidas. Manteniendo el clic se construye seguido.
 - **Se levantan de a poco:** la pieza aparece en holograma y se va llenando de abajo hacia arriba; arranca con el 30 % de su vida y llega al máximo cuando termina (madera 150 en 2,5 s, piedra 300 en 5 s, metal 450 en 7,5 s). Apuntando a una construcción se ve su vida debajo de la mira, y las dañadas se ven agrietadas.
-- **Apoyo y derrumbes:** una pieza nueva tiene que tocar el piso, una estructura del mapa u otra construcción. Si se rompe lo que sostiene algo (una pieza tuya o una pieza del mapa), todo lo que deja de llegar al piso se cae.
-- **Edición** (F mirando una construcción tuya): aparece la grilla de la pieza y se marcan baldosas con clic (manteniendo apretado se marcan varias). F otra vez confirma; clic derecho la deja como nueva.
+- **Apoyo y derrumbes:** una pieza nueva tiene que apoyarse en el suelo o en una estructura del mapa, o compartir un borde con otra construcción. Si se rompe lo que sostiene algo (una pieza tuya o una pieza del mapa), todo lo que deja de llegar al piso pasando de borde en borde se cae.
+- **Para construir rápido** (opciones en la pestaña Juego de la configuración): *Confirmar la edición al soltar la tecla* (prendida de fábrica: mantenés F, marcás y al soltar se confirma; un toque corto deja la edición abierta como antes), *Construir seguido manteniendo el clic* (prendida) y *Volver a la pared al entrar a construir* (apagada: Q vuelve a la última pieza). Si una rampa o un piso aparece donde estás parado, te sube arriba en vez de dejarte adentro.
+- **Edición** (F mirando una construcción tuya): aparece la grilla de la pieza y se marcan baldosas con clic (manteniendo apretado se marcan varias). F otra vez (o soltar F, si la mantuviste) confirma; clic derecho la deja como nueva. Una pieza editada sigue sosteniendo lo que tiene arriba.
   - Pared (3×3): lo marcado se saca. Así se hacen puertas, ventanas, arcos o media pared, y se puede pasar y disparar por el hueco.
   - Piso (2×2): lo marcado se saca y se cae por el hueco.
   - Rampa (3×3, vista desde arriba): se arrastra en la dirección en que tiene que subir, y si marcás solo una o dos columnas queda una rampa angosta.
@@ -106,10 +108,12 @@ Como en los battle royale del género:
 - **Material automático:** si se te termina el material elegido, pasa solo al siguiente que alcance para una pieza. Con clic derecho en modo construcción se cambia a mano.
 - Las piezas nuevas no se pueden poner cayendo ni planeando. Los pisos, rampas y techos de construcción hacen de techo: saltando abajo no se atraviesan.
 
-Las pruebas de la construcción (choques con las piezas editadas, que lo que se ve coincida con lo que se pisa, apoyo, derrumbes y vida):
+Las pruebas de la construcción (choques con las piezas editadas, que lo que se ve coincida con lo que se pisa, la grilla de encastre, apoyo, derrumbes y vida) y las del servidor rechazando piezas mal puestas por red:
 
 ```bash
 node tools/construccion/pruebas.mjs
+node tools/construccion/red.mjs
+CAPTURAS=capturas node tools/construccion/capturas.mjs   # fotos del encastre en el juego (Playwright)
 ```
 
 Para probar a construir sin juntar materiales: `SF_MATS=500 npm start` arranca cada partida con 500 de cada material.
@@ -155,7 +159,7 @@ En pantalla no hay una lista de controles: en el auto aparece una ayuda corta co
 
 El panel tiene cuatro pestañas y todo se guarda en el navegador (`localStorage`), así que queda para la próxima vez:
 
-- **Juego:** sensibilidad del mouse, sensibilidad apuntando y con mira telescópica, invertir el eje vertical, apuntar manteniendo o alternando, correr siempre, números de daño, y los bots de las salas que crees (hasta cuántos jugadores completan y su dificultad).
+- **Juego:** sensibilidad del mouse, sensibilidad apuntando y con mira telescópica, invertir el eje vertical, apuntar manteniendo o alternando, correr siempre, números de daño, las opciones de construcción (confirmar la edición al soltar, construir seguido, volver a la pared al entrar a construir), y los bots de las salas que crees (hasta cuántos jugadores completan y su dificultad).
 - **Video:** calidad gráfica (baja sin sombras, media y alta), resolución 3D, campo de visión, color de la mira y contador de FPS.
 - **Sonido:** volumen general.
 - **Controles:** cambiar cualquier tecla. Si elegís una que ya usaba otra acción, se la saca a esa y te avisa. Una tecla puede repetirse entre combate y construcción (por ejemplo, R recarga y en modo construcción gira la rampa) porque no se usan a la vez. Lo mismo con los controles del auto (grupo *Vehículos*): solo valen sentado en un auto, así que repiten las de a pie.
@@ -198,10 +202,10 @@ node tools/controles/pruebas.mjs
 - `Vault/`: vault de Obsidian que documenta el proyecto (empezar por `Vault/Inicio.md`) y grafo del código generado con graphify en `Vault/graphify-out`.
 - `public/js/caida.js`: física de la caída libre (planeo / picada), el paracaídas (altura límite, frenos) y el deslizamiento, y los parámetros de animación que viajan por la red. Pruebas: `node tools/caida/pruebas.mjs`.
 - `public/js/main.js`: el juego en sí (cámara en tercera persona, física, disparo, HUD, minimapa, red).
-- `public/js/construccion.js`: reglas de la construcción, compartidas por el cliente y el servidor: ediciones válidas, superficie que se pisa y cajas que chocan de cada pieza editada, apoyo, derrumbes, vida que crece y qué baldosa se mira al editar.
+- `public/js/construccion.js`: reglas de la construcción, compartidas por el cliente y el servidor: grilla de encastre (bordes de cada pieza, qué va donde, dónde cae la vista previa), ediciones válidas, superficie que se pisa y cajas que chocan de cada pieza editada, apoyo, derrumbes, vida que crece y qué baldosa se mira al editar.
 - `public/js/construccion3d.js`: mallas de las construcciones (texturas de tablas, bloques de piedra y chapa con remaches, marcos que rodean también los huecos editados), holograma de la vista previa, grilla de edición y el relleno de la pieza mientras se levanta.
 - `public/js/construir.js`: la construcción en el juego: modo construcción, dónde va cada pieza, colocar seguido, edición, material automático y la barra de piezas del HUD (la vida de lo que se mira la muestra `golpes.js`). Registra sus controles en `controles.js`.
-- `tools/construccion/pruebas.mjs`: pruebas de la construcción.
+- `tools/construccion/pruebas.mjs`: pruebas de la construcción. `tools/construccion/red.mjs`: el servidor rechaza piezas que no encajan.
 - `public/js/controles.js`: registro central de acciones y teclas (con contexto: siempre, combate, construcción o vehículo) y de las opciones del juego, guardados en `localStorage`. Cualquier control u opción nueva se agrega acá con `registrarAccion` / `registrarOpcion`.
 - `public/js/configuracion.js`: el panel de configuración (pestañas Juego, Video, Sonido y Controles).
 - `tools/controles/pruebas.mjs`: pruebas del registro de controles y opciones.
@@ -216,6 +220,9 @@ node tools/controles/pruebas.mjs
 ![Piezas de construcción en madera, piedra y metal, editadas](docs/construccion.png)
 ![Editando una pared: la grilla de 3×3](docs/construccion_edicion.png)
 ![La puerta hecha y la barra de piezas arriba del inventario](docs/construccion_puerta.png)
+![Grilla de encastre: la rampa que sube hasta el borde del piso de arriba encaja (azul)](docs/encastre_encaja.png)
+![Un piso sin nada que lo sostenga: rojo, con el motivo en la ayuda](docs/encastre_no_encaja.png)
+![Parado en la rampa: el piso de adelante va en su borde alto](docs/encastre_piso_rampa.png)
 ![Personajes](docs/personajes.png)
 
 ### Bots

@@ -11,7 +11,7 @@ import {
   WEAPONS, CONSUMABLES, AMMO, MATERIALS, BUILD_COST, MAX_MATS, PICKAXE, PUNTO_DEBIL, SLOTS, GRID, DIRS,
   randomWeapon, randomConsumable, randomAmmo, weaponDamage, weaponReload, structKey,
 } from './public/js/items.js';
-import { TIPOS, normalizar, tieneApoyo, sinApoyo, vidaDe, editValida, OBRA, ALCANCE_EDICION, cajaPieza, superficie, DEBAJO } from './public/js/construccion.js';
+import { TIPOS, normalizar, motivoNoEncaja, sinApoyo, vidaDe, editValida, OBRA, ALCANCE_EDICION, cajaPieza, superficie, DEBAJO } from './public/js/construccion.js';
 import { AUTO, nuevoAuto, aplicarRed, estadoRed, autoPublico, asientoLibre, rapidez, materialChoque, impacto, claveChoque } from './public/js/autos.js';
 import { repartirLoot, acomodarLoot, LOOT_RADIO, LOOT_ALTO } from './public/js/lugarLoot.js';
 import { totalValido, dificultadValida, cuantosBots } from './public/js/opcionesBots.js';
@@ -619,9 +619,9 @@ function handleGame(room, player, msg) {
       if (Math.hypot(cx - player.pos[0], cz - player.pos[2]) > GRID * 3 || Math.abs(y - player.pos[1]) > GRID * 2.5) break;
       const s = normalizar({ type, i, j, y, dir, mat, e: 0 });
       s.key = structKey(s);
-      if (room.world.structs.has(s.key)) break;
-      // tiene que apoyarse en el piso, en el mapa o en otra construcción
-      if (!tieneApoyo(room.world, s)) break;
+      // grilla de encastre (construccion.js): lugar libre, misma grilla que lo que toca y apoyada en el piso,
+      // en el mapa o en el borde de otra construcción. Lo mismo que pinta de verde la vista previa.
+      if (motivoNoEncaja(room.world, s)) break;
       s.born = Date.now(); s.dano = 0;
       s.owner = player.id;
       room.world.addStruct(s);
