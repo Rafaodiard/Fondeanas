@@ -178,6 +178,8 @@ node tools/controles/pruebas.mjs
 
 ## Capturas
 
+![Golpe crítico en el punto débil: 100 de daño, chispas celestes y la barra de vida de la pared](docs/golpes_critico.jpg)
+![Paredes con distinto daño: las grietas se abren a medida que pierden vida](docs/golpes_grietas.jpg)
 ![Bus volador desde el juego](docs/bus.png)
 ![Bus volador renderizado en Blender](docs/bus_blender.jpg)
 ![Combate](docs/combate.png)
