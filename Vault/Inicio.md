@@ -63,7 +63,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 - [[Pipeline de armas]]: scripts de Blender de las armas (modelado, horneado, recargas, export).
 - [[Pipeline del bus]]: script de Blender del bus volador (modelado, fotos y export).
 - [[Pipeline del auto]]: script de Blender del auto (carrocería paramétrica, ruedas, interior, fotos y export).
-- `tools/autos/pruebas.mjs`: pruebas de los autos (ver [[autos.js]]).
+- `tools/autos/pruebas.mjs`: pruebas de los autos (ver [[autos.js]]). `tools/autos/embestidas.mjs` y `tools/autos/servidor.mjs`: pruebas de los autos que rompen lo que chocan según la velocidad (física y contra el servidor, ver [[Autos]]).
 - `tools/bots/pruebas.mjs` y `tools/bots/partida.mjs`: pruebas de los bots y una partida entera solo con bots (ver [[Bots]]).
 - `tools/iconos/pruebas.mjs`: pruebas de las fotos de la barra de items en el navegador (ver [[iconos.js]]).
 - `tools/golpes/pruebas.mjs`: pruebas del punto débil y la vida de lo dañado contra el servidor (ver [[Daño visible y punto débil]]).

@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import {
   AUTO, ASIENTOS, nuevoAuto, aplicarRed, estadoRed, fisicaAuto, avance, rapidez, derecha, lugarBajada, puntoMundo, pisaA,
-  rayoAuto, aLocal,
+  rayoAuto, aLocal, materialChoque,
 } from './autos.js';
 import { createAuto, animateCharacter } from './models.js';
 import { activa, teclaDe } from './controles.js';
@@ -20,7 +20,8 @@ const MANO_I = new THREE.Vector3(-0.172, 0.07, 0.035), MANO_D = new THREE.Vector
 const NO_SUBE = { lleno: 'El auto está lleno', lejos: 'Acercate más al auto', roto: 'Ese auto está destruido', estado: 'Para subir tenés que estar parado en el piso' };
 const ESCAPES = [[-0.55, 0.34, 2.26], [-0.42, 0.34, 2.26]];
 
-export function crearManejo({ scene, camera, me, getWorld, getMyId, sendMsg, ui, sfx, others, explosion, alSubir, alBajar, feed = () => {} }) {
+// vida(o): vida que se conoce de una cosa del mapa ({ pz } | { key } | { res, idx }), para predecir si el auto la rompe.
+export function crearManejo({ scene, camera, me, getWorld, getMyId, sendMsg, ui, sfx, others, explosion, alSubir, alBajar, feed = () => {}, vida = null }) {
   let pedido = null; // { i, t }: pidió subir y espera la respuesta del servidor
   let autos = [];               // { a, mesh, giroRueda, obj, tObj, llamas }
   let tEnvio = 0, enviado = new Map(), tBocina = 0, tAtropello = new Map(), tChoque = 0, turbaba = false;
@@ -193,7 +194,8 @@ export function crearManejo({ scene, camera, me, getWorld, getMyId, sendMsg, ui,
       ? { acel: activa('acelerar'), freno: activa('frenar'), izq: activa('doblarIzq'), der: activa('doblarDer'), mano: activa('frenoMano'), turbo: activa('turbo') }
       : { acel: false, freno: false, izq: false, der: false, mano: !a.seats.some((s) => s !== null), turbo: false };
     if (!conTeclas && rapidez(a) < 0.05 && a.suelo && Math.abs(a.vy) < 0.05) { a.frena = false; return; }
-    const golpe = fisicaAuto(world, a, ent, dt);
+    const golpe = fisicaAuto(world, a, ent, dt, emb);
+    embestidas(world, e);
     if (golpe > 3) {
       const d = Math.hypot(a.x - me.pos.x, a.z - me.pos.z);
       sfx.choque(golpe, d);
@@ -211,6 +213,25 @@ export function crearManejo({ scene, camera, me, getWorld, getMyId, sendMsg, ui,
         tAtropello.set(id, t);
         sendMsg({ t: 'atropello', pid: id });
       }
+    }
+  }
+
+  // Lo que el auto chocó fuerte (rompió o dañó): se le avisa al servidor, que decide con la vida de verdad y le avisa
+  // a todos (pzHp/pzRota, structHp/structDel, resHit/resGone). Acá solo el golpe: sonido y sacudón.
+  const emb = { vida: (o) => vidaDe(o) };
+  function vidaDe(o) {
+    if (vida) { const v = vida(o.pz !== undefined ? { tipo: 'pz', id: o.pz } : o.key ? { tipo: 'key', id: o.key } : { tipo: o.res, id: o.idx }); return v ? v.hp : null; }
+    const w = getWorld(), p = o.pz !== undefined && w.piezas[o.pz];
+    return p ? (p.vida ?? p.hp) : materialChoque(w, o) ? 150 : null;
+  }
+  function embestidas(world, e) {
+    const a = e.a;
+    if (!a.embestidas?.length) return;
+    const d = Math.hypot(a.x - me.pos.x, a.z - me.pos.z);
+    for (const g of a.embestidas.splice(0)) {
+      sendMsg({ t: 'embestida', a: a.id, o: g.o, v: g.v });
+      sfx.choque(g.rompe ? Math.min(14, 4 + g.v * 0.3) : g.v * 0.6, d);
+      e.mesh.userData.golpe = Math.max(e.mesh.userData.golpe || 0, Math.min(1, g.v / (g.rompe ? 30 : 16)));
     }
   }
 
