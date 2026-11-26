@@ -4,6 +4,7 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 import { WebSocketServer } from 'ws';
 import { World } from './public/js/world.js';
 import {
@@ -35,6 +36,25 @@ const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.glb': 'model/gltf-binary', '.png': 'image/png', '.json': 'application/json',
 };
+// Versión del código: huella de los archivos del juego al arrancar. Si después cambian en el disco (un git pull con el
+// servidor prendido), el servidor sigue corriendo lo viejo: lo avisa en la consola y en el juego, para reiniciarlo.
+function huellaCodigo() {
+  const h = crypto.createHash('sha1');
+  const carpetas = [__dirname, path.join(__dirname, 'servidor'), path.join(__dirname, 'public/js')];
+  for (const dir of carpetas) {
+    let lista = [];
+    try { lista = fs.readdirSync(dir).filter((f) => f.endsWith('.js')).sort(); } catch { continue; }
+    for (const f of lista) { h.update(f); h.update(fs.readFileSync(path.join(dir, f))); }
+  }
+  return h.digest('hex').slice(0, 12);
+}
+const VERSION = huellaCodigo();
+let avisoViejo = false;
+function codigoViejo() {
+  const viejo = huellaCodigo() !== VERSION;
+  if (viejo && !avisoViejo) { avisoViejo = true; console.warn('⚠ El código cambió desde que arrancó el servidor: cerralo (Ctrl+C) y volvé a correr npm start.'); }
+  return viejo;
+}
 const ROOTS = {
   '/vendor/three/': path.join(__dirname, 'node_modules/three/'),
   '/': path.join(__dirname, 'public/'),
@@ -48,7 +68,8 @@ const server = http.createServer((req, res) => {
     if (!file.startsWith(dir)) break;
     return fs.readFile(file, (err, data) => {
       if (err) { res.writeHead(404); return res.end('No encontrado'); }
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+      // sin caché: después de un git pull el navegador trae los archivos nuevos (no mezcla código viejo con nuevo)
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
       res.end(data);
     });
   }
@@ -635,11 +656,15 @@ function handleGame(room, player, msg) {
     }
     // ---------- Autos ----------
     case 'subir': {
+      // si no se puede, se avisa por qué (el cliente lo muestra)
       const a = room.autos[msg.a];
-      if (!a || a.rota || !player.alive || player.state !== 'ground' || player.auto || room.phase !== 'playing') break;
-      if (Math.hypot(a.x - player.pos[0], a.z - player.pos[2]) > AUTO.ALCANCE + 1 || Math.abs(a.y - player.pos[1]) > 3) break;
+      const no = (por) => send(player.ws, { t: 'autoNo', a: msg.a, por });
+      if (!a || !player.alive || player.auto || room.phase !== 'playing') break;
+      if (a.rota) { no('roto'); break; }
+      if (player.state !== 'ground') { no('estado'); break; }
+      if (Math.hypot(a.x - player.pos[0], a.z - player.pos[2]) > AUTO.ALCANCE + 1 || Math.abs(a.y - player.pos[1]) > 3) { no('lejos'); break; }
       const k = asientoLibre(a);
-      if (k < 0) break;
+      if (k < 0) { no('lleno'); break; }
       if (player.use) player.use = null;
       a.seats[k] = player.id;
       player.auto = { a: a.id, k };
@@ -990,7 +1015,7 @@ wss.on('connection', (ws) => {
       };
       room.players.set(player.id, player);
       if (!room.hostId) room.hostId = player.id;
-      send(ws, { t: 'welcome', id: player.id, room: roomInfo(room), snap: room.world && room.phase !== 'lobby' ? matchSnapshot(room) : null });
+      send(ws, { t: 'welcome', id: player.id, version: VERSION, viejo: codigoViejo(), room: roomInfo(room), snap: room.world && room.phase !== 'lobby' ? matchSnapshot(room) : null });
       broadcast(room, { t: 'room', room: roomInfo(room) }, player.id);
       return;
     }

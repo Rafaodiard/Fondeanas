@@ -11,6 +11,8 @@ npm start
 
 Abrí http://localhost:3000, poné tu nombre y tocá **Crear sala**. Tus amigos entran con el código de 5 letras (o con el link `http://TU-IP:3000/?sala=CODIGO` si están en tu misma red). Para jugar por internet hay que subir el servidor a un hosting con Node y WebSockets (Render, Railway, Fly.io, etc.).
 
+**Después de cada `git pull`, cerrá el servidor (Ctrl+C) y volvé a correr `npm start`.** El servidor carga su código una sola vez al arrancar: si sigue prendido, el navegador recibe los archivos nuevos pero el servidor sigue con la lógica vieja, y lo nuevo no anda (por ejemplo, los autos muestran *E Manejar* pero no te dejan subir). Si pasa, el juego muestra un cartel rojo arriba que lo avisa y la consola del servidor también.
+
 Para jugar solo contra bots, tocá **🤖 Jugar con bots**: crea una sala con bots y la empieza enseguida (ver [Bots](#bots)).
 
 ## Bots

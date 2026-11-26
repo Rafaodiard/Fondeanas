@@ -53,3 +53,9 @@ Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.
 - `send` y `broadcast` saltean a los que no tienen conexión (los bots). `publicPlayer` agrega `bot: true`. `personas(room)`: solo las personas (para el límite de 16, cerrar la sala cuando se van todas y elegir anfitrión).
 - `damagePlayer` avisa a los bots que los lastimaron (`alRecibirDanio`) y `killPlayer` al bot que eliminó a alguien (`alMatar`). En `state` se estima la velocidad de cada persona (`velEst`) para la puntería de los bots. `damagePieza` tira las grillas de navegación que tocaba la pieza rota.
 - `checkWinner` / `endMatch`: si no queda ninguna persona viva, la partida termina a los 4,5 s con `botsVivos` (salvo con `SF_BOTS_HASTA_EL_FINAL=1`). Ver [[Bots]].
+
+## Versión y caché (2026-11-26)
+
+- `huellaCodigo()`: sha1 de los `.js` de la raíz, `servidor/` y `public/js` al arrancar (`VERSION`). `codigoViejo()` la recalcula cuando alguien entra a una sala: si cambió (un `git pull` con el servidor prendido) avisa una vez en la consola y manda `viejo: true` en `welcome`.
+- Los archivos estáticos salen con `Cache-Control: no-cache`, para que después de actualizar el navegador no mezcle archivos viejos con nuevos.
+- Por qué: [[Autos funcionales]] (Rafael actualizó sin reiniciar el servidor y los autos "no andaban").
