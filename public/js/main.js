@@ -1326,7 +1326,7 @@ function updateOthers(dt) {
 }
 
 function updateItems(t) {
-  animarLoot(items, world.chestMeshes, t, camera);
+  animarLoot(items, world.chestMeshes, t, camera, world);
 }
 
 const camTarget = new THREE.Vector3();

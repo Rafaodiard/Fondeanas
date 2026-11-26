@@ -29,12 +29,13 @@ Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.
 - `startMatch`: crea el `World` ([[world.js]]), reparte loot del piso, arma el recorrido del bus y las fases de la tormenta, resetea jugadores y la vida de las piezas del mapa (`room.pzHp`, `room.pzRotas`).
 - `stormAt` → [[Tormenta]]
 - `damagePlayer` (el escudo absorbe primero), `killPlayer` (tira todo lo que tenía), `checkWinner`.
-- `addToInventory`, `spawnItem`, `spawnAround` → [[Loot y rarezas]]
+- `addToInventory`, `spawnItem`, `spawnAround` (reparte con `repartirLoot` de [[lugarLoot.js]]: no atraviesa paredes) → [[Loot y rarezas]]
+- `acomodarItems(room, cajas)`: el loot cerca de esas cajas se acomoda con `acomodarLoot` de [[lugarLoot.js]] (sale de una pared nueva, sube arriba de un piso o rampa, cae si se rompió lo de abajo) y se reenvía con `itemsDel` + `itemsAdd`. Se llama al construir y editar (`build`, `edit`), al romperse una construcción (`damageStruct`) y en `damagePieza`. `derrumbar(room, cajas?)` suma a `cajas` las de las construcciones que se cayeron.
 - `handleGame`: un `case` por mensaje de juego (salto, estado, loot, cofres, recarga, disparo, pico, construcción, consumibles, caída).
 - `explode` (lanzacohetes, daño en área; el que dispara recibe la mitad; también daña las piezas del mapa dentro del radio) y `damageStruct` (suma daño y compara con `vidaDe`) → [[Armas y disparo]], [[Construcción]]
 - `derrumbar` (saca las construcciones sin apoyo, también después de romperse una pieza del mapa), `structPublic` y los `case 'build'` / `case 'edit'` → [[Construcción]]. `SF_MATS` (variable de entorno) da materiales al empezar, para probar.
 - Punto débil del pico: `puntoGolpe`, `esCritico`, `nuevoDebil`, `avisarDebil` (`player.debil`) → [[Daño visible y punto débil]]
-- `distPieza` (distancia a la caja de una pieza) y `damagePieza` (si no se rompe avisa la vida con `pzHp`; si se rompe, rompe la pieza y las que quedan sin apoyo, avisa con `pzRota` y baja el loot y los cofres que estaban encima) → [[Estructuras rompibles]]
+- `distPieza` (distancia a la caja de una pieza) y `damagePieza` (si no se rompe avisa la vida con `pzHp`; si se rompe, rompe la pieza y las que quedan sin apoyo, avisa con `pzRota` y baja el loot (con `acomodarItems`, también el que estaba sobre construcciones que se cayeron) y los cofres que estaban encima) → [[Estructuras rompibles]]
 
 ## Usa
 
