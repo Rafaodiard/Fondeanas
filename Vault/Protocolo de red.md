@@ -15,7 +15,7 @@ En la sala:
 - `chat` (`text`, hasta 120 caracteres).
 
 Durante la partida (los maneja `handleGame` en [[server.js]]):
-- `jump`, `state`, `fall` → [[Bus, caída y planeador]]
+- `jump`, `state`, `fall` → [[Bus, caída y paracaídas]]. `state` lleva `x`: cuatro enteros de -100 a 100 (caída, giro, freno, deslizando; [[caida.js]] `paramsRed`) que el servidor limita y reenvía en su `state`.
 - `pickup`, `drop`, `chest` → [[Loot y rarezas]]
 - `reload`, `shoot` → [[Armas y disparo]] (`hits` puede llevar `{ pz, n }`: pieza del mapa y cuántos perdigones le pegaron)
 - `swing` → [[Pico y recursos]] (con `pz` si el golpe fue a una pieza del mapa, ver [[Estructuras rompibles]])

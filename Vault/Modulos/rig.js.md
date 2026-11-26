@@ -15,11 +15,15 @@ Archivo: `public/js/rig.js`. Personaje con esqueleto y animaciones hechas en Ble
   - **Sin arma** (locomoción, pico, objeto, golpe): `Spine1` 18 %, `Spine2` 22 %, cuello 20 % y cabeza 30 % del `pitch`. Mirando abajo, los brazos giran para atrás lo mismo que se dobló el pecho, o sea que cuelgan; si no, las manos se metían en la funda del muslo y en los bolsillos del chaleco. Mirando arriba siguen al pecho.
   - Lo revisa `brazos_choque.py` ([[Pipeline del héroe]]).
 - Recargas (`RECARGA`: `RecargaRifle`, `RecargaSubfusil`, `RecargaPistola`, `RecargaEscopeta`, `RecargaFranco`, `RecargaCohete`) y bombeo de la escopeta (`BombeoEscopeta`, `BombeoEscopetaApunta`). Los clips vienen de `animaciones_armas.glb` ([[Pipeline de armas]]).
+- Caída libre (`animaciones_caida.glb`): mezcla `CaidaPlaneo` / `Caida` / `CaidaPicada` según `x.caida` (-1 a 1).
+- Paracaídas: `Abrir` una vez al pasar de `falling` a `glider` (`abrirT`), después `Paracaidas` mezclado con `ParacaidasIzq`, `ParacaidasDer` y `ParacaidasFreno` según `x.giro` y `x.freno`. Al tocar el piso desde el aire, `Aterrizaje` (`aterrizaT`) pisa la locomoción y se corta si sale corriendo. `Deslizar` reemplaza la locomoción con `x.desliz`.
+- `placeParachute` cuelga `paracaidas.glb` de `ARNES` (entre los hombros del clip `Paracaidas`) y `animarParacaidas` maneja la apertura (`paraK`: sale arrugado con la forma `Plegado` y se infla con rebote entre 0,2 y 0,75 s), el cierre, los frenos (formas `FrenoL`/`FrenoR`) y las cuerdas de los frenos hasta las manos.
+- `inclinar`: todo el cuerpo (grupo `pivote`, entre la raíz y el modelo) se ladea hacia la curva: en caída libre sobre la cadera y con el paracaídas sobre los hombros, así la vela se inclina con el cuerpo; al frenar se va un poco atrás.
 - Piezas móviles del arma (`PIEZAS`): cargador, cerrojo, bomba, corredera, cohete, cartucho, bala.
 - Retroceso (`retroceso`, al final de `animateRig`): cada tiro (`recoil = 1`, lo marca [[main.js]]) suma un impulso a un resorte amortiguado (`R_W`, `R_Z`, `R_IMP`), así sube rápido, vuelve con un rebote chico y con las automáticas se acumula. La tabla `RETRO` da por arma cuánto se inclina el pecho (`sube`), cuánto gira el arma sobre el puño (`flip`), cuánto retrocede en la mano (`atras`) y cuánto gira el torso de costado (`giro`). Apuntando se multiplica por 0,7. Ver [[Armas y disparo]].
 
 ## Funciones exportadas
 
-`setRigEnv` (iluminación de entorno con `RoomEnvironment`), `hasRig`, `createRigCharacter`, `placeGlider`, `animateRig`, `weaponRig`, `rigAction`, `rigStopAction`, `rigShot`.
+`setRigEnv` (iluminación de entorno con `RoomEnvironment`), `hasRig`, `createRigCharacter`, `placeGlider`, `placeParachute`, `ARNES`, `animateRig`, `weaponRig`, `rigAction`, `rigStopAction`, `rigShot`.
 
 Usa [[assets.js]]. Lo usan [[models.js]], [[main.js]] y [[visor.html]].

@@ -19,3 +19,4 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 - [[Panel de configuración]]: el pedido del panel y quién eligió cada opción.
 - [[Pedido del bus]]: el bus volador modelado por script.
 - [[Caminos prolijos]]: ninguna calle se corta de golpe; remates y la prueba de caminos.
+- [[Caída, paracaídas y deslizarse]]: el pedido de la caída libre con más control, el paracaídas con altura límite y deslizarse.

@@ -9,11 +9,14 @@ import {
 } from './items.js';
 import { sfx, setVolumen } from './audio.js';
 import { setRigEnv } from './rig.js';
+import {
+  estadoCaida, fisicaAire, abrirParacaidas, puedeCerrar, cerrarParacaidas, PARACAIDAS, DESLIZ,
+  puedeDeslizar, empezarDeslizar, terminarDeslizar, fisicaDeslizar, paramsRed, leerParams,
+} from './caida.js';
 import { accionesDe, activa, presionar, soltar, soltarTodo, teclaDe, listaAcciones, opcion, alCambiar, cargarDistribucion } from './controles.js';
 import { abrirConfig, cerrarConfig, abierto as configAbierta } from './configuracion.js';
 
 const GRAVITY = 25, WALK = 6, SPRINT = 9.5, AIM_WALK = 3.5, JUMP = 8.5, SWIM_Y = -1.3;
-const FREEFALL_V = 42, FREEFALL_H = 20, GLIDER_V = 8, GLIDER_H = 17, AUTO_GLIDER = 70;
 const PICKUP_RANGE = 3;
 
 // ---------- DOM ----------
@@ -135,11 +138,12 @@ const others = new Map();
 const items = new Map(); // id -> { it, mesh }
 const me = {
   pos: new THREE.Vector3(), vel: new THREE.Vector3(), yaw: 0, pitch: -0.2, state: 'lobby',
-  hp: 100, shield: 0, kills: 0, onGround: false, aiming: false, gliderUsed: false,
+  hp: 100, shield: 0, kills: 0, onGround: false, aiming: false,
   slots: Array(SLOTS).fill(null), ammo: {}, mats: { madera: 0, piedra: 0, metal: 0 },
   sel: -1, // -1 = pico, 0..4 = slots
   reloading: 0, reloadSlot: -1, lastShot: 0, lastSwing: 0, use: null,
   build: null, mat: 'madera', mesh: null, spectate: null, minVy: 0,
+  ...estadoCaida(), // caída libre, paracaídas y deslizarse (caida.js)
 };
 let bus = null;
 let mouseDown = false, mouseClicked = false, locked = false, rmbDown = false;
@@ -214,7 +218,7 @@ function handle(m) {
       const o = others.get(m.id);
       if (!o) break;
       o.target.fromArray(m.p);
-      o.rotTarget = m.r; o.state = m.s; o.aiming = m.a; o.dance = !!m.b;
+      o.rotTarget = m.r; o.state = m.s; o.aiming = m.a; o.dance = !!m.b; o.x = leerParams(m.x);
       if (m.h) setHeld(o.mesh, m.h[0], m.h[1]);
       // recarga de los demás: empieza cuando aparece el tiempo restante y se corta si desaparece antes
       const rl = m.rl || 0;
@@ -393,7 +397,7 @@ function setupMatch(snap) {
   ui.hud.classList.remove('hidden');
   ui.killfeed.innerHTML = '';
   Object.assign(me, {
-    hp: 100, shield: 0, kills: 0, state: 'bus', gliderUsed: false, spectate: null, sel: -1, build: null,
+    hp: 100, shield: 0, kills: 0, state: 'bus', spectate: null, sel: -1, build: null, ...estadoCaida(),
     reloading: 0, reloadSlot: -1, use: null, slots: Array(SLOTS).fill(null), mats: { madera: 0, piedra: 0, metal: 0 }, ammo: {},
   });
   me.vel.set(0, 0, 0);
@@ -621,6 +625,8 @@ document.addEventListener('keydown', (e) => {
   pulsar(e.code, e);
 });
 document.addEventListener('keyup', (e) => liberar(e.code));
+// En partida, cerrar la pestaña sin querer (por ejemplo Ctrl+W mientras se desliza con Ctrl) pide confirmación.
+window.addEventListener('beforeunload', (e) => { if (PLAYING.includes(me.state)) { e.preventDefault(); e.returnValue = ''; } });
 window.addEventListener('blur', soltarEntradas);
 function soltarEntradas() { soltarTodo(); mouseDown = false; if (!opcion('apuntarAlternar')) { rmbDown = false; me.aiming = false; } }
 
@@ -647,6 +653,7 @@ function hacer(a, e) {
     case 'interactuar': doInteract(); break;
     case 'tirar': dropHeld(); break;
     case 'bailar': if (me.state === 'ground') me.dance = !me.dance; break;
+    case 'deslizar': intentarDeslizar(); break;
     case 'pico': selectSlot(-1); break;
     case 'ranuraSiguiente': case 'ranuraAnterior':
       if (!me.build) selectSlot(((me.sel + 1 + (a === 'ranuraSiguiente' ? 1 : -1) + SLOTS + 1) % (SLOTS + 1)) - 1);
@@ -696,9 +703,15 @@ function setBuild(type) {
 }
 
 function onSpace() {
+  const altura = alturaSuelo();
   if (me.state === 'bus' && room?.bus && now() > room.bus.start) jumpFromBus();
-  else if (me.state === 'falling' && me.pos.y - world.groundHeight(me.pos.x, me.pos.z) > 12) openGlider();
-  else if (me.state === 'ground' && me.onGround) { me.vel.y = JUMP; me.onGround = false; }
+  else if (me.state === 'falling' && altura > PARACAIDAS.MIN) openGlider();
+  else if (me.state === 'glider' && puedeCerrar(me, altura)) { cerrarParacaidas(me); sfx.paracaidasCierra(); }
+  else if (me.state === 'ground' && me.onGround) {
+    // saltar en medio de un deslizamiento conserva la velocidad
+    if (me.desliz) terminarDeslizar(me);
+    me.vel.y = JUMP; me.onGround = false;
+  }
 }
 function jumpFromBus() {
   me.state = 'falling';
@@ -708,9 +721,7 @@ function jumpFromBus() {
   sendMsg({ t: 'jump' });
 }
 function openGlider() {
-  if (me.gliderUsed) return;
-  me.gliderUsed = true;
-  me.state = 'glider';
+  abrirParacaidas(me);
   sfx.glider();
 }
 function startReload() {
@@ -1123,19 +1134,22 @@ function updateMe(dt) {
   if (input.lengthSq() > 0) input.normalize();
   const ground = world.groundHeight(me.pos.x, me.pos.z, me.pos.y);
 
-  if (me.state === 'falling') {
-    const dive = Math.max(0, -me.pitch) * 0.6;
-    me.vel.y += (-(FREEFALL_V * (1 + dive)) - me.vel.y) * Math.min(1, dt * 2);
-    me.vel.x += (input.x * FREEFALL_H - me.vel.x) * Math.min(1, dt * 2);
-    me.vel.z += (input.z * FREEFALL_H - me.vel.z) * Math.min(1, dt * 2);
-    if (me.pos.y - ground < AUTO_GLIDER) openGlider();
-  } else if (me.state === 'glider') {
-    me.vel.y += (-GLIDER_V - me.vel.y) * Math.min(1, dt * 3);
-    const h = fwd.clone().multiplyScalar(6).addScaledVector(input, GLIDER_H - 6);
-    me.vel.x += (h.x - me.vel.x) * Math.min(1, dt * 1.5);
-    me.vel.z += (h.z - me.vel.z) * Math.min(1, dt * 1.5);
+  if (me.state === 'falling' || me.state === 'glider') {
+    // caída libre (planeo / picada) y paracaídas: caida.js
+    const ent = { fwd, right, adelante: activa('adelante'), atras: activa('atras'), izq: activa('izquierda'), der: activa('derecha') };
+    if (fisicaAire(me, ent, dt, alturaSuelo()) === 'abrir') sfx.glider();
+  } else if (me.state === 'ground' && me.desliz) {
+    // deslizándose: el impulso se gasta con el roce y crece en bajada
+    const swimming = ground < SWIM_Y;
+    if (swimming || !fisicaDeslizar(me, dt, pendiente(me.pos.x, me.pos.z), input, activa('deslizar'))) terminarDeslizar(me);
+    me.vel.y -= GRAVITY * dt;
+    if (!me.onGround) me.minVy = Math.min(me.minVy, me.vel.y);
   } else if (me.state === 'ground') {
     const swimming = ground < SWIM_Y;
+    // mantener apretado deslizarse mientras se arranca a correr también vale (una vez por apretada: al terminar un
+    // deslizamiento con la tecla apretada no empieza otro hasta soltarla)
+    if (!activa('deslizar')) me.deslizSuelta = true;
+    else if (me.deslizSuelta && puedeDeslizar(me, swimming)) intentarDeslizar();
     const slow = me.use ? 0.5 : 1;
     // "Correr siempre": se corre sin apretar nada y la tecla de correr pasa a caminar
     const corre = activa('adelante') && (activa('correr') !== !!opcion('correrSiempre'));
@@ -1174,13 +1188,36 @@ function updateMe(dt) {
 
   me.mesh.visible = true;
   me.mesh.position.copy(me.pos);
-  me.mesh.rotation.y = me.yaw;
   const hs = Math.hypot(me.vel.x, me.vel.z);
   const it = heldItem();
+  const armado = (me.aiming || mouseDown) && it?.kind === 'weapon';
+  // deslizándose el cuerpo mira hacia donde va, salvo que se esté apuntando o tirando
+  me.mesh.rotation.y = me.desliz && !armado ? me.desliz.yaw : me.yaw;
   if (me.dance && (hs > 0.5 || me.state !== 'ground' || mouseDown)) me.dance = false;
-  animateCharacter(me.mesh, me.state, hs, dt, (me.aiming || mouseDown) && it?.kind === 'weapon',
-    { air: !me.onGround, vy: me.vel.y, pitch: me.pitch, dance: me.dance });
+  animateCharacter(me.mesh, me.state, hs, dt, armado,
+    { air: !me.onGround, vy: me.vel.y, pitch: me.pitch, dance: me.dance, caida: me.caida, giro: me.giro, freno: me.freno, desliz: !!me.desliz });
+  sfx.viento(me.state === 'falling' ? Math.min(1, -me.vel.y / 70) : me.state === 'glider' ? 0.25 : 0);
+  if (me.desliz) sfx.deslizar(hs / DESLIZ.MAX); else sfx.deslizar(0);
   if (me.state === 'ground' && me.mesh.userData.headG) me.mesh.userData.headG.rotation.x = me.pitch * 0.5;
+}
+
+// Altura sobre lo que hay abajo (terreno, techo o el agua): manda la apertura del paracaídas.
+function alturaSuelo() {
+  return me.pos.y - Math.max(world.groundHeight(me.pos.x, me.pos.z, me.pos.y), SWIM_Y);
+}
+// Pendiente del piso (dh/dx, dh/dz) para deslizarse.
+function pendiente(x, z) {
+  const e = 0.6;
+  const h = (a, b) => world.groundHeight(a, b, me.pos.y + 0.5);
+  return new THREE.Vector2((h(x + e, z) - h(x - e, z)) / (2 * e), (h(x, z + e) - h(x, z - e)) / (2 * e));
+}
+function intentarDeslizar() {
+  const ground = world?.groundHeight(me.pos.x, me.pos.z, me.pos.y) ?? 0;
+  if (!puedeDeslizar(me, ground < SWIM_Y)) return;
+  empezarDeslizar(me);
+  me.deslizSuelta = false;
+  if (me.use) cancelUse();
+  sfx.deslizarInicio();
 }
 
 function updateOthers(dt) {
@@ -1197,7 +1234,8 @@ function updateOthers(dt) {
     o.speed += (sp - o.speed) * Math.min(1, dt * 8);
     const vy = (o.mesh.position.y - o.prev.y) / Math.max(dt, 1e-3);
     o.vy = (o.vy || 0) + (vy - (o.vy || 0)) * Math.min(1, dt * 10);
-    animateCharacter(o.mesh, o.state, o.speed, dt, o.aiming, { air: Math.abs(o.vy) > 1.6, vy: o.vy, pitch: 0, dance: o.dance });
+    const x = o.x || {};
+    animateCharacter(o.mesh, o.state, o.speed, dt, o.aiming, { air: !x.desliz && Math.abs(o.vy) > 1.6, vy: o.vy, pitch: 0, dance: o.dance, ...x });
   }
 }
 
@@ -1209,7 +1247,7 @@ const camTarget = new THREE.Vector3();
 const camRay = new THREE.Raycaster();
 const _cd = new THREE.Vector3();
 let camArm = null; // largo actual del brazo de la cámara: entra de golpe si choca y sale suave al despejarse
-let camD = null, camS = 0, camU = 0; // distancia, corrimiento al hombro y altura, suavizados
+let camD = null, camS = 0, camU = 0, camAlto = 1.68; // distancia, corrimiento al hombro y altura, suavizados
 function updateCamera(dt, t) {
   if (!world) return;
   if (me.state === 'lobby' || !room || room.phase === 'lobby') {
@@ -1227,11 +1265,15 @@ function updateCamera(dt, t) {
     const o = me.spectate && others.get(me.spectate);
     if (o && o.mesh.visible) { focus = o.mesh.position.clone().add(new THREE.Vector3(0, 1.6, 0)); dist = 4.5; up = 0.3; side = 0.7; collide = true; }
     else { focus = me.pos.clone().add(new THREE.Vector3(0, 2, 0)); dist = 14; up = 2; }
-  } else if (me.state === 'falling' || me.state === 'glider') {
-    focus = me.pos.clone().add(new THREE.Vector3(0, 1.5, 0)); dist = 7.5; up = 0.5; collide = true;
+  } else if (me.state === 'falling') {
+    focus = me.pos.clone().add(new THREE.Vector3(0, 1.2, 0)); dist = 7.5; up = 0.6; collide = true;
+  } else if (me.state === 'glider') {
+    // más lejos y más alto: entra la vela del paracaídas en la pantalla
+    focus = me.pos.clone().add(new THREE.Vector3(0, 2.0, 0)); dist = 9; up = 1.1; collide = true;
   } else {
-    // cámara al hombro, cerca del personaje (como en los battle royale en tercera persona)
-    focus = me.pos.clone().add(new THREE.Vector3(0, 1.68, 0));
+    // cámara al hombro, cerca del personaje (como en los battle royale en tercera persona); baja al deslizarse
+    camAlto += ((me.desliz ? DESLIZ.ALTO_CAMARA : 1.68) - camAlto) * Math.min(1, dt * 8);
+    focus = me.pos.clone().add(new THREE.Vector3(0, camAlto, 0));
     dist = scoped ? 0.2 : me.aiming ? 1.9 : me.build ? 4.6 : 3.6;
     side = scoped ? 0 : me.aiming ? 0.72 : me.build ? 0.9 : 0.8;
     up = scoped ? 0 : me.aiming ? 0.12 : 0.28;
@@ -1265,7 +1307,7 @@ function updateCamera(dt, t) {
   camera.position.copy(camTarget);
   camera.lookAt(camera.position.clone().add(dir));
   const fovBase = opcion('fov');
-  const fovTarget = scoped ? 18 : me.aiming ? fovBase - 18 : me.state === 'falling' ? fovBase + 10 : fovBase;
+  const fovTarget = scoped ? 18 : me.aiming ? fovBase - 18 : me.state === 'falling' ? fovBase + 8 + 8 * Math.max(0, me.caida) : me.desliz ? fovBase + 5 : fovBase;
   camera.fov += (fovTarget - camera.fov) * Math.min(1, dt * 12);
   camera.updateProjectionMatrix();
   ui.scope.classList.toggle('hidden', !scoped);
@@ -1346,8 +1388,14 @@ function updateHud(t) {
     const left = (room.bus.start - t) / 1000;
     if (left > 0) showCenter(`Despegue en ${Math.ceil(left)}`, 'Elegí dónde caer mirando el mapa');
     else ui.center.innerHTML = `<small>Apretá ${escapeHtml(teclaDe('saltar').toUpperCase())} para saltar del bus</small>`;
-  } else if (me.state === 'falling') ui.center.innerHTML = `<small>Altura ${Math.round(me.pos.y - world.groundHeight(me.pos.x, me.pos.z))} m · ${escapeHtml(teclaDe('saltar').toUpperCase())} abre el planeador</small>`;
-  else if ((me.state === 'glider' || me.state === 'ground') && (ui.center.innerHTML.includes('planeador') || ui.center.innerHTML.includes('bus'))) showCenter('');
+  } else if (me.state === 'falling' || me.state === 'glider') {
+    // altura y qué hace la tecla de saltar; debajo del límite el paracaídas ya no se cierra
+    const alt = Math.round(alturaSuelo());
+    const tecla = escapeHtml(teclaDe('saltar').toUpperCase());
+    const que = me.state === 'falling' ? `${tecla} abre el paracaídas`
+      : !me.paraBloq && alt >= PARACAIDAS.LIMITE ? `${tecla} lo cierra` : '';
+    ui.center.innerHTML = `<small class="altura">${alt} m${que ? ' · ' + que : ''}</small>`;
+  } else if (me.state === 'ground' && (ui.center.innerHTML.includes('altura') || ui.center.innerHTML.includes('bus'))) showCenter('');
   if (me.state === 'ground') updatePrompt(); else ui.prompt.classList.add('hidden');
 }
 
@@ -1374,7 +1422,7 @@ function frame() {
       sendTimer = 1 / 15;
       const it = heldItem();
       const h = me.build ? [null] : !it ? ['pico'] : it.kind === 'weapon' ? [it.w, RARITIES[it.rarity].color] : ['item', CONSUMABLES[it.c].color];
-      sendMsg({ t: 'state', p: [+me.pos.x.toFixed(2), +me.pos.y.toFixed(2), +me.pos.z.toFixed(2)], r: +me.yaw.toFixed(3), s: me.state, a: (me.aiming || mouseDown) && it?.kind === 'weapon', h, b: !!me.dance, rl: me.reloading > 0 ? +me.reloading.toFixed(2) : 0 });
+      sendMsg({ t: 'state', p: [+me.pos.x.toFixed(2), +me.pos.y.toFixed(2), +me.pos.z.toFixed(2)], r: +me.mesh.rotation.y.toFixed(3), s: me.state, x: paramsRed(me), a: (me.aiming || mouseDown) && it?.kind === 'weapon', h, b: !!me.dance, rl: me.reloading > 0 ? +me.reloading.toFixed(2) : 0 });
     }
   }
   updateEffects(dt);

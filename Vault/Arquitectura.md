@@ -35,7 +35,8 @@ public/models/*.glb ──► assets.js (loadAssets, cloneAsset, bakedParts)
 ## Dependencias entre módulos (imports)
 
 - [[server.js]] → [[world.js]], [[items.js]], `ws`
-- [[main.js]] → [[world.js]], [[assets.js]], [[models.js]], [[items.js]], [[audio.js]], [[rig.js]]
+- [[main.js]] → [[world.js]], [[assets.js]], [[models.js]], [[items.js]], [[audio.js]], [[rig.js]], [[caida.js]]
+- [[caida.js]] → `three` (solo vectores; no toca la escena)
 - [[models.js]] → [[assets.js]], [[rig.js]]
 - [[rig.js]] → [[assets.js]]
 - [[world.js]] → [[items.js]], [[planos.js]], [[isla.js]], [[colision.js]], [[mallas.js]]

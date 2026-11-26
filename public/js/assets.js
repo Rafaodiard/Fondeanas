@@ -5,7 +5,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 export const ASSETS = {};
 export const ANIMS = {};
-const FILES = ['personaje', 'animaciones_armas', 'bus', 'planeador', 'cofre', 'armas', 'objetos', 'pino', 'arbol', 'roca'];
+const FILES = ['personaje', 'animaciones_armas', 'animaciones_caida', 'bus', 'paracaidas', 'cofre', 'armas', 'objetos', 'pino', 'arbol', 'roca'];
 
 export async function loadAssets(onProgress) {
   const loader = new GLTFLoader();
@@ -25,6 +25,8 @@ export async function loadAssets(onProgress) {
   }));
   // recargas y bombeo del héroe: se suman a sus clips (las pistas se enganchan por nombre de hueso)
   if (ANIMS.personaje && ANIMS.animaciones_armas?.length) ANIMS.personaje.push(...ANIMS.animaciones_armas);
+  // caída libre, paracaídas, aterrizaje y deslizarse (tools/blender/heroe_caida.py): igual que las recargas
+  if (ANIMS.personaje && ANIMS.animaciones_caida?.length) ANIMS.personaje.push(...ANIMS.animaciones_caida);
   return ASSETS;
 }
 

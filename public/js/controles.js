@@ -182,7 +182,8 @@ A('atras', 'Atrás', 'Movimiento', ['KeyS', 'ArrowDown']);
 A('izquierda', 'Izquierda', 'Movimiento', ['KeyA', 'ArrowLeft']);
 A('derecha', 'Derecha', 'Movimiento', ['KeyD', 'ArrowRight']);
 A('correr', 'Correr', 'Movimiento', ['ShiftLeft']);
-A('saltar', 'Saltar / saltar del bus / abrir planeador', 'Movimiento', ['Space']);
+A('saltar', 'Saltar / saltar del bus / abrir y cerrar el paracaídas', 'Movimiento', ['Space']);
+A('deslizar', 'Deslizarse (corriendo)', 'Movimiento', ['ControlLeft']);
 A('bailar', 'Bailar', 'Movimiento', ['KeyB']);
 
 A('disparar', 'Disparar / usar', 'Combate', ['Mouse0']);

@@ -317,7 +317,9 @@ function handleGame(room, player, msg) {
       player.pos = p;
       if (['falling', 'glider', 'ground'].includes(msg.s)) player.state = msg.s;
       const rl = Math.min(5, Math.max(0, Number(msg.rl) || 0));
-      broadcast(room, { t: 'state', id: player.id, p, r: Number(msg.r) || 0, s: player.state, a: !!msg.a, h: msg.h, sw: !!msg.sw, b: !!msg.b, rl }, player.id);
+      // parámetros de animación de la caída, el paracaídas y el deslizamiento (caida.js): 4 enteros chicos
+      const x = Array.isArray(msg.x) ? msg.x.slice(0, 4).map((v) => Math.max(-100, Math.min(100, Math.round(Number(v) || 0)))) : undefined;
+      broadcast(room, { t: 'state', id: player.id, p, r: Number(msg.r) || 0, s: player.state, a: !!msg.a, h: msg.h, sw: !!msg.sw, b: !!msg.b, rl, x }, player.id);
       break;
     }
     case 'pickup': {
