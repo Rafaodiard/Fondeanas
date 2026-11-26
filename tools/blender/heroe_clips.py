@@ -306,6 +306,7 @@ class Marcha:
         self.muneca = -10.0
         self.hombros = 0.0
         self.arco = 1.0          # >1: la mano recién cruza hacia el centro al final del vaivén (rodea el chaleco)
+        self.giro_antebrazo = 0.0  # grados: atrás el antebrazo gira (dorso hacia atrás, pulgar adelante), no pulgar a la cola
         self.vuelo = []
         self.__dict__.update(k)
         self.ts = self.duty * self.T / FPS
@@ -389,6 +390,11 @@ class Marcha:
             W = desde_hombro(p, l, o)
             pol = D3 @ V(S(l) * self.brazo_polo[0], self.brazo_polo[1], self.brazo_polo[2])
             brazo(p, l, W, pol)
+            if self.giro_antebrazo:
+                # cuanto más atrás va el brazo, más gira el antebrazo (y la mano la mitad): el puño pasa al costado
+                # de la cadera mostrando el dorso, sin que el pulgar apunte a la cola ni al cinturón
+                p.rot_local('LowerArm.' + l, (0, 1, 0), S(l) * self.giro_antebrazo * (1 - t))
+                p.rot_local('Hand.' + l, (0, 1, 0), S(l) * self.giro_antebrazo * 0.5 * (1 - t))
             p.rot_local('Hand.' + l, (1, 0, 0), self.muneca)
             p.dedos(l, self.puno[0], self.puno[1])
 
@@ -408,8 +414,8 @@ TROTE = dict(T=22, duty=0.33, y_land=-0.30, y_off=0.30, ancho=0.115, giro_pie=-7
              balanceo=0.014, giro_cadera=7.0, ladeo_cadera=3.5, incl_cadera=4.0, incl=7.0, giro_hombros=9.0,
              cabeza=1.0, vuelo=[(0.25, 0.0, 0.30, 0.31, 60.0, -5.0), (0.52, -0.005, 0.0, 0.36, 26.0, 0.0),
                                 (0.8, 0.0, -0.31, 0.22, -6.0, 0.0)],
-             brazo_adelante=(-0.06, -0.28, -0.19), brazo_atras=(0.0, 0.15, -0.40), brazo_polo=(0.45, 0.9, -0.3),
-             arco=3.0, puno=(50.0, 30.0))
+             brazo_adelante=(-0.04, -0.28, -0.19), brazo_atras=(0.07, 0.15, -0.40), brazo_polo=(0.45, 0.9, -0.3),
+             arco=3.0, puno=(50.0, 30.0), giro_antebrazo=-45.0)
 
 CORRER = dict(T=20, duty=0.26, y_land=-0.36, y_off=0.34, ancho=0.11, giro_pie=-8.0,
               p_land=-5.0, p_mid=0.0, p_off=50.0, roll=(0.18, 0.42),
@@ -417,8 +423,8 @@ CORRER = dict(T=20, duty=0.26, y_land=-0.36, y_off=0.34, ancho=0.11, giro_pie=-8
               balanceo=0.012, giro_cadera=9.0, ladeo_cadera=4.0, incl_cadera=6.0, incl=10.0, giro_hombros=12.0,
               cabeza=2.0, vuelo=[(0.22, 0.0, 0.40, 0.42, 72.0, -5.0), (0.5, -0.005, 0.02, 0.50, 34.0, 0.0),
                                  (0.79, 0.0, -0.39, 0.30, -2.0, 0.0)],
-              brazo_adelante=(-0.07, -0.32, -0.16), brazo_atras=(0.01, 0.21, -0.40), brazo_polo=(0.45, 0.9, -0.3),
-              arco=3.0, puno=(55.0, 35.0), hombros=3.0)
+              brazo_adelante=(-0.05, -0.32, -0.16), brazo_atras=(0.11, 0.18, -0.38), brazo_polo=(0.45, 0.9, -0.3),
+              arco=3.0, puno=(55.0, 35.0), hombros=3.0, giro_antebrazo=-45.0)
 
 SPRINT = dict(T=18, duty=0.24, y_land=-0.38, y_off=0.38, ancho=0.10, giro_pie=-9.0,
               p_land=8.0, p_mid=4.0, p_off=55.0, roll=(0.15, 0.36),
@@ -426,8 +432,8 @@ SPRINT = dict(T=18, duty=0.24, y_land=-0.38, y_off=0.38, ancho=0.10, giro_pie=-9
               balanceo=0.01, giro_cadera=10.0, ladeo_cadera=4.0, incl_cadera=10.0, incl=16.0, giro_hombros=14.0,
               cabeza=4.0, vuelo=[(0.22, 0.0, 0.42, 0.55, 78.0, -5.0), (0.5, -0.005, -0.03, 0.58, 38.0, 0.0),
                                  (0.8, 0.0, -0.42, 0.32, 4.0, 0.0)],
-              brazo_adelante=(-0.08, -0.31, -0.17), brazo_atras=(0.02, 0.27, -0.36), puno=(45.0, 30.0), arco=3.0,
-              muneca=-4.0, hombros=5.0)
+              brazo_adelante=(-0.06, -0.31, -0.17), brazo_atras=(0.13, 0.22, -0.34), puno=(45.0, 30.0), arco=3.0,
+              muneca=-4.0, hombros=5.0, giro_antebrazo=-45.0)
 
 MARCHAS = {'Caminar': CAMINAR, 'Trote': TROTE, 'Correr': CORRER, 'Sprint': SPRINT}
 
