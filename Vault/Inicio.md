@@ -4,7 +4,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 
 - Repo: https://github.com/Rafaodiard/Fondeanas
 - Stack: Node (`server.js` con `ws`) + Three.js 0.170 como ES modules sin bundler. `npm start` levanta todo en el puerto 3000 (`PORT` lo cambia).
-- Vault actualizado con los bots (rama `claude/project-thread-jzsanm`, 2026-11-26), el daño visible y el punto débil del pico (rama `claude/project-thread-rrpo2j`, 2026-11-26), los autos manejables, además de la construcción estilo battle royale, el cofre y los objetos del piso modelados, y la caída libre, el paracaídas y deslizarse. El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
+- Vault actualizado con las fotos de las armas en la barra de items (rama `claude/project-thread-re7eeo`, 2026-11-26), los bots (rama `claude/project-thread-jzsanm`, 2026-11-26), el daño visible y el punto débil del pico (rama `claude/project-thread-rrpo2j`, 2026-11-26), los autos manejables, además de la construcción estilo battle royale, el cofre y los objetos del piso modelados, y la caída libre, el paracaídas y deslizarse. El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
 
 ## Cómo está armado
 
@@ -27,6 +27,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 | [[assets.js]] | `public/js/assets.js` | Carga de los GLB y clonado con tintes |
 | [[models.js]] | `public/js/models.js` | Personajes, bus y armas (GLB o primitivas de respaldo) |
 | [[loot.js]] | `public/js/loot.js` | Objetos del piso y cofres en el juego, con sus efectos y animaciones |
+| [[iconos.js]] | `public/js/iconos.js` | Fotos de las armas y objetos para la barra de items, sacadas de sus modelos 3D |
 | [[rig.js]] | `public/js/rig.js` | Esqueleto y animaciones del personaje por capas, paracaídas colgado de los hombros |
 | [[caida.js]] | `public/js/caida.js` | Física de la caída libre (planeo / picada), el paracaídas y deslizarse |
 | [[audio.js]] | `public/js/audio.js` | Sonidos sintetizados con WebAudio y volumen general |
@@ -63,6 +64,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 - [[Pipeline del auto]]: script de Blender del auto (carrocería paramétrica, ruedas, interior, fotos y export).
 - `tools/autos/pruebas.mjs`: pruebas de los autos (ver [[autos.js]]).
 - `tools/bots/pruebas.mjs` y `tools/bots/partida.mjs`: pruebas de los bots y una partida entera solo con bots (ver [[Bots]]).
+- `tools/iconos/pruebas.mjs`: pruebas de las fotos de la barra de items en el navegador (ver [[iconos.js]]).
 - `tools/golpes/pruebas.mjs`: pruebas del punto débil y la vida de lo dañado contra el servidor (ver [[Daño visible y punto débil]]).
 - [[sf_tools.py]]: herramientas base de modelado por script.
 - [[Texturas]]: máscaras de cara y tatuaje hechas con Python.
