@@ -293,7 +293,7 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
   else if (state === 'ground' && !dance && u.heldKind && POSE_ARMA[u.heldKind]) {
     let n = POSE_ARMA[u.heldKind];
     if (aiming && APUNTA[n]) n = APUNTA[n];
-    over[n] = n === 'SostenerPico' ? Math.max(0, 1 - speed / 2.5) * (air ? 0.4 : 1) : 1;
+    over[n] = n === 'SostenerPico' ? (air ? 0.4 : 1) : 1;
   }
   let O = 0, OL = 0;      // peso de la pose de arriba, y la parte que deja libre la mano izquierda
   for (const n in over) { O += over[n]; if (MANO_L_LIBRE.has(n)) OL += over[n]; }
