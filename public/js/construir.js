@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { GRID, DIRS, MATERIALS, MAT_ORDER, BUILD_COST, structKey } from './items.js';
 import {
-  TIPOS, NOMBRES, normalizar, tieneApoyo, rayoEdicion, marcasIniciales, resultadoEdicion, ALCANCE_EDICION, cajaPieza, HP_INICIAL,
+  TIPOS, NOMBRES, normalizar, tieneApoyo, rayoEdicion, marcasIniciales, resultadoEdicion, ALCANCE_EDICION, cajaPieza,
 } from './construccion.js';
 import { makeStructMesh, pintarFantasma, grillaEdicion, pintarGrilla, liberarGrilla, liberar } from './construccion3d.js';
 import { registrarAccion, teclaDe } from './controles.js';
@@ -30,7 +30,6 @@ export function crearConstruccion({ scene, camera, me, getWorld, getMyId, sendMs
   let giro = 0; // vueltas extra de la rampa (R)
   let fantasma = null, fantasmaKey = '', objetivoActual = null, ultimaColocada = '', tColocada = 0;
   let edit = null; // { s, grilla, marcas, camino, pinta, hover, valida }
-  const ray = new THREE.Raycaster();
   const _o = new THREE.Vector3(), _d = new THREE.Vector3();
 
   const puede = () => me.state === 'ground';
@@ -249,29 +248,7 @@ export function crearConstruccion({ scene, camera, me, getWorld, getMyId, sendMs
     pintarGrilla(edit.grilla, edit.marcas, edit.hover, edit.valida);
   }
 
-  // ---------- Vida de la pieza que se mira ----------
-  function vidaActual(s) {
-    if (!(s.max > 0)) return null;
-    const t = performance.now();
-    const crece = s.obra > 0 ? (s.max * (1 - HP_INICIAL) / s.obra) * Math.max(0, Math.min(t, s.creceHasta || 0) - (s.recibido || t)) / 1000 : 0;
-    return Math.max(0, Math.min(s.max, s.hp + crece));
-  }
-  function actualizarVidaVista(world) {
-    if (!ui.structhp) return;
-    let txt = '';
-    if (puede() && (me.build || edit || me.sel === -1)) {
-      const { o, d } = rayoCamara();
-      ray.set(o, d); ray.far = o.distanceTo(me.pos) + 12;
-      const hit = ray.intersectObjects(world.structMeshes, true)[0];
-      let obj = hit?.object;
-      while (obj && !obj.userData.structKey) obj = obj.parent;
-      const s = obj && world.structs.get(obj.userData.structKey);
-      const v = s && vidaActual(s);
-      if (v !== null && v !== undefined) txt = `<i style="background:${MATERIALS[s.mat].color}"></i>${Math.ceil(v)} / ${s.max}`;
-    }
-    if (ui.structhp.innerHTML !== txt) ui.structhp.innerHTML = txt;
-    ui.structhp.classList.toggle('hidden', !txt);
-  }
+  // La vida de la pieza que se mira o se golpea la muestra golpes.js (#structhp).
 
   // ---------- Por cuadro ----------
   function update(dt, mouseDown) {
@@ -279,7 +256,6 @@ export function crearConstruccion({ scene, camera, me, getWorld, getMyId, sendMs
     if (!world) return;
     if (edit) actualizarEdicion(world, mouseDown);
     else actualizarFantasma(world, mouseDown);
-    actualizarVidaVista(world);
   }
 
   // ---------- HUD: barra de piezas arriba del inventario y ayuda solo de construcción ----------

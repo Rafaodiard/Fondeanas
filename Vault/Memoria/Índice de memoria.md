@@ -21,6 +21,7 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 - [[Pedido del bus]]: el bus volador modelado por script.
 - [[Caminos prolijos]]: ninguna calle se corta de golpe; remates y la prueba de caminos.
 - [[Autos funcionales]]: el pedido de autos manejables y qué se decidió (teclas, asientos, quién simula).
+- [[Daño visible y críticos]]: el pedido de ver cuánto daño tiene una pared y el punto débil del pico.
 - [[Caída, paracaídas y deslizarse]]: el pedido de la caída libre con más control, el paracaídas con altura límite y deslizarse.
 
 - [[Jugar con bots]]: el pedido de jugar con bots y lo que se decidió (nombres, fin de partida, límite de 24).

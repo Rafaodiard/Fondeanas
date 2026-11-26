@@ -22,15 +22,15 @@ Volver a [[Inicio]] · reglas en [[construccion.js]] · mallas en [[construccion
 
 - Modo construcción, vista previa y colocación seguida: [[construir.js]]. No se construye cayendo ni planeando.
 - Controles (de fábrica, todos remapeables en [[Configuración y controles]]): Q modo construcción, Z/X/C/V pared/piso/rampa/techo, F editar y confirmar, R girar la rampa (solo en construcción), clic derecho en construcción cambia el material y editando restablece la pieza, clic izquierdo coloca o marca baldosas.
-- HUD ([[index.html]]): arriba del inventario, la barra `#buildbar` con las cuatro piezas, su tecla y el material elegido; `#buildhint` con la ayuda de construcción o de edición (solo en esos modos); `#structhp` con la vida de la construcción que se mira.
+- HUD ([[index.html]]): arriba del inventario, la barra `#buildbar` con las cuatro piezas, su tecla y el material elegido; `#buildhint` con la ayuda de construcción o de edición (solo en esos modos); `#structhp` con la vida de lo que se mira o se golpea (construcciones, piezas del mapa, árboles y rocas; lo maneja [[golpes.js]]).
 - Material automático: si el elegido no alcanza para una pieza, pasa al siguiente que alcance (`autoMaterial`, en cada `inv`).
 
 ## Servidor ([[server.js]])
 
 - `case 'build'`: tipo, material, materiales suficientes, distancia (3 celdas en horizontal y 2,5 en altura), estado (no en el bus, cayendo ni planeando), que no exista y que tenga apoyo. Guarda `born`, `dano` y `owner` y manda `structAdd`.
 - `case 'edit'`: dueño, distancia (`ALCANCE_EDICION` + 2) y edición válida; manda `structEdit` con `e` y `dir`.
-- Daño: disparos, pico y explosiones (`damageStruct`) → `structHp` con la vida actual, o `structDel` con la pieza y `caidas` (las que se cayeron). Cuando se rompe una pieza del mapa, también `structDel` con `key: null` y `caidas`.
-- `structPublic` manda `e`, `owner`, `hp`, `max`, `obra` y `crece` (segundos que le faltan para levantarse).
+- Daño: disparos, pico (con punto débil, ver [[Daño visible y punto débil]]) y explosiones (`damageStruct`) → `structHp` con la vida actual y el daño acumulado (`dano`, para las grietas), o `structDel` con la pieza y `caidas` (las que se cayeron). Cuando se rompe una pieza del mapa, también `structDel` con `key: null` y `caidas`.
+- `structPublic` manda `e`, `owner`, `hp`, `max`, `dano`, `obra` y `crece` (segundos que le faltan para levantarse).
 - `SF_MATS=500 npm start` arranca cada partida con 500 de cada material (para probar).
 
 Pruebas: [[Pruebas de construcción]].

@@ -14,10 +14,10 @@ Todas las estructuras del mapa se rompen con el pico, a tiros y con explosiones,
 
 ## Daño
 
-- **Pico** (`swing` con `pz`): 50 por golpe (`PICKAXE.struct`), y da material según la pieza: madera 6, piedra 6, metal 5 (`PICKAXE.gain` de [[items.js]]); el golpe que la rompe da el doble.
+- **Pico** (`swing` con `pz`, `at` y `n`): 50 por golpe (`PICKAXE.struct`), 100 si le pega al punto débil ([[Daño visible y punto débil]]), y da material según la pieza: madera 6, piedra 6, metal 5 (`PICKAXE.gain` de [[items.js]]); el golpe que la rompe da el doble.
 - **Disparos** (`shoot` con `hits: [{ pz, n }]`): daño de estructura del arma (`def.struct`) por la rareza y por la parte de los perdigones que pegaron.
 - **Explosiones** (`explode`): cada pieza dentro del radio, una vez, con menos daño cuanto más lejos.
-- El servidor valida la distancia a la caja de la pieza (`distPieza`) y lleva la vida en `room.pzHp`.
+- El servidor valida la distancia a la caja de la pieza (`distPieza`) y lleva la vida en `room.pzHp`. Si la pieza no se rompe, manda la vida nueva a todos (`pzHp`); el cliente dibuja grietas según cuánto perdió ([[golpes.js]]).
 
 ## Cuando se rompe
 

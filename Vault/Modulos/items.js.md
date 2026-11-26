@@ -12,6 +12,7 @@ Archivo: `public/js/items.js`. Definiciones compartidas entre cliente y servidor
 - `CONSUMABLES`: venda, botiquín, frasco azul, bidón azul. Ver [[Curación y escudo]].
 - `MATERIALS`: madera (150 de vida), piedra (300), metal (450). `MAT_ORDER`, `BUILD_COST = 10`, `MAX_MATS = 999`, `GRID = 4`.
 - `PICKAXE`: daño, daño a estructuras, cooldown, alcance y cuánto material da cada recurso. Ver [[Pico y recursos]].
+- `PUNTO_DEBIL`: daño del crítico (×2), tolerancia, radio del círculo, duración y distancia del siguiente. Ver [[Daño visible y punto débil]].
 - `SLOTS = 5` (sin contar el pico).
 - Funciones: `rollRarity`, `randomWeapon` (pesos distintos para piso y cofre), `randomConsumable`, `randomAmmo`, `itemLabel`, `itemColor`, `weaponDamage`, `weaponReload`.
 - Construcciones: `DIRS` y `structKey` (normaliza paredes compartidas entre dos celdas). Ver [[Construcción]].

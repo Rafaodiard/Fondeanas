@@ -18,6 +18,7 @@ import { BOT_TOTALES, BOT_DIFICULTADES, BOT_TOTAL_DEF, cuantosBots } from './opc
 import { abrirConfig, cerrarConfig, abierto as configAbierta } from './configuracion.js';
 import { crearConstruccion } from './construir.js';
 import { crearManejo } from './manejar.js';
+import { crearGolpes, objetivoDe, aMensaje } from './golpes.js';
 
 const GRAVITY = 25, WALK = 6, SPRINT = 9.5, AIM_WALK = 3.5, JUMP = 8.5, SWIM_Y = -1.3;
 const PICKUP_RANGE = 3;
@@ -160,6 +161,8 @@ let minimapBase = null;
 let interact = null;
 // Construcción (construir.js): modo construcción, vista previa, edición y su HUD.
 const cons = crearConstruccion({ scene, camera, me, getWorld: () => world, getMyId: () => myId, sendMsg, ui, sfx, feed });
+// Daño visible (grietas y barra de vida) y punto débil del pico (golpes.js).
+const golpes = crearGolpes({ scene, camera, me, getWorld: () => world, ui, sfx, cons, rayo: (o, d, r, n) => castRay(o, d, r, n), mirar: mirarPico, addDmgNum, sparks });
 // Autos (manejar.js): manejo, autos de los demás, subir y bajar, pose sentado y su HUD.
 const autos = crearManejo({
   scene, camera, me, getWorld: () => world, getMyId: () => myId, sendMsg, ui, sfx, others,
@@ -305,10 +308,11 @@ function handle(m) {
     case 'itemsDel': for (const id of m.ids) removeItem(id); break;
     case 'chestOpen': world.openChest(m.idx, true); if (world.chestSpots[m.idx] && me.pos.distanceTo(v3(world.chestSpots[m.idx])) < 15) sfx.chest(); break;
     case 'resHit': world.shakeResource(m.res, m.idx); break;
-    case 'resGone': world.destroyResource(m.res, m.idx); break;
+    case 'resGone': world.destroyResource(m.res, m.idx); golpes.alRomper({ tipo: m.res, id: m.idx }); break;
     case 'structAdd':
       world.addStruct(m.s);
       cons.alAgregar(m.s);
+      if (m.s.dano) golpes.vidaStruct(world.structs.get(m.s.key), m.s.dano, false);
       if (me.pos.distanceTo(new THREE.Vector3(m.s.i * GRID, m.s.y, m.s.j * GRID)) < 40) sfx.build();
       break;
     case 'structDel': {
@@ -320,6 +324,7 @@ function handle(m) {
         const c = new THREE.Vector3(s.i * GRID + 2, s.y + 2, s.j * GRID + 2);
         explosionFx(c, MATERIALS[s.mat].color, 0.6);
         if (c.distanceTo(me.pos) < 60) cerca = true;
+        golpes.alRomper({ tipo: 'key', id: key });
         world.removeStruct(key);
       }
       if (cerca) sfx.structBreak();
@@ -335,6 +340,7 @@ function handle(m) {
       let cerca = false;
       for (const id of m.ids) {
         const p = world.romperPieza(id);
+        golpes.alRomper({ tipo: 'pz', id });
         if (!p) continue;
         escombros(p);
         const a = p.aabb;
@@ -344,9 +350,11 @@ function handle(m) {
       break;
     }
     case 'chestMove': world.moveChest(m.idx, m.y); break;
+    case 'pzHp': for (let i = 0; i < m.ids.length; i++) golpes.vidaPieza(m.ids[i], m.hp[i]); break;
+    case 'debil': golpes.alDebil(m); break;
     case 'structHp': {
       const s = world.structs.get(m.key);
-      if (s) cons.alCambiarVida(s, m.hp);
+      if (s) { cons.alCambiarVida(s, m.hp); golpes.vidaStruct(s, m.dano); }
       if (s?.mesh) { s.mesh.scale.setScalar(0.94); setTimeout(() => s.mesh && s.mesh.scale.setScalar(1), 70); }
       break;
     }
@@ -486,6 +494,7 @@ function setupMatch(snap) {
   ui.hud.classList.remove('hidden');
   ui.killfeed.innerHTML = '';
   cons.cancelar();
+  golpes.reiniciar();
   Object.assign(me, {
     hp: 100, shield: 0, kills: 0, state: 'bus', spectate: null, sel: -1, build: null, ...estadoCaida(),
     reloading: 0, reloadSlot: -1, use: null, slots: Array(SLOTS).fill(null), mats: { madera: 0, piedra: 0, metal: 0 }, ammo: {},
@@ -502,8 +511,9 @@ function setupMatch(snap) {
     for (const i of snap.chests) world.openChest(i);
     for (const i of snap.trees) world.destroyResource('tree', i);
     for (const i of snap.rocks) world.destroyResource('rock', i);
-    for (const s of snap.structs) { world.addStruct(s); cons.alAgregar(s); }
+    for (const s of snap.structs) { world.addStruct(s); cons.alAgregar(s); if (s.dano) golpes.vidaStruct(world.structs.get(s.key), s.dano, false); }
     for (const id of snap.piezas || []) world.romperPieza(id);
+    for (const [id, hp] of snap.pzHp || []) golpes.vidaPieza(id, hp, false);
     for (const [i, y] of snap.cofresMovidos || []) world.moveChest(i, y);
   }
   autos.iniciar(snap?.autos);
@@ -899,7 +909,18 @@ function structOf(obj) {
   return null;
 }
 
-// Primer impacto a lo largo del rayo: { dist, pid, head, key, res, idx, pz, auto }
+// Normal (en el mundo, mirando hacia el rayo) de la cara que tocó un raycast.
+const _m4 = new THREE.Matrix4();
+function normalDe(h, dir) {
+  if (!h.face) return null;
+  const n = h.face.normal.clone();
+  if (h.object.isInstancedMesh && h.instanceId !== undefined) { h.object.getMatrixAt(h.instanceId, _m4); n.transformDirection(_m4); }
+  n.transformDirection(h.object.matrixWorld);
+  if (n.dot(dir) > 0) n.negate();
+  return n;
+}
+
+// Primer impacto a lo largo del rayo: { dist, n (normal de la cara), pid, head, key, res, idx, pz, auto }
 function castRay(origin, dir, range, near) {
   let best = { dist: range };
   raycaster.set(origin, dir);
@@ -907,12 +928,12 @@ function castRay(origin, dir, range, near) {
   const hits = raycaster.intersectObjects([...world.solidMeshes, ...world.structMeshes], true);
   for (const h of hits) {
     const key = structOf(h.object);
-    if (key) { best = { dist: h.distance, key }; break; }
+    if (key) { best = { dist: h.distance, key, n: normalDe(h, dir) }; break; }
     // malla de choque del mapa: cada triángulo sabe de qué pieza es (las fijas no se rompen)
     const tp = h.object.userData.triPz;
     if (tp) {
       const pz = tp[h.faceIndex], p = pz >= 0 ? world.piezas[pz] : null;
-      best = p && !p.fija && !p.rota ? { dist: h.distance, pz } : { dist: h.distance };
+      best = p && !p.fija && !p.rota ? { dist: h.distance, pz, n: normalDe(h, dir) } : { dist: h.distance };
       break;
     }
     const hv = h.object.userData.harvest;
@@ -921,7 +942,7 @@ function castRay(origin, dir, range, near) {
         const idx = hv.map ? hv.map[h.instanceId] : h.instanceId;
         const list = hv.kind === 'tree' ? world.trees : world.rocks;
         if (!list[idx]?.alive) continue;
-        best = { dist: h.distance, res: hv.kind, idx };
+        best = { dist: h.distance, res: hv.kind, idx, n: normalDe(h, dir) };
       } else best = { dist: h.distance, res: hv.kind };
       break;
     }
@@ -971,21 +992,27 @@ function trySwing() {
   const res = castRay(camera.position, camDir, near + PICKAXE.range + 0.7, Math.max(0, near - 0.8));
   if (res.dist >= near + PICKAXE.range + 1) { sfx.whiff(); sendMsg({ t: 'swing' }); return; }
   const at = camera.position.clone().addScaledVector(camDir, res.dist);
-  if (res.pid) sendMsg({ t: 'swing', pid: res.pid });
-  else if (res.key) { sendMsg({ t: 'swing', key: res.key }); sfx.pickaxe('struct'); }
+  // estructuras, árboles y rocas: el golpe lleva el punto y la normal (para el punto débil) y se ve el daño al toque
+  const obj = objetivoDe(res);
+  if (obj) {
+    const n = res.n || camDir.clone().negate();
+    sendMsg({ t: 'swing', ...aMensaje(obj), at: at.toArray().map((v) => +v.toFixed(2)), n: n.toArray().map((v) => +v.toFixed(3)) });
+    golpes.golpePico(obj, at, n);
+    if (obj.tipo === 'pz') { const p = world.piezas[res.pz]; sfx.pickaxe(p.clase === 'madera' ? 'tree' : 'rock'); sparks(at, p.color || '#dddddd'); return; }
+    if (obj.tipo === 'key') sfx.pickaxe('struct');
+    else { sfx.pickaxe(res.res); world.shakeResource(res.res, res.idx); }
+  } else if (res.pid) sendMsg({ t: 'swing', pid: res.pid });
   else if (res.auto !== undefined) { sendMsg({ t: 'swing', auto: res.auto }); sfx.pickaxe('rock'); }
-  else if (res.pz !== undefined) {
-    const p = world.piezas[res.pz];
-    sendMsg({ t: 'swing', pz: res.pz });
-    sfx.pickaxe(p.clase === 'madera' ? 'tree' : 'rock');
-    sparks(at, p.color || '#dddddd');
-    return;
-  } else if (res.res) {
-    sendMsg({ t: 'swing', res: res.res, idx: res.idx });
-    sfx.pickaxe(res.res);
-    if (res.idx !== undefined) world.shakeResource(res.res, res.idx);
-  } else { sfx.pickaxe('rock'); sendMsg({ t: 'swing' }); }
+  else if (res.res) { sendMsg({ t: 'swing', res: res.res, idx: res.idx }); sfx.pickaxe(res.res); }
+  else { sfx.pickaxe('rock'); sendMsg({ t: 'swing' }); }
   sparks(at, res.res === 'tree' ? '#c58b4c' : '#dddddd');
+}
+
+// Lo que se mira con el pico o construyendo (para mostrar su vida).
+function mirarPico() {
+  const camDir = camera.getWorldDirection(new THREE.Vector3());
+  const near = headDepth(camDir);
+  return castRay(camera.position, camDir, near + 10, Math.max(0, near - 0.8));
 }
 
 function tryShoot(it, def) {
@@ -1021,6 +1048,7 @@ function tryShoot(it, def) {
     if (!def.rocket) { addTracer(muzzle, end, it.w); if (!res.pid) sparks(end, '#ffe9a8', 3); }
   }
   if (def.rocket) addRocket(muzzle, mainEnd);
+  for (const e of tally.values()) { const o = objetivoDe(e); if (o) { golpes.mostrar(o); break; } }
   sendMsg({ t: 'shoot', slot: me.sel, from: muzzle.toArray(), to: mainEnd.toArray(), hits: [...tally.values()] });
   sfx.shot(it.w);
   me.pitch = Math.min(1.2, me.pitch + ({ rifle: 0.008, subfusil: 0.006, pistola: 0.012, escopeta: 0.04, francotirador: 0.06, lanzacohetes: 0.05 }[it.w] || 0.01));
@@ -1082,11 +1110,12 @@ function sparks(at, color, n = 6) {
   }
 }
 
-function addDmgNum(pos, dmg, color) {
+function addDmgNum(pos, dmg, color, cls = '') {
   if (!opcion('numerosDanio')) return;
   const el = document.createElement('div');
   el.textContent = dmg;
   el.style.color = color;
+  if (cls) el.className = cls;
   ui.dmgnums.append(el);
   dmgNums.push({ el, pos: pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0, 0)), life: 0.9 });
 }
@@ -1462,6 +1491,7 @@ function frame() {
     updateOthers(dt);
     updateItems(t);
     world.updateStructs();
+    golpes.update(dt, me.state === 'ground' && (!!me.build || cons.editando || me.sel === -1));
     const s = updateStorm(t);
     drawMinimap(s);
     updateHud(t);
@@ -1486,6 +1516,6 @@ frame();
 import * as ITEMS from "./items.js";
 window.__WEAPONS = ITEMS.WEAPONS;
 window.__game = {
-  me, others, items, camera, sendMsg, selectSlot, setBuild, doInteract, findInteract, trySwing, tryShoot, updateSlots, renderer, scene, cons, pulsar, liberar, autos,
+  me, others, items, camera, sendMsg, selectSlot, setBuild, doInteract, findInteract, trySwing, tryShoot, updateSlots, renderer, scene, cons, pulsar, liberar, autos, golpes, castRay,
   get room() { return room; }, get world() { return world; },
 };

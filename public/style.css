@@ -127,8 +127,16 @@ button:hover { filter: brightness(1.1); }
 #buildbar .pmat span { font-size: 9px; font-weight: 800; text-transform: uppercase; opacity: .8; }
 #buildhint { display: flex; gap: 10px; font-size: 12px; font-weight: 700; text-shadow: 0 1px 2px #000; background: rgba(0,0,0,.35); padding: 4px 10px; border-radius: 7px; }
 #buildhint b { background: #fff; color: #000; padding: 0 5px; border-radius: 3px; margin-right: 3px; font-size: 11px; }
-#structhp { position: absolute; left: 50%; top: calc(50% + 26px); transform: translateX(-50%); display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; background: rgba(0,0,0,.45); padding: 2px 8px; border-radius: 6px; text-shadow: 0 1px 2px #000; }
-#structhp i { width: 10px; height: 10px; border-radius: 2px; }
+/* Vida de lo que golpeás o mirás con el pico (golpes.js): barra con la parte recién perdida en blanco */
+#structhp { position: absolute; left: 50%; top: calc(50% + 28px); transform: translateX(-50%); display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; background: rgba(0,0,0,.5); padding: 3px 8px; border-radius: 7px; text-shadow: 0 1px 2px #000; pointer-events: none; }
+#structhp i { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+#structhp .barra { position: relative; width: 110px; height: 8px; background: rgba(255,255,255,.14); border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0,0,0,.45); }
+#structhp .barra b { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+#structhp .barra .perdida { background: #fff; opacity: .85; }
+#structhp .barra .vida { box-shadow: inset 0 -3px 0 rgba(0,0,0,.25); transition: width 60ms linear; }
+#structhp span { min-width: 62px; font-variant-numeric: tabular-nums; }
+#structhp.crit { box-shadow: 0 0 0 2px #6fe0ff, 0 0 14px #6fe0ff; }
+#structhp.crit span { color: #9eeaff; }
 #prompt { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); background: rgba(0,0,0,.6); padding: 8px 14px; border-radius: 8px; font-weight: 700; white-space: nowrap; }
 #prompt b { background: #fff; color: #000; padding: 1px 7px; border-radius: 4px; margin-right: 6px; }
 #usebar { position: absolute; left: 50%; top: 56%; transform: translateX(-50%); width: 220px; height: 16px; background: rgba(0,0,0,.6); border-radius: 8px; overflow: hidden; }
@@ -137,6 +145,8 @@ button:hover { filter: brightness(1.1); }
 #pickupFeed { position: absolute; left: 16px; top: 60px; display: flex; flex-direction: column; gap: 3px; font-size: 13px; font-weight: 700; }
 #pickupFeed div { background: rgba(0,0,0,.45); padding: 3px 8px; border-radius: 5px; border-left: 4px solid #fff; }
 #dmgnums div { position: absolute; font-weight: 900; font-size: 20px; text-shadow: 0 2px 3px #000; transform: translate(-50%, -50%); pointer-events: none; }
+#dmgnums div.estr { font-size: 17px; }
+#dmgnums div.crit { font-size: 30px; -webkit-text-stroke: 1px #0a3a52; text-shadow: 0 0 10px #39c8ff, 0 2px 3px #000; }
 #scope { position: absolute; inset: 0; background: radial-gradient(circle at center, transparent 0 32vmin, #000 32.3vmin); }
 #scope::before, #scope::after { content: ''; position: absolute; background: #000; }
 #scope::before { left: 50%; top: 18vh; bottom: 18vh; width: 2px; }
