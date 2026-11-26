@@ -1,7 +1,7 @@
-// Personajes, bus, planeador, armas y objetos: usa los GLB hechos en Blender y, si alguno no cargó, modelos low-poly procedurales de respaldo.
+// Personajes, bus, paracaídas, armas y objetos: usa los GLB hechos en Blender y, si alguno no cargó, modelos low-poly procedurales de respaldo.
 import * as THREE from 'three';
 import { cloneAsset } from './assets.js';
-import { hasRig, createRigCharacter, animateRig, placeGlider, weaponRig, rigAction, rigStopAction, rigShot } from './rig.js';
+import { hasRig, createRigCharacter, animateRig, placeGlider, placeParachute, weaponRig, rigAction, rigStopAction, rigShot } from './rig.js';
 
 export { rigAction as weaponAction, rigStopAction as stopWeaponAction, rigShot as weaponShot };
 
@@ -18,9 +18,13 @@ function box(w, h, d, mat, x = 0, y = 0, z = 0) {
 export function createCharacter(color) {
   if (hasRig()) {
     const root = createRigCharacter(color);
-    const glider = createGlider(color);
-    glider.visible = false;
-    placeGlider(root, glider);
+    const para = cloneAsset('paracaidas', null, { Tela: color });
+    if (para) placeParachute(root, para);
+    else {
+      const glider = createGlider(color);
+      glider.visible = false;
+      placeGlider(root, glider);
+    }
     setHeld(root, 'pico');
     return root;
   }
@@ -77,10 +81,8 @@ function createCharacterProcedural(color) {
   return root;
 }
 
+// Planeador de respaldo (si paracaidas.glb no cargó o el personaje no tiene esqueleto).
 export function createGlider(color) {
-  const glb = cloneAsset('planeador', null, { Tela: color });
-  if (glb) { const g = new THREE.Group(); glb.position.y = 0.6; g.add(glb); return g; }
-
   const g = new THREE.Group();
   const canopyMat = std(color, { side: THREE.DoubleSide });
   const shape = new THREE.Shape();

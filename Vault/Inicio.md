@@ -1,10 +1,11 @@
 # Salto Final · Inicio
 
-Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]), bus volador, caída libre con planeador, tormenta que se achica y salas privadas a las que se entra con un código de 5 letras.
+Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]), bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica y salas privadas a las que se entra con un código de 5 letras.
 
 - Repo: https://github.com/Rafaodiard/Fondeanas
 - Stack: Node (`server.js` con `ws`) + Three.js 0.170 como ES modules sin bundler. `npm start` levanta todo en el puerto 3000 (`PORT` lo cambia).
 - Vault actualizado con el cofre y los objetos del piso modelados y sus efectos (rama `claude/project-thread-cw9rz0`, 2026-11-26), sobre el commit `5398592` de `main`. El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
+- También tiene la caída libre, el paracaídas y deslizarse (rama `claude/project-thread-sx1i2r`, 2026-11-26).
 
 ## Cómo está armado
 
@@ -27,7 +28,8 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 | [[assets.js]] | `public/js/assets.js` | Carga de los GLB y clonado con tintes |
 | [[models.js]] | `public/js/models.js` | Personajes, bus y armas (GLB o primitivas de respaldo) |
 | [[loot.js]] | `public/js/loot.js` | Objetos del piso y cofres en el juego, con sus efectos y animaciones |
-| [[rig.js]] | `public/js/rig.js` | Esqueleto y animaciones del personaje por capas |
+| [[rig.js]] | `public/js/rig.js` | Esqueleto y animaciones del personaje por capas, paracaídas colgado de los hombros |
+| [[caida.js]] | `public/js/caida.js` | Física de la caída libre (planeo / picada), el paracaídas y deslizarse |
 | [[audio.js]] | `public/js/audio.js` | Sonidos sintetizados con WebAudio y volumen general |
 | [[controles.js]] | `public/js/controles.js` | Registro central de teclas (acciones con contexto) y opciones del juego, guardados en `localStorage` |
 | [[configuracion.js]] | `public/js/configuracion.js` | Panel de configuración: Juego, Video, Sonido y Controles |
@@ -41,7 +43,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 
 ## Sistemas del juego
 
-- [[Mapa de la isla]] · [[Estructuras rompibles]] · [[Salas y partidas]] · [[Bus, caída y planeador]] · [[Tormenta]] · [[Loot y rarezas]] · [[Armas y disparo]] · [[Construcción]] · [[Pico y recursos]] · [[Curación y escudo]] · [[Configuración y controles]]
+- [[Mapa de la isla]] · [[Estructuras rompibles]] · [[Salas y partidas]] · [[Bus, caída y paracaídas]] · [[Deslizarse]] · [[Tormenta]] · [[Loot y rarezas]] · [[Armas y disparo]] · [[Construcción]] · [[Pico y recursos]] · [[Curación y escudo]] · [[Configuración y controles]]
 
 ## Arte y herramientas
 
@@ -52,6 +54,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 - [[Pipeline del bus]]: script de Blender del bus volador (modelado, fotos y export).
 - [[sf_tools.py]]: herramientas base de modelado por script.
 - [[Texturas]]: máscaras de cara y tatuaje hechas con Python.
+- `tools/caida/pruebas.mjs`: pruebas de la caída libre, el paracaídas y deslizarse (ver [[caida.js]]).
 - `tools/controles/pruebas.mjs`: pruebas del registro de controles y opciones (ver [[controles.js]]).
 - [[Pruebas del mapa]]: pruebas automáticas de colisiones, escaleras, puertas, alcance del loot, lo que se ve (caras al revés, caras que titilan, pisos falsos) y derrumbes.
 

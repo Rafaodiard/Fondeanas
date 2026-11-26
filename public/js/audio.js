@@ -63,8 +63,41 @@ const SHOTS = {
   lanzacohetes: { dur: 0.35, freq: 500, vol: 1.0 },
 };
 
+// Ruido que suena en loop (viento de la caída libre, roce al deslizarse): se crea una vez y solo cambia el volumen.
+const loops = {};
+function loop(nombre, freq, q, tipo) {
+  if (loops[nombre]) return loops[nombre];
+  const c = ac(); if (!c) return null;
+  const buf = c.createBuffer(1, c.sampleRate * 2, c.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+  const f = c.createBiquadFilter(); f.type = tipo; f.frequency.value = freq; f.Q.value = q;
+  const g = c.createGain(); g.gain.value = 0;
+  src.connect(f); f.connect(g); g.connect(master);
+  src.start();
+  loops[nombre] = { g, f, nivel: 0 };
+  return loops[nombre];
+}
+function nivelLoop(nombre, v, freq, q, tipo, vol, fmin, fmax) {
+  if (!ctx && v <= 0) return;
+  const L = loop(nombre, freq, q, tipo); if (!L) return;
+  v = Math.max(0, Math.min(1, v));
+  if (Math.abs(v - L.nivel) < 0.01) return;
+  L.nivel = v;
+  const t = ctx.currentTime;
+  L.g.gain.setTargetAtTime(v * vol, t, 0.12);
+  L.f.frequency.setTargetAtTime(fmin + (fmax - fmin) * v, t, 0.12);
+}
+
 export const sfx = {
   unlock: () => ac(),
+  // viento de la caída (0 = nada, 1 = picada a fondo)
+  viento(v) { nivelLoop('viento', v, 500, 0.7, 'bandpass', 0.55, 300, 1300); },
+  // roce contra el piso al deslizarse (v = velocidad relativa)
+  deslizar(v) { nivelLoop('roce', v, 900, 1.2, 'bandpass', 0.45, 500, 1400); },
+  deslizarInicio() { burst({ dur: 0.25, freq: 700, q: 0.8, vol: 0.7, type: 'bandpass' }); },
+  paracaidasCierra() { burst({ dur: 0.3, freq: 1200, q: 0.6, vol: 0.5, type: 'highpass' }); },
   shot(w, distance = 0) {
     const s = SHOTS[w] || SHOTS.rifle;
     const att = Math.max(0.05, 1 - distance / 250);

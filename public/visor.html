@@ -25,9 +25,17 @@
     <option value="ground">En el piso</option>
     <option value="salto">Saltando</option>
     <option value="falling">Caída libre</option>
-    <option value="glider">Planeador</option>
+    <option value="glider">Paracaídas (abre desde la caída)</option>
+    <option value="aterrizar">Aterrizar (cae con el paracaídas y toca el piso)</option>
+    <option value="desliz">Deslizarse</option>
     <option value="baile">Baile</option>
   </select>
+  <label>Caída: planeo ↔ picada (<span id="ctxt">0</span>)</label>
+  <input id="caida" type="range" min="-1" max="1" step="0.05" value="0">
+  <label>Giro: izquierda ↔ derecha (<span id="gtxt">0</span>)</label>
+  <input id="giro" type="range" min="-1" max="1" step="0.05" value="0">
+  <label>Freno del paracaídas (<span id="ftxt">0</span>)</label>
+  <input id="freno" type="range" min="0" max="1" step="0.05" value="0">
   <label>Velocidad: <span id="vtxt">0</span> m/s</label>
   <input id="vel" type="range" min="0" max="9.5" step="0.1" value="0">
   <label>En la mano</label>
@@ -68,7 +76,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#8fb3cf');
 scene.fog = new THREE.Fog('#8fb3cf', 20, 60);
-const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 200);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 400);
 camera.position.set(2.6, 1.8, -3.4);
 const controls = new OrbitControls(camera, canvas);
 controls.target.set(0, 1.0, 0);
@@ -100,14 +108,23 @@ setRigEnv(renderer);
 const $ = (id) => document.getElementById(id);
 let pj = createCharacter($('color').value);
 scene.add(pj);
-const S = { estado: 'ground', vel: 0, mano: 'pico', apunta: false, pitch: 0, t: 0, vy: 0, dist: 0 };
+const S = { estado: 'ground', vel: 0, mano: 'pico', apunta: false, pitch: 0, t: 0, vy: 0, dist: 0, caida: 0, giro: 0, freno: 0 };
 const recargar = () => { if (WEAPONS[S.mano]) weaponAction(pj, 'reload', WEAPONS[S.mano].reload); };
 const disparar = () => { if (WEAPONS[S.mano]) { pj.userData.recoil = 1; weaponShot(pj, S.mano, S.apunta); } };
 window.VISOR = { S, get pj() { return pj; }, THREE, scene, camera, renderer, controls, golpe: () => { pj.userData.swing = 1; }, recargar, disparar };
 $('recargar').onclick = recargar;
 $('disparar').onclick = disparar;
 
-$('estado').onchange = (e) => { S.estado = e.target.value; S.t = 0; };
+$('estado').onchange = (e) => {
+  S.t = 0;
+  // el paracaídas se abre desde la caída libre (así se ve el tirón) y el aterrizaje arranca con el paracaídas abierto
+  if (e.target.value === 'glider') { animateCharacter(pj, 'falling', 0, 0.016, false, {}); }
+  if (e.target.value === 'aterrizar') { animateCharacter(pj, 'falling', 0, 0.016, false, {}); animateCharacter(pj, 'glider', 0, 2, false, {}); }
+  S.estado = e.target.value;
+};
+for (const [id, k, t] of [['caida', 'caida', 'ctxt'], ['giro', 'giro', 'gtxt'], ['freno', 'freno', 'ftxt']]) {
+  $(id).oninput = (e) => { S[k] = +e.target.value; $(t).textContent = S[k].toFixed(2); };
+}
 $('vel').oninput = (e) => { S.vel = +e.target.value; $('vtxt').textContent = S.vel.toFixed(1); };
 $('mano').onchange = (e) => { S.mano = e.target.value; setHeld(pj, S.mano || null, '#4fa3ff'); };
 $('apunta').onchange = (e) => { S.apunta = e.target.checked; };
@@ -130,7 +147,9 @@ const clock = new THREE.Clock();
 function frame() {
   const dt = Math.min(0.05, clock.getDelta());
   S.t += dt;
-  let state = S.estado, air = false;
+  let state = S.estado, air = false, desliz = false;
+  if (state === 'desliz') { state = 'ground'; desliz = true; }
+  if (state === 'aterrizar') state = S.t < 0.4 ? 'glider' : 'ground';
   if (state === 'salto') {
     const T = 2 * 8.5 / 25;                 // misma física que el juego
     const t = S.t % (T + 0.4);
@@ -138,12 +157,12 @@ function frame() {
     air = t < T;
     pj.position.y = t < T ? 8.5 * t - 12.5 * t * t : 0;
     state = 'ground';
-  } else pj.position.y = state === 'falling' || state === 'glider' ? 0.5 : 0;
+  } else pj.position.y = state === 'falling' ? 0.5 : 0;
   // el piso se mueve debajo para que se note si los pies patinan
   S.dist += S.vel * dt;
   floor.position.z = grid.position.z = (S.dist % 1);
   animateCharacter(pj, state === 'baile' ? 'ground' : state, S.vel, dt, S.apunta && !!S.mano && S.mano !== 'pico' && S.mano !== 'item',
-    { air, vy: S.vy, pitch: S.pitch, dance: state === 'baile' });
+    { air, vy: S.vy, pitch: S.pitch, dance: state === 'baile', caida: S.caida, giro: S.giro, freno: S.freno, desliz });
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(frame);

@@ -13,7 +13,7 @@ Archivo: `public/js/controles.js`. Registro central de **acciones** (qué hace c
 - `teclaDe(id)` y `nombreTecla(code)`: nombres para mostrar ("Espacio", "Clic der.", "Rueda ↓"). `cargarDistribucion()` usa `navigator.keyboard.getLayoutMap()` (Chrome/Edge) para nombrar las teclas como están impresas en el teclado del jugador.
 - Lo que cambia el jugador se guarda en `localStorage` (`sf-controles`, solo las acciones cambiadas). Una acción registrada tarde toma lo guardado; si no tiene nada guardado y su tecla de fábrica la eligió el jugador para otra acción, queda vacía.
 
-Acciones de fábrica: `adelante`, `atras`, `izquierda`, `derecha`, `correr`, `saltar`, `bailar`, `disparar`, `apuntar` (combate), `recargar` (combate), `interactuar`, `pico`, `ranura1`…`ranura5`, `ranuraSiguiente`, `ranuraAnterior`, `tirar`, `modoConstruccion`, `construirPared`, `construirPiso`, `construirRampa`, `cambiarMaterial` (construcción), `chat`.
+Acciones de fábrica: `adelante`, `atras`, `izquierda`, `derecha`, `correr`, `saltar` (también abre y cierra el paracaídas), `deslizar` (Ctrl izquierdo, ver [[Deslizarse]]), `bailar`, `disparar`, `apuntar` (combate), `recargar` (combate), `interactuar`, `pico`, `ranura1`…`ranura5`, `ranuraSiguiente`, `ranuraAnterior`, `tirar`, `modoConstruccion`, `construirPared`, `construirPiso`, `construirRampa`, `cambiarMaterial` (construcción), `chat`.
 
 ## Opciones
 

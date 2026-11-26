@@ -1,6 +1,6 @@
 # Pipeline del bus
 
-Volver a [[Inicio]] · resultado: `bus.glb` ([[Modelos GLB]]) · en el juego: [[models.js]], [[Bus, caída y planeador]] · pedido: [[Pedido del bus]]
+Volver a [[Inicio]] · resultado: `bus.glb` ([[Modelos GLB]]) · en el juego: [[models.js]], [[Bus, caída y paracaídas]] · pedido: [[Pedido del bus]]
 
 Script de Blender `tools/blender/bus.py` (diseño propio). Usa las herramientas de `armas_base.py` ([[Pipeline de armas]]): `prisma`, `caja`, `torno`, `tubo`, `acabado` (bisel + normales ponderadas) y `finalizar`.
 

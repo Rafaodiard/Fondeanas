@@ -20,6 +20,7 @@ const APUNTA = { Rifle: 'RifleApunta', Pistola: 'PistolaApunta', Lanzacohetes: '
 const RECARGA = { rifle: 'RecargaRifle', subfusil: 'RecargaSubfusil', pistola: 'RecargaPistola', escopeta: 'RecargaEscopeta', francotirador: 'RecargaFranco', lanzacohetes: 'RecargaCohete' };
 const BOMBEO = { escopeta: ['BombeoEscopeta', 'BombeoEscopetaApunta'] };
 const ACCIONES = new Set([...Object.values(RECARGA), ...Object.values(BOMBEO).flat()]);
+const UNA_VEZ = new Set(['Abrir', 'Aterrizaje']);
 const PIEZAS = ['cargador', 'cerrojo', 'bomba', 'corredera', 'cohete', 'cartucho', 'bala'];
 const SALTO_APICE = 13 / 30;
 // cuánto puede doblarse la columna para seguir la mira con un arma (rad, abajo / arriba): apuntando y a la cadera.
@@ -27,6 +28,11 @@ const SALTO_APICE = 13 / 30;
 const CURVA_APUNTA = [-55 * Math.PI / 180, 65 * Math.PI / 180];
 const CURVA_CADERA = [-15 * Math.PI / 180, 20 * Math.PI / 180];
 const ALTO_BARRA = 2.122; // altura de las manos en el planeador
+// Paracaídas (paracaidas.glb, tools/blender/paracaidas.py): su origen va entre los hombros del clip Paracaidas.
+// Es el punto medio de los hombros en ese clip, 6 cm más arriba y 3 cm atrás (heroe_caida.py, ARNES), pasado a los
+// ejes del juego y con la suela en y = 0.
+export const ARNES = new THREE.Vector3(0, 1.596, 0.066);
+const PARA_ABRE = [0.2, 0.75];   // el paracaídas sale al tirar de la manija y termina de inflarse (s desde que se abre)
 
 let CLIPS = null;
 
@@ -73,7 +79,10 @@ export function createRigCharacter(color) {
   const root = new THREE.Group();
   const model = SkeletonUtils.clone(ASSETS.personaje);
   model.rotation.y = Math.PI; // en Blender mira a -Y, que en glTF es +Z; el juego mira a -Z
-  root.add(model);
+  // el pivote inclina todo el cuerpo (y el paracaídas) al doblar en el aire, sin tocar el giro del grupo raíz
+  const pivote = new THREE.Group();
+  pivote.add(model);
+  root.add(pivote);
   model.traverse((o) => {
     if (!o.isMesh) return;
     o.castShadow = true;
@@ -84,7 +93,7 @@ export function createRigCharacter(color) {
   });
   const bone = (n) => model.getObjectByName(n);
   const B = { spine: bone('Spine'), spine1: bone('Spine1'), spine2: bone('Spine2'), neck: bone('Neck'), head: bone('Head'), arma: bone('ArmaR'),
-    brazoL: bone('UpperArmL'), brazoR: bone('UpperArmR') };
+    brazoL: bone('UpperArmL'), brazoR: bone('UpperArmR'), manoL: bone('HandL'), manoR: bone('HandR') };
   const mixer = new THREE.AnimationMixer(model);
   const acts = {};
   for (const [name, c] of Object.entries(clips)) {
@@ -101,8 +110,9 @@ export function createRigCharacter(color) {
   const muzzle = new THREE.Object3D();
   gun.add(muzzle);
   root.userData = {
-    rig: true, model, mixer, acts, B, gun, muzzle, glider: null, held: null, heldKind: null,
+    rig: true, model, pivote, mixer, acts, B, gun, muzzle, glider: null, para: null, held: null, heldKind: null,
     phase: 0, swing: 0, golpeT: 99, recoil: 0, rx: 0, rv: 0, rs: 1, vy: 0,
+    prevState: null, abrirT: 99, aterrizaT: 99, paraK: 0, banco: 0, cabeceo: 0,
   };
   return root;
 }
@@ -112,6 +122,74 @@ export function placeGlider(root, glider) {
   glider.position.set(0, ALTO_BARRA + 1 - 0.6, -0.1);
   root.userData.glider = glider;
   root.add(glider);
+}
+
+// Paracaídas colgado de los hombros: la vela con sus formas (Plegado, FrenoL, FrenoR) y las cuerdas de los frenos,
+// que se dibujan cada cuadro desde el borde de fuga hasta cada mano.
+export function placeParachute(root, para) {
+  const u = root.userData;
+  para.rotation.y = Math.PI;
+  para.position.copy(ARNES);
+  para.visible = false;
+  u.pivote.add(para);
+  let vela = null;
+  para.traverse((o) => { if (o.isMesh && o.morphTargetDictionary && 'Plegado' in o.morphTargetDictionary) vela = o; });
+  if (vela) {
+    vela.frustumCulled = false;   // las formas cambian el tamaño: la caja de la malla base no alcanza
+    vela.castShadow = true;
+  }
+  const atado = {};
+  for (const l of 'LR') {
+    const a = para.getObjectByName('Freno_' + l), b = para.getObjectByName('Freno_' + l + '_Tirado');
+    if (a && b) atado[l] = [a.position.clone(), b.position.clone(), a.parent];
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12), 3));
+  const cuerdas = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: '#2a2a2c' }));
+  cuerdas.frustumCulled = false;
+  cuerdas.visible = false;
+  root.add(cuerdas);
+  u.para = { obj: para, vela, atado, cuerdas };
+}
+
+const _w = new THREE.Vector3(), _e = new THREE.Euler(), _piv = new THREE.Vector3();
+const easeOutBack = (k) => 1 + 2.2 * Math.pow(k - 1, 3) + 1.2 * Math.pow(k - 1, 2);
+
+function animarParacaidas(char, u, state, dt, giro, freno) {
+  const P = u.para;
+  const abierto = state === 'glider';
+  if (abierto) u.paraK = u.abrirT >= 98 ? 1 : Math.max(0, Math.min(1, (u.abrirT - PARA_ABRE[0]) / (PARA_ABRE[1] - PARA_ABRE[0])));
+  else u.paraK = Math.max(0, u.paraK - dt * 3.2);
+  const k = u.paraK;
+  P.obj.visible = k > 0.001;
+  P.cuerdas.visible = false;
+  if (!P.obj.visible) return;
+  const e = abierto ? easeOutBack(k) : k * k;
+  P.obj.scale.setScalar(0.25 + 0.75 * e);
+  const fl = Math.min(1, freno + Math.max(0, -giro)) * k, fr = Math.min(1, freno + Math.max(0, giro)) * k;
+  if (P.vela) {
+    const d = P.vela.morphTargetDictionary, inf = P.vela.morphTargetInfluences;
+    inf[d.Plegado] = Math.max(0, Math.min(1, 1 - e));
+    if (d.FrenoL !== undefined) inf[d.FrenoL] = fl;
+    if (d.FrenoR !== undefined) inf[d.FrenoR] = fr;
+  }
+  // cuerdas de los frenos: del borde de fuga (según cuánto se tira) a cada mano
+  if (!abierto || k < 0.95 || !P.atado.L || !u.B.manoL) return;
+  char.updateMatrixWorld(true);
+  const pos = P.cuerdas.geometry.attributes.position;
+  let i = 0;
+  for (const [l, f, mano] of [['L', fl, u.B.manoL], ['R', fr, u.B.manoR]]) {
+    const [a, b, padre] = P.atado[l];
+    _w.lerpVectors(a, b, f);
+    padre.localToWorld(_w);
+    char.worldToLocal(_w);
+    pos.setXYZ(i++, _w.x, _w.y, _w.z);
+    mano.getWorldPosition(_w);
+    char.worldToLocal(_w);
+    pos.setXYZ(i++, _w.x, _w.y, _w.z);
+  }
+  pos.needsUpdate = true;
+  P.cuerdas.visible = true;
 }
 
 const _q = new THREE.Quaternion(), _qp = new THREE.Quaternion(), _qa = new THREE.Quaternion();
@@ -132,20 +210,45 @@ function smooth(cur, target, k, dt) {
 }
 
 // state: ground/falling/glider; speed: velocidad horizontal; aiming: apuntando con un arma.
-// x: { air, vy, pitch, dance }
+// x: { air, vy, pitch, dance, caida (-1 planeo .. 1 picada), giro (-1 izq .. 1 der), freno (0..1), desliz }
 export function animateRig(char, state, speed, dt, aiming, x = {}) {
   const u = char.userData;
   const A = u.acts;
   dt = Math.min(dt, 0.1);
-  const air = state === 'ground' && !!x.air;
-  const dance = state === 'ground' && !air && x.dance && speed < 0.5;
+  const desliz = state === 'ground' && !!x.desliz && !!A.Deslizar;
+  const air = state === 'ground' && !!x.air && !desliz;
+  const dance = state === 'ground' && !air && !desliz && x.dance && speed < 0.5;
+  const giro = x.giro || 0, freno = x.freno || 0;
+  // abrir el paracaídas (desde la caída) y aterrizar: clips de una sola vez que arrancan con el cambio de estado
+  if (state !== u.prevState) {
+    if (state === 'glider') u.abrirT = u.prevState === 'falling' ? 0 : 99;
+    if (state === 'ground' && (u.prevState === 'glider' || u.prevState === 'falling')) u.aterrizaT = 0;
+    u.prevState = state;
+  }
+  u.abrirT += dt;
+  u.aterrizaT += dt;
 
   // ---- pose base (las dos capas)
   const base = {};
   let rate = 0;
-  if (state === 'falling') base.Caida = 1;
-  else if (state === 'glider') base.Planear = 1;
-  else if (dance) base.Baile = 1;
+  if (state === 'falling') {
+    // planeo / caída / picada según cómo cae
+    const c = Math.max(-1, Math.min(1, x.caida || 0));
+    if (c < 0 && A.CaidaPlaneo) { base.CaidaPlaneo = -c; base.Caida = 1 + c; }
+    else if (c > 0 && A.CaidaPicada) { base.CaidaPicada = c; base.Caida = 1 - c; }
+    else base.Caida = 1;
+  } else if (state === 'glider') {
+    if (!A.Paracaidas) base.Planear = 1;
+    else if (A.Abrir && u.abrirT < A.Abrir.dur) base.Abrir = 1;
+    else {
+      const izq = Math.max(0, -giro) * (1 - freno), der = Math.max(0, giro) * (1 - freno);
+      base.ParacaidasIzq = izq;
+      base.ParacaidasDer = der;
+      base.ParacaidasFreno = freno;
+      base.Paracaidas = Math.max(0, 1 - izq - der - freno);
+    }
+  } else if (dance) base.Baile = 1;
+  else if (desliz) base.Deslizar = 1;
   else if (air) base.Salto = 1;
   else {
     const s = Math.max(0, speed);
@@ -164,6 +267,12 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
     if (wsum > 0) rate /= wsum;
     if (s < LOCO[1][1]) rate *= Math.max(0.45, s / LOCO[1][1]);
     if (s > LOCO[4][1]) rate *= Math.pow(s / LOCO[4][1], 0.6);
+    // al tocar el piso amortigua con las rodillas (si sale corriendo, se corta)
+    if (A.Aterrizaje && u.aterrizaT < A.Aterrizaje.dur) {
+      const w = 1 - Math.min(1, s / 4);
+      for (const n in base) base[n] *= 1 - w;
+      base.Aterrizaje = w;
+    }
   }
   u.phase = (u.phase + dt * rate) % 1;
 
@@ -196,7 +305,7 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
     const tp = base[n] || 0;
     const tt = (base[n] || 0) * (1 - O) + (over[n] || 0);
     const tb = (base[n] || 0) * (1 - O + OL) + (MANO_L_LIBRE.has(n) ? 0 : over[n] || 0);
-    const k = n === 'Golpe' || (golpe && tt === 0) ? 22 : n === 'Salto' || base.Salto || ACCIONES.has(n) ? 14 : 10;
+    const k = n === 'Golpe' || (golpe && tt === 0) ? 22 : n === 'Salto' || base.Salto || ACCIONES.has(n) || UNA_VEZ.has(n) || base.Deslizar ? 14 : 10;
     a.wp = smooth(a.wp, tp, k, dt);
     a.wt = smooth(a.wt, tt, k, dt);
     a.wb = smooth(a.wb, tb, k, dt);
@@ -211,6 +320,8 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
       const vy = x.vy || 0;
       time = vy > 0 ? (1 - Math.min(1, vy / 8.5)) * SALTO_APICE : SALTO_APICE + Math.min(1, -vy / 12) * (a.dur - SALTO_APICE - 0.01);
     } else if (n === 'Golpe') time = Math.min(u.golpeT, a.dur - 0.001);
+    else if (n === 'Abrir') time = Math.min(u.abrirT, a.dur - 0.001);
+    else if (n === 'Aterrizaje') time = Math.min(u.aterrizaT, a.dur - 0.001);
     else if (ACCIONES.has(n)) {
       // la acción avanza con su propio largo (el tiempo de recarga del arma); al terminar queda en el último cuadro
       if (accion && accion.name === n) a.clock = Math.min(accion.t / accion.len, 0.999) * a.dur;
@@ -247,9 +358,11 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
     }
   }
 
-  // ---- extras: planeador, arma visible
+  // ---- extras: paracaídas (o el planeador viejo), arma visible
   if (u.glider) u.glider.visible = state === 'glider';
+  if (u.para) animarParacaidas(char, u, state, dt, giro, freno);
   u.gun.visible = state === 'ground' && !dance;
+  inclinar(u, state, giro, freno, dt);
 
   // ---- columna: mirar y apuntar
   if (state !== 'ground' || dance) return;
@@ -301,6 +414,21 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
     rotWorld(B.head, _right, pitch * 0.3);
   }
   retroceso(u, B, dt, aiming);
+}
+
+// Inclinación de todo el cuerpo en el aire: al doblar se ladea hacia la curva (en caída libre sobre la cadera, con el
+// paracaídas sobre los hombros, así la vela se inclina con el cuerpo) y al frenar el paracaídas se va un poco atrás.
+function inclinar(u, state, giro, freno, dt) {
+  let roll = 0, pitch = 0, alto = 1.0;
+  if (state === 'falling') roll = -giro * 0.55;
+  else if (state === 'glider') { roll = -giro * 0.3 * u.paraK; pitch = freno * 0.14 * u.paraK; alto = ARNES.y; }
+  u.banco = smooth(u.banco, roll, 5, dt);
+  u.cabeceo = smooth(u.cabeceo, pitch, 4, dt);
+  if (Math.abs(u.banco) < 1e-4 && Math.abs(u.cabeceo) < 1e-4) { u.pivote.position.set(0, 0, 0); u.pivote.quaternion.identity(); return; }
+  _e.set(u.cabeceo, 0, u.banco);
+  u.pivote.quaternion.setFromEuler(_e);
+  _piv.set(0, alto, 0);
+  u.pivote.position.copy(_piv).sub(_w.copy(_piv).applyQuaternion(u.pivote.quaternion));
 }
 
 // Retroceso por arma: cada tiro es un impulso a un resorte amortiguado (sube rápido y vuelve con un rebote chico,
