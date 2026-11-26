@@ -13,3 +13,13 @@ Pidió: "Hace autos funcionales". El coordinador lo interpretó como: autos que 
 - Cuatro asientos. El que maneja simula el auto (como el jugador simula su personaje); el servidor decide asientos, daño y explosiones.
 - Se agregó turbo, atropellos, daño y explosión, y que se les pueda disparar y picar (dan metal), como en el género.
 - Desde el auto todavía no se dispara (ni el conductor ni los acompañantes).
+
+**2026-11-26 · Rafael**
+
+"Pq no andan los autos ?"
+
+**2026-11-26 · Claude (al revisarlo)**
+
+- En una instalación limpia de `main` (con los bots y el daño nuevos) los autos andan: subir con E, manejar con WASD, doblar y bajarse, probado con teclas reales.
+- Lo que hace exactamente ese síntoma (*E Manejar* aparece pero no pasa nada) es tener el servidor prendido desde antes del `git pull`: sirve los archivos nuevos pero corre la lógica vieja. Se reprodujo así.
+- Arreglo: el servidor avisa cuando su código quedó viejo (cartel en el juego y consola), no deja cachear los archivos, explica por qué no se puede subir (`autoNo`) y el cliente avisa si no hay respuesta. El README dice que hay que reiniciar el servidor después de cada `git pull`.

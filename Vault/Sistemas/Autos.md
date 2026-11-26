@@ -29,6 +29,11 @@ Autos manejables estacionados en las calles. Se suben hasta cuatro jugadores (co
 - Sonidos ([[audio.js]]): motor que sube de tono con la velocidad (también el del auto andando más cercano), derrape, bocina, choque, puerta y turbo.
 - En el minimapa cada auto es un rectángulo de su color.
 
+## Si no andan
+
+- **Servidor sin reiniciar después de un `git pull`** (2026-11-26, lo que le pasó a Rafael): el navegador recibe los archivos nuevos (el servidor los lee del disco en cada pedido) pero el servidor sigue con la lógica vieja, que no conoce `subir`. Se ve *E Manejar* y no pasa nada. Desde entonces el servidor avisa (cartel rojo `#avisoServidor` en el juego y un aviso en la consola, ver [[server.js]]) y el cliente, si pide subir y no hay respuesta en 2,5 s, dice que reinicien el servidor.
+- Si el servidor no deja subir, manda `autoNo` con el motivo (`lleno`, `lejos`, `roto`, `estado`) y el juego lo muestra.
+
 ## Red
 
 El que maneja simula su auto y manda `auto` 15 veces por segundo; el servidor lo valida (sin teletransportes) y lo reparte; los demás lo ven interpolado. Ver [[Protocolo de red]].

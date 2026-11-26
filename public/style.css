@@ -238,3 +238,4 @@ button:hover { filter: brightness(1.1); }
 .bots-sala select:focus { border-color: #ffd23f; }
 .bots-sala .hint { text-align: left; }
 #playerList li.bot { opacity: .8; font-style: italic; }
+#avisoServidor { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 50; max-width: min(92vw, 640px); background: #b3261e; color: #fff; font-weight: 800; font-size: 14px; padding: 8px 14px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.4); text-align: center; pointer-events: none; }

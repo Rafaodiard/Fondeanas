@@ -17,9 +17,11 @@ const GIRO_VOLANTE = 2.1;      // vueltas del volante (rad) con la dirección a 
 // Manos en el aro del volante (radio 0.19, en el plano XY del nodo): "diez y diez", un poco hacia el conductor.
 const MANO_I = new THREE.Vector3(-0.172, 0.07, 0.035), MANO_D = new THREE.Vector3(0.172, 0.07, 0.035);
 // Caños de escape (para la llama del turbo), en coordenadas del auto.
+const NO_SUBE = { lleno: 'El auto está lleno', lejos: 'Acercate más al auto', roto: 'Ese auto está destruido', estado: 'Para subir tenés que estar parado en el piso' };
 const ESCAPES = [[-0.55, 0.34, 2.26], [-0.42, 0.34, 2.26]];
 
-export function crearManejo({ scene, camera, me, getWorld, getMyId, sendMsg, ui, sfx, others, explosion, alSubir, alBajar }) {
+export function crearManejo({ scene, camera, me, getWorld, getMyId, sendMsg, ui, sfx, others, explosion, alSubir, alBajar, feed = () => {} }) {
+  let pedido = null; // { i, t }: pidió subir y espera la respuesta del servidor
   let autos = [];               // { a, mesh, giroRueda, obj, tObj, llamas }
   let tEnvio = 0, enviado = new Map(), tBocina = 0, tAtropello = new Map(), tChoque = 0, turbaba = false;
   let tMouse = 0;               // último movimiento del mouse (la cámara vuelve sola atrás del auto si no se toca)
@@ -82,6 +84,11 @@ export function crearManejo({ scene, camera, me, getWorld, getMyId, sendMsg, ui,
         e.mesh.userData.quemar();
         explosion(_p.set(e.a.x, e.a.y + 0.9, e.a.z));
         return true;
+      case 'autoNo':
+        // el servidor no dejó subir: se dice por qué
+        pedido = null;
+        feed(NO_SUBE[m.por] || 'No se pudo subir al auto', '#ff6b6b');
+        return true;
       case 'bocina':
         if (e) sfx.bocina(Math.hypot(e.a.x - me.pos.x, e.a.z - me.pos.z));
         return true;
@@ -90,6 +97,7 @@ export function crearManejo({ scene, camera, me, getWorld, getMyId, sendMsg, ui,
   }
 
   function subi(e, k) {
+    pedido = null;
     me.auto = { i: e.a.id, k };
     me.state = 'auto';
     me.vel.set(0, 0, 0);
@@ -139,12 +147,21 @@ export function crearManejo({ scene, camera, me, getWorld, getMyId, sendMsg, ui,
     }
     return mejor && { d: md, i: mejor.a.id, maneja: mejor.a.seats[0] === null };
   }
-  function subir(i) { sendMsg({ t: 'subir', a: i }); }
+  function subir(i) {
+    if (pedido && performance.now() - pedido.t < 1500) return;
+    pedido = { i, t: performance.now() };
+    sendMsg({ t: 'subir', a: i });
+  }
 
   // ---------- Cada cuadro ----------
   function update(dt) {
     const world = getWorld(), myId = getMyId();
     const mio = me.auto ? autos[me.auto.i] : null;
+    // sin respuesta del servidor (por ejemplo, un servidor viejo que no conoce los autos): se avisa en vez de no hacer nada
+    if (pedido && performance.now() - pedido.t > 2500) {
+      pedido = null;
+      feed('El servidor no respondió: si actualizaste el juego, reiniciá el servidor (Ctrl+C y npm start)', '#ff6b6b');
+    }
     const manejo = mio && me.auto.k === 0 && mio.a.ctrl === myId && me.state === 'auto';
     for (const e of autos) {
       const a = e.a;

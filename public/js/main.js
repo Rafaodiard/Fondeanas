@@ -167,6 +167,7 @@ const golpes = crearGolpes({ scene, camera, me, getWorld: () => world, ui, sfx, 
 const autos = crearManejo({
   scene, camera, me, getWorld: () => world, getMyId: () => myId, sendMsg, ui, sfx, others,
   explosion: (p) => explosionFx(p.clone(), '#ff8a2a', 1.3),
+  feed: (texto, color) => feed(texto, color),
   alSubir: () => {
     // al subir se corta lo que se estaba haciendo a pie
     cons.cancelar();
@@ -244,6 +245,11 @@ function handle(m) {
     case 'error': ui.menuError.textContent = m.message; break;
     case 'welcome':
       myId = m.id;
+      // servidor viejo: no manda versión (antes de los autos) o el código cambió en el disco después de arrancarlo
+      if (!m.version || m.viejo) {
+        $('avisoServidor').textContent = 'El servidor está corriendo una versión vieja del juego: cerralo (Ctrl+C) y volvé a abrirlo con npm start. Mientras tanto los autos y lo nuevo no andan.';
+        $('avisoServidor').classList.remove('hidden');
+      }
       setRoom(m.room);
       if (alCrear) {
         // sala recién creada: los bots elegidos y, con "Jugar con bots", empezar ya (el servidor los procesa en orden)
