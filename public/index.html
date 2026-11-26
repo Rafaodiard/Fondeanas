@@ -19,6 +19,7 @@
     <p class="sub">Saltá del bus, sobreviví a la tormenta, quedá último en pie.</p>
     <label>Tu nombre <input id="name" maxlength="16" placeholder="Jugador"></label>
     <button id="btnCreate" class="primary">Crear sala</button>
+    <button id="btnBots" class="btn-bots" type="button">🤖 Jugar con bots<small id="botsResumenMenu"></small></button>
     <div class="row">
       <input id="code" maxlength="5" placeholder="CÓDIGO" autocomplete="off">
       <button id="btnJoin">Unirse</button>
@@ -35,6 +36,15 @@
     <div id="roomCode" class="code" title="Clic para copiar"></div>
     <p class="hint">Pasale este código a tus amigos para que se unan.</p>
     <ul id="playerList"></ul>
+    <!-- bots: el anfitrión elige hasta cuántos jugadores completan y la dificultad; los demás ven lo elegido -->
+    <div id="botsSala" class="bots-sala">
+      <div class="bots-titulo">🤖 Bots</div>
+      <div id="botsElegir" class="bots-elegir">
+        <label>Completar la sala hasta <select id="botsTotal"></select></label>
+        <label>Dificultad <select id="botsDif"></select></label>
+      </div>
+      <p id="botsResumen" class="hint"></p>
+    </div>
     <button id="btnStart" class="primary">Empezar partida</button>
     <p id="waitHost" class="hint">Esperando a que el anfitrión empiece…</p>
     <button id="btnConfigSala" class="btn-config" type="button">⚙ Configuración</button>

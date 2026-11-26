@@ -13,7 +13,8 @@ import {
   estadoCaida, fisicaAire, abrirParacaidas, puedeCerrar, cerrarParacaidas, PARACAIDAS, DESLIZ,
   puedeDeslizar, empezarDeslizar, terminarDeslizar, fisicaDeslizar, paramsRed, leerParams,
 } from './caida.js';
-import { accionesDe, activa, presionar, soltar, soltarTodo, teclaDe, listaAcciones, opcion, alCambiar, cargarDistribucion } from './controles.js';
+import { accionesDe, activa, presionar, soltar, soltarTodo, teclaDe, listaAcciones, opcion, fijarOpcion, alCambiar, cargarDistribucion } from './controles.js';
+import { BOT_TOTALES, BOT_DIFICULTADES, BOT_TOTAL_DEF, cuantosBots } from './opcionesBots.js';
 import { abrirConfig, cerrarConfig, abierto as configAbierta } from './configuracion.js';
 import { crearConstruccion } from './construir.js';
 import { crearManejo } from './manejar.js';
@@ -34,10 +35,11 @@ const ui = {
   slots: $('slots'), prompt: $('prompt'), usebar: $('usebar'), usefill: $('usefill'), usetext: $('usetext'),
   pickupFeed: $('pickupFeed'), buildbar: $('buildbar'), buildhint: $('buildhint'), structhp: $('structhp'), scope: $('scope'), dmgnums: $('dmgnums'), crosshair: $('crosshair'),
   autohud: $('autohud'), autovel: $('autovel'), autovida: $('autovida'), autoturbo: $('autoturbo'), autohint: $('autohint'),
+  btnBots: $('btnBots'), botsResumenMenu: $('botsResumenMenu'), botsElegir: $('botsElegir'), botsTotal: $('botsTotal'), botsDif: $('botsDif'), botsResumen: $('botsResumen'),
 };
 ui.name.value = storageGet('br-name') || '';
 // Modelos de Blender: se cargan antes de habilitar el menú.
-const btns = [$('btnCreate'), $('btnJoin')];
+const btns = [$('btnCreate'), $('btnJoin'), $('btnBots')];
 btns.forEach((b) => { b.disabled = true; });
 ui.menuError.textContent = 'Cargando modelos…';
 await loadAssets((k) => { ui.menuError.textContent = `Cargando modelos… ${Math.round(k * 100)}%`; });
@@ -195,18 +197,41 @@ function connect(onOpen) {
 }
 function sendMsg(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
 
-function enter(type) {
+// conBots: "Jugar con bots" crea la sala con bots y la empieza enseguida.
+let alCrear = null;
+function enter(type, conBots = false) {
   sfx.unlock();
   const name = ui.name.value.trim() || 'Jugador';
   storageSet('br-name', name);
   const code = ui.code.value.trim().toUpperCase();
   if (type === 'join' && code.length < 4) { ui.menuError.textContent = 'Escribí el código de la sala.'; return; }
   ui.menuError.textContent = '';
+  // la sala nueva arranca con los bots de Configuración (o con los de "Jugar con bots")
+  alCrear = type === 'create' ? { total: conBots ? opcion('botsTotal') || BOT_TOTAL_DEF : opcion('botsTotal'), dif: opcion('botsDificultad'), empezar: conBots } : null;
   const go = () => sendMsg({ t: type, name, code });
   if (ws && ws.readyState === 1) go(); else connect(go);
 }
 $('btnCreate').onclick = () => enter('create');
 $('btnJoin').onclick = () => enter('join');
+ui.btnBots.onclick = () => enter('create', true);
+
+// ---------- Bots (opciones de la sala) ----------
+ui.botsTotal.innerHTML = BOT_TOTALES.map((n) => `<option value="${n}">${n ? `${n} jugadores` : 'Sin bots'}</option>`).join('');
+ui.botsDif.innerHTML = Object.entries(BOT_DIFICULTADES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+function cambiarBots() {
+  const total = Number(ui.botsTotal.value), dif = ui.botsDif.value;
+  // queda guardado para la próxima sala (es la misma opción de Configuración)
+  fijarOpcion('botsTotal', total); fijarOpcion('botsDificultad', dif);
+  sendMsg({ t: 'bots', total, dif });
+}
+ui.botsTotal.onchange = cambiarBots;
+ui.botsDif.onchange = cambiarBots;
+function resumenMenuBots() {
+  const total = opcion('botsTotal') || BOT_TOTAL_DEF;
+  ui.botsResumenMenu.textContent = `${total} jugadores · ${BOT_DIFICULTADES[opcion('botsDificultad')] || 'Normal'}`;
+}
+resumenMenuBots();
+alCambiar((tipo, id) => { if (tipo === 'opcion' && (!id || id.startsWith('bots'))) resumenMenuBots(); });
 ui.code.addEventListener('keydown', (e) => { if (e.key === 'Enter') enter('join'); });
 ui.btnStart.onclick = () => sendMsg({ t: 'start' });
 ui.roomCode.onclick = () => navigator.clipboard?.writeText(room.code).catch(() => {});
@@ -220,6 +245,12 @@ function handle(m) {
     case 'welcome':
       myId = m.id;
       setRoom(m.room);
+      if (alCrear) {
+        // sala recién creada: los bots elegidos y, con "Jugar con bots", empezar ya (el servidor los procesa en orden)
+        sendMsg({ t: 'bots', total: alCrear.total, dif: alCrear.dif });
+        if (alCrear.empezar) sendMsg({ t: 'start' });
+        alCrear = null;
+      }
       ensureWorld();
       if (room.phase === 'lobby') showLobby();
       else {
@@ -438,12 +469,23 @@ function showLobby() {
   stormMesh.visible = false;
   document.exitPointerLock?.();
   ui.roomCode.textContent = room.code;
-  ui.playerList.innerHTML = room.players.map((p) =>
-    `<li><span class="dot" style="background:${p.color}"></span>${escapeHtml(p.name)}${p.id === room.hostId ? ' 👑' : ''}${p.id === myId ? ' (vos)' : ''}</li>`).join('');
+  const personas = room.players.filter((p) => !p.bot);
+  const bots = room.bots || { total: 0, dif: 'normal' };
+  const nBots = cuantosBots(bots.total, personas.length);
+  const dif = BOT_DIFICULTADES[bots.dif] || 'Normal';
+  ui.playerList.innerHTML = personas.map((p) =>
+    `<li><span class="dot" style="background:${p.color}"></span>${escapeHtml(p.name)}${p.id === room.hostId ? ' 👑' : ''}${p.id === myId ? ' (vos)' : ''}</li>`).join('') +
+    (nBots ? `<li class="bot"><span class="dot" style="background:#5ad65a"></span>🤖 + ${nBots} ${nBots === 1 ? 'bot' : 'bots'} (${dif})</li>` : '');
   const host = room.hostId === myId;
   ui.btnStart.classList.toggle('hidden', !host);
   ui.waitHost.classList.toggle('hidden', host);
-  ui.btnStart.textContent = room.players.length > 1 ? 'Empezar partida' : 'Empezar (solo, para explorar)';
+  ui.btnStart.textContent = nBots ? `Empezar con ${nBots} ${nBots === 1 ? 'bot' : 'bots'}` : personas.length > 1 ? 'Empezar partida' : 'Empezar (solo, para explorar)';
+  // el anfitrión elige los bots; los demás ven lo que eligió
+  ui.botsElegir.classList.toggle('hidden', !host);
+  ui.botsTotal.value = String(bots.total);
+  ui.botsDif.value = bots.dif;
+  ui.botsResumen.textContent = !bots.total ? (host ? 'Sin bots: solo juegan las personas de la sala.' : 'Sin bots.')
+    : `Los bots completan la sala hasta ${bots.total} jugadores (${dif}).${nBots ? '' : ' Ya están todos: no entra ninguno.'}`;
 }
 
 function setupMatch(snap) {
@@ -580,6 +622,7 @@ function onMatchEnd(m) {
   for (const p of m.players) { const o = others.get(p.id); if (o) o.info = p; }
   if (m.winner === myId) showCenter('🏆 ¡ÚLTIMO EN PIE!', `Ganaste con ${me.kills} ${me.kills === 1 ? 'eliminación' : 'eliminaciones'} · Volviendo a la sala…`);
   else if (m.winner) showCenter(`Ganó ${escapeHtml(nameOf(m.winner))}`, 'Volviendo a la sala…');
+  else if (m.botsVivos) showCenter('Fin de la partida', `Quedaban ${m.botsVivos} ${m.botsVivos === 1 ? 'bot' : 'bots'} en pie · Volviendo a la sala…`);
   else showCenter('Fin de la partida', 'Volviendo a la sala…');
   if (me.state !== 'dead') me.state = 'ended';
 }

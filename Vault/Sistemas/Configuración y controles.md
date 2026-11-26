@@ -8,3 +8,7 @@ Volver a [[Inicio]]
 - Qué aplica cada opción en [[main.js]]: sensibilidad base `0.0022 × sens` (× `sensApunta` apuntando, × `sensMira` con mira), `invertirY`, `apuntarAlternar` (el clic de apuntar alterna; se suelta al cambiar de slot o construir), `correrSiempre` (la tecla de correr pasa a caminar), `numerosDanio`, `calidad` (`aplicarVideo`: baja = sin sombras y resolución 1×, media = sombras 1024 y hasta 1,25×, alta = sombras 2048 y hasta 2×), `resolucion` (multiplica la resolución), `fov` (apuntando `fov − 18`, en caída `fov + 10`, mira telescópica 18), `colorMira` (variable CSS `--mira` de la retícula), `fps` (`#fps` en la barra de arriba) y `volumen` (`setVolumen` de [[audio.js]]).
 - Los carteles del HUD usan `teclaDe`: números de los slots, barra de piezas y ayuda de construcción ([[construir.js]]; ya no hay ayuda general de controles en pantalla), ayuda del auto arriba del velocímetro ([[manejar.js]]), *E Manejar* / *Subir al auto*, aviso de agarrar/abrir y los mensajes del bus y la caída.
 - Para sumar un control nuevo (por ejemplo de [[Construcción]] o de [[Bus, caída y paracaídas]]): `registrarAccion` en [[controles.js]] y un `case` en `hacer()` de [[main.js]].
+
+## Bots (2026-11-26)
+
+En la pestaña Juego: *Bots: completar la sala hasta* (`botsTotal`: Sin bots, 4… 24 jugadores) y *Dificultad de los bots* (`botsDificultad`). Es lo que se pone al crear una sala y lo que usa *Jugar con bots* (si dice "Sin bots", usa 12). Cambiarlo en la sala también lo guarda acá. Ver [[Bots]].

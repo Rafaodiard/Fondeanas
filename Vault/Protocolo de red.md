@@ -12,6 +12,7 @@ Antes de estar en una sala:
 
 En la sala:
 - `start`: solo el anfitrión, en fase `lobby`. Ver [[Salas y partidas]].
+- `bots` (`total`: 0, 4, 8, 12, 16, 20 o 24; `dif`: `facil`, `normal` o `dificil`): solo el anfitrión, en fase `lobby`. El servidor contesta a todos con `room`. Ver [[Bots]].
 - `chat` (`text`, hasta 120 caracteres).
 
 Durante la partida (los maneja `handleGame` en [[server.js]]):
@@ -32,3 +33,6 @@ Los procesa `handle(m)` en [[main.js]]:
 - `inv` lleva vida, escudo, slots, munición y materiales del jugador (lo arma `invMsg` en el servidor).
 - `matchStart` y `welcome` (si la partida ya empezó) llevan un snapshot de la partida (`matchSnapshot`), con las piezas del mapa ya rotas (`piezas`), las dañadas con su vida (`pzHp`: `[[id, vida], ...]`) y los cofres que bajaron (`cofresMovidos`), y los autos (`autos`: posición, vida, si está roto, asientos y color).
 - `pzRota` (`ids`): piezas del mapa que se rompieron; la primera es la que recibió el golpe y las demás se cayeron por quedar sin apoyo. `chestMove` (`idx`, `y`): un cofre bajó porque se rompió el piso donde estaba.
+
+- `room` lleva `bots` (`{ total, dif }`) y cada jugador de la lista puede traer `bot: true`. Los bots mandan su estado con el mismo `state` que los jugadores (lo arma el servidor, ver [[Bots]]).
+- `matchEnd` puede traer `botsVivos`: la partida terminó porque no quedaba ninguna persona viva.

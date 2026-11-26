@@ -1,6 +1,6 @@
 # Salto Final
 
-Battle royale 3D para navegador: una isla con 10 pueblos distintos, bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica y salas privadas a las que se entra con un código.
+Battle royale 3D para navegador: una isla con 10 pueblos distintos, bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica, salas privadas a las que se entra con un código y bots para jugar solo o completar la sala.
 
 ## Cómo jugar en tu compu
 
@@ -10,6 +10,24 @@ npm start
 ```
 
 Abrí http://localhost:3000, poné tu nombre y tocá **Crear sala**. Tus amigos entran con el código de 5 letras (o con el link `http://TU-IP:3000/?sala=CODIGO` si están en tu misma red). Para jugar por internet hay que subir el servidor a un hosting con Node y WebSockets (Render, Railway, Fly.io, etc.).
+
+Para jugar solo contra bots, tocá **🤖 Jugar con bots**: crea una sala con bots y la empieza enseguida (ver [Bots](#bots)).
+
+## Bots
+
+Los bots completan la sala hasta un total de jugadores: si en la sala hay 3 personas y elegís 12, entran 9 bots. Se juega igual solo o con amigos.
+
+- **Dónde se eligen.** En la sala, el anfitrión elige *Completar la sala hasta* (sin bots, 4, 8, 12, 16, 20 o 24 jugadores) y la *Dificultad* (Fácil, Normal o Difícil); los demás ven lo elegido y la lista muestra cuántos bots van a entrar. En **Configuración → Juego** quedan guardados para las salas que crees. El botón **🤖 Jugar con bots** del menú usa esa configuración (con "Sin bots", 12 jugadores) y arranca la partida directo.
+- **Qué hacen.** Son jugadores que maneja el servidor, con la misma física, vida, escudo e inventario que vos, y se llaman "Bot" + un animal (Bot Carpincho, Bot Tero…). Eligen dónde caer y saltan del bus cuando les queda cerca, planean y abren el paracaídas, buscan armas, munición, curas y cofres caminando por las calles, entrando por las puertas y subiendo escaleras, pican árboles para tener madera, se curan cuando están tranquilos y escapan de la tormenta. Cuando ven a alguien (las paredes y las construcciones les tapan la vista; los vidrios no), reaccionan, eligen el arma según la distancia, se mueven de costado y saltan; si les tiran, a veces levantan una pared (y en difícil una rampa), y si una construcción tapa al enemigo le tiran a la construcción. Se pelean también entre ellos.
+- **Dificultad.** Cambia cuánto ven (45, 70 o 100 m), cuánto tardan en reaccionar, la puntería y los tiros a la cabeza, cuánto construyen y si persiguen al que se les escapó.
+- **Fin de la partida.** Si quedás último, ganás. Si ya no queda ninguna persona viva, la partida termina a los pocos segundos y vuelve a la sala ("Quedaban N bots en pie").
+
+Para mirar una partida solo de bots: `SF_BOTS_HASTA_EL_FINAL=1 npm start` sigue la partida hasta el final aunque ya no quede nadie vivo (podés mirarla como espectador), y `SF_BOTS_DEBUG=1` muestra en la consola qué hace cada bot cada 10 segundos. Las pruebas:
+
+```bash
+node tools/bots/pruebas.mjs      # rutas, llegar caminando a los cofres, salir de pisos altos
+node tools/bots/partida.mjs      # una partida entera solo con bots (12 jugadores, normal; acepta total, dificultad y segundos)
+```
 
 ## El mapa
 
@@ -130,7 +148,7 @@ En pantalla no hay una lista de controles: en el auto aparece una ayuda corta co
 
 El panel tiene cuatro pestañas y todo se guarda en el navegador (`localStorage`), así que queda para la próxima vez:
 
-- **Juego:** sensibilidad del mouse, sensibilidad apuntando y con mira telescópica, invertir el eje vertical, apuntar manteniendo o alternando, correr siempre y números de daño.
+- **Juego:** sensibilidad del mouse, sensibilidad apuntando y con mira telescópica, invertir el eje vertical, apuntar manteniendo o alternando, correr siempre, números de daño, y los bots de las salas que crees (hasta cuántos jugadores completan y su dificultad).
 - **Video:** calidad gráfica (baja sin sombras, media y alta), resolución 3D, campo de visión, color de la mira y contador de FPS.
 - **Sonido:** volumen general.
 - **Controles:** cambiar cualquier tecla. Si elegís una que ya usaba otra acción, se la saca a esa y te avisa. Una tecla puede repetirse entre combate y construcción (por ejemplo, R recarga y en modo construcción gira la rampa) porque no se usan a la vez. Lo mismo con los controles del auto (grupo *Vehículos*): solo valen sentado en un auto, así que repiten las de a pie.
@@ -143,7 +161,11 @@ node tools/controles/pruebas.mjs
 
 ## Estructura
 
-- `server.js`: servidor HTTP + WebSocket. Maneja salas por código, el recorrido del bus, la tormenta, la vida, el daño, las piezas del mapa que se rompen y quién gana.
+- `server.js`: servidor HTTP + WebSocket. Maneja salas por código, el recorrido del bus, la tormenta, la vida, el daño, las piezas del mapa que se rompen, los bots y quién gana.
+- `servidor/bots.js`: los bots (solo corren en el servidor): salto del bus, caída, loot, pelea, construcción, curación y tormenta. Sus acciones pasan por el mismo `handleGame` que las de los jugadores.
+- `servidor/navegacion.js`: grillas de lugares donde se puede estar parado (terreno, pisos, escaleras, techos, agua) y rutas por ellas, para que los bots caminen por el mapa.
+- `public/js/opcionesBots.js`: totales y dificultades de los bots, compartido por el servidor, la sala y Configuración.
+- `tools/bots/`: pruebas de los bots (`pruebas.mjs`) y una partida entera solo con bots (`partida.mjs`).
 - `public/js/world.js`: arma la isla (terreno, pueblos, rutas, río, árboles, rocas, cofres y agua) igual en el servidor y en todos los clientes, y mueve al jugador contra el mapa en pasos chicos (piso, techo y paredes).
 - `public/js/isla.js`: diseño de la isla: pueblos con sus calles y estructuras, rutas (con el remate de cada punta que no llega a otra calle), río, teleférico y lugares chicos entre pueblos.
 - `public/js/planos.js`: planos de todas las estructuras (casas, edificios, faro, grúa, granero, cúpula, etc.). De la misma lista de piezas salen lo que se ve, lo que choca y las piezas que se rompen.
@@ -187,6 +209,11 @@ node tools/controles/pruebas.mjs
 ![Editando una pared: la grilla de 3×3](docs/construccion_edicion.png)
 ![La puerta hecha y la barra de piezas arriba del inventario](docs/construccion_puerta.png)
 ![Personajes](docs/personajes.png)
+
+### Bots
+
+![La sala con bots: completar hasta N jugadores y dificultad](docs/bots_sala.jpg)
+![Mirando a un bot (Bot Tero, con francotirador) después de morir](docs/bots_partida.jpg)
 
 ### Loot
 

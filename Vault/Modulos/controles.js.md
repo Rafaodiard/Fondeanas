@@ -2,7 +2,7 @@
 
 Volver a [[Inicio]] · ver [[Configuración y controles]]
 
-Archivo: `public/js/controles.js`. Registro central de **acciones** (qué hace cada tecla) y de **opciones** del juego. No depende de nada; lo usan [[main.js]] y [[configuracion.js]]. Lo prueba `tools/controles/pruebas.mjs`.
+Archivo: `public/js/controles.js`. Registro central de **acciones** (qué hace cada tecla) y de **opciones** del juego. Solo depende de [[opcionesBots.js]] (los valores de las opciones de los bots); lo usan [[main.js]] y [[configuracion.js]]. Lo prueba `tools/controles/pruebas.mjs`.
 
 ## Acciones
 
@@ -21,7 +21,7 @@ Acciones de fábrica: `adelante`, `atras`, `izquierda`, `derecha`, `correr`, `sa
 - `opcion(id)`, `fijarOpcion(id, v)` (ignora valores inválidos), `restablecerOpciones()`. Se guardan en `sf-opciones`.
 - `alCambiar(fn)`: avisa `('controles' | 'opcion', id)` en cada cambio.
 
-Opciones de fábrica: `sens`, `sensApunta`, `sensMira`, `invertirY`, `apuntarAlternar`, `correrSiempre`, `numerosDanio`, `calidad`, `resolucion`, `fov`, `colorMira`, `fps`, `volumen`.
+Opciones de fábrica: `sens`, `sensApunta`, `sensMira`, `invertirY`, `apuntarAlternar`, `correrSiempre`, `numerosDanio`, `botsTotal`, `botsDificultad` (ver [[Bots]]; los valores salen de [[opcionesBots.js]], el único import del módulo), `calidad`, `resolucion`, `fov`, `colorMira`, `fps`, `volumen`.
 
 ## Acciones del auto (2026-11-26)
 
