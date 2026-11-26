@@ -131,6 +131,12 @@ export const sfx = {
   },
   whiff() { burst({ dur: 0.12, freq: 800, q: 0.5, vol: 0.2, type: 'highpass' }); },
   build() { burst({ dur: 0.1, freq: 400, q: 2, vol: 0.8, type: 'bandpass' }); tone({ f1: 300, f2: 500, dur: 0.08, vol: 0.12, type: 'square' }); },
+  // golpe de pico en el punto débil: "ting" brillante y un golpe seco
+  critico() {
+    tone({ f1: 1568, f2: 1568, dur: 0.14, vol: 0.22, type: 'triangle' });
+    tone({ f1: 2349, f2: 2093, dur: 0.22, vol: 0.14, type: 'sine', delay: 0.04 });
+    burst({ dur: 0.07, freq: 4200, q: 3, vol: 0.6, type: 'bandpass' });
+  },
   structBreak() { burst({ dur: 0.35, freq: 700, q: 1, vol: 1 }); },
   pickup() { tone({ f1: 600, f2: 900, dur: 0.08, vol: 0.2, type: 'triangle' }); tone({ f1: 900, f2: 1300, dur: 0.08, vol: 0.2, type: 'triangle', delay: 0.07 }); },
   chest() { [523, 659, 784, 1046].forEach((f, i) => tone({ f1: f, f2: f, dur: 0.18, vol: 0.18, type: 'triangle', delay: i * 0.08 })); },

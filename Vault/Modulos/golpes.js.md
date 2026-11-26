@@ -1,0 +1,14 @@
+# golpes.js
+
+Volver a [[Inicio]] · sistema: [[Daño visible y punto débil]]
+
+Archivo: `public/js/golpes.js` (solo cliente). Muestra cuánto daño tiene lo que se golpea y maneja el punto débil del pico. [[main.js]] lo crea con `crearGolpes({ scene, camera, me, getWorld, ui, sfx, cons, rayo, mirar, addDmgNum, sparks })` y lo usa como `golpes` (`rayo` es `castRay`; `mirar` es `mirarPico`, el rayo de la mira).
+
+- `objetivoDe(res)` / `aMensaje(o)`: pasan de un resultado de `castRay` a un objeto golpeable `{ tipo: 'pz' | 'key' | 'tree' | 'rock', id }` y de ahí a lo que se manda al servidor (`pz`, `key` o `res` + `idx`).
+- **Grietas**: `grietas(o, dano, flash)` pone encima de la pieza una capa (`ShaderMaterial` con `polygonOffset`, sin escribir profundidad) con grietas procedurales (bordes de Voronoi en el plano dominante de cada cara) que se abren de a poco: cada grieta tiene un número al azar y aparece cuando el daño (0 a 1) lo pasa; también se ensancha y la pieza se oscurece. En las piezas del mapa la capa es una copia de sus triángulos visibles (los saca de `lote.rangos` de [[mallas.js]]); en las construcciones usa la geometría del panel y el marco ([[construccion3d.js]]), respeta el plano de corte mientras se levantan y se rehace si cambia la malla (edición). Se apaga de lejos (60-100 m). El destello blanco del golpe es `uFlash`.
+- `vidaPieza(id, hp)` (mensaje `pzHp`) y `vidaStruct(s, dano)` (mensaje `structHp`): guardan la vida (`world.piezas[id].vida`, `s.dano`) y actualizan las grietas. Las ven todos.
+- **Barra de vida** (`#structhp` de [[index.html]], debajo de la mira): la de lo último que golpeaste (pico o tiros, 2,2 s con `mostrar(o)`) o la de lo que mirás con el pico, construyendo o editando (rayo cada 100 ms). Ícono y relleno del color del material, número `vida / máximo` y la parte recién perdida en blanco que baja después de 0,28 s. Brilla celeste en un crítico. Reemplaza a la vida que antes mostraba [[construir.js]] (solo construcciones).
+- **Punto débil**: `alDebil(m)` (mensaje `debil`) lleva el punto que eligió el servidor a la superficie que se ve (rayo a lo largo de la normal, o desde la cámara) y dibuja el círculo celeste (shader con aro, relleno que late, centro blanco y cuatro marcas). `esCritico(o, at)` mira si el golpe cae dentro del círculo (y cerca del punto del servidor). Se borra a los `PUNTO_DEBIL.dura` segundos sin pegarle, al romperse la cosa (`alRomper`) o en una partida nueva (`reiniciar`).
+- `golpePico(o, at, n)`: lo llama `trySwing` al picar una estructura, árbol o roca. Predice el daño (×2 si es crítico) para que la barra y las grietas cambien al toque, saca el número de daño (blanco; celeste y grande en el crítico) y en el crítico: aro que se agranda, chispas celestes y `sfx.critico()` de [[audio.js]]. El servidor confirma con `pzHp` / `structHp` / `debil`.
+
+Lo prueba `tools/golpes/pruebas.mjs` (ver [[Daño visible y punto débil]]).
