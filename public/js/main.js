@@ -15,6 +15,7 @@ import {
 } from './caida.js';
 import { accionesDe, activa, presionar, soltar, soltarTodo, teclaDe, listaAcciones, opcion, alCambiar, cargarDistribucion } from './controles.js';
 import { abrirConfig, cerrarConfig, abierto as configAbierta } from './configuracion.js';
+import { crearConstruccion } from './construir.js';
 
 const GRAVITY = 25, WALK = 6, SPRINT = 9.5, AIM_WALK = 3.5, JUMP = 8.5, SWIM_Y = -1.3;
 const PICKUP_RANGE = 3;
@@ -29,7 +30,7 @@ const ui = {
   killfeed: $('killfeed'), hpfill: $('hpfill'), hptext: $('hptext'), shieldfill: $('shieldfill'), shieldtext: $('shieldtext'),
   hit: $('hitmarker'), damage: $('damage'), chatlog: $('chatlog'), chatInput: $('chatInput'), click: $('clickToPlay'),
   slots: $('slots'), prompt: $('prompt'), usebar: $('usebar'), usefill: $('usefill'), usetext: $('usetext'),
-  pickupFeed: $('pickupFeed'), buildbar: $('buildbar'), scope: $('scope'), dmgnums: $('dmgnums'), crosshair: $('crosshair'),
+  pickupFeed: $('pickupFeed'), buildbar: $('buildbar'), buildhint: $('buildhint'), structhp: $('structhp'), scope: $('scope'), dmgnums: $('dmgnums'), crosshair: $('crosshair'),
 };
 ui.name.value = storageGet('br-name') || '';
 // Modelos de Blender: se cargan antes de habilitar el menú.
@@ -52,6 +53,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 setRigEnv(renderer);
 luzLoot(renderer);
+renderer.localClippingEnabled = true; // las construcciones se llenan de abajo hacia arriba mientras se levantan
 
 const scene = new THREE.Scene();
 const SKY = new THREE.Color('#7cc8ff');
@@ -123,7 +125,7 @@ window.addEventListener('resize', resize);
 aplicarOpciones();
 alCambiar((tipo) => {
   if (tipo === 'opcion') aplicarOpciones();
-  else { ghostKey = ''; updateSlots(); updateHelp(); }
+  else updateSlots();
 });
 cargarDistribucion();
 
@@ -151,8 +153,11 @@ const tracers = [];
 const effects = [];
 const dmgNums = [];
 let minimapBase = null;
-let ghost = null, ghostKey = '';
 let interact = null;
+// Construcción (construir.js): modo construcción, vista previa, edición y su HUD.
+const cons = crearConstruccion({ scene, camera, me, getWorld: () => world, getMyId: () => myId, sendMsg, ui, sfx, feed });
+me.cancelUse = () => { if (me.use) cancelUse(); };
+me.onBuildChange = () => { if (me.build && opcion('apuntarAlternar')) rmbDown = false; updateSlots(); };
 
 const now = () => Date.now() + serverOffset;
 
@@ -253,12 +258,26 @@ function handle(m) {
     case 'resGone': world.destroyResource(m.res, m.idx); break;
     case 'structAdd':
       world.addStruct(m.s);
+      cons.alAgregar(m.s);
       if (me.pos.distanceTo(new THREE.Vector3(m.s.i * GRID, m.s.y, m.s.j * GRID)) < 40) sfx.build();
       break;
     case 'structDel': {
+      // la pieza rota y las que se cayeron por quedar sin apoyo
+      let cerca = false;
+      for (const key of [m.key, ...(m.caidas || [])]) {
+        const s = key && world.structs.get(key);
+        if (!s) continue;
+        const c = new THREE.Vector3(s.i * GRID + 2, s.y + 2, s.j * GRID + 2);
+        explosionFx(c, MATERIALS[s.mat].color, 0.6);
+        if (c.distanceTo(me.pos) < 60) cerca = true;
+        world.removeStruct(key);
+      }
+      if (cerca) sfx.structBreak();
+      break;
+    }
+    case 'structEdit': {
       const s = world.structs.get(m.key);
-      if (s) { explosionFx(new THREE.Vector3(s.i * GRID + 2, s.y + 2, s.j * GRID + 2), MATERIALS[s.mat].color, 0.6); sfx.structBreak(); }
-      world.removeStruct(m.key);
+      if (s && (s.e !== m.e || s.dir !== m.dir)) world.editStruct(m.key, m.e, m.dir);
       break;
     }
     case 'pzRota': {
@@ -277,6 +296,7 @@ function handle(m) {
     case 'chestMove': world.moveChest(m.idx, m.y); break;
     case 'structHp': {
       const s = world.structs.get(m.key);
+      if (s) cons.alCambiarVida(s, m.hp);
       if (s?.mesh) { s.mesh.scale.setScalar(0.94); setTimeout(() => s.mesh && s.mesh.scale.setScalar(1), 70); }
       break;
     }
@@ -302,6 +322,7 @@ function onInventory(m) {
   if (m.picked) { sfx.pickup(); feed(itemLabel(m.picked), itemColor(m.picked)); }
   if (m.gained) feed(`+${m.gained[1]} ${MATERIALS[m.gained[0]].name}`, MATERIALS[m.gained[0]].color);
   if (me.reloadSlot >= 0 && me.slots[me.reloadSlot]?.kind === 'weapon' && me.slots[me.reloadSlot].mag >= WEAPONS[me.slots[me.reloadSlot].w].mag) { me.reloading = 0; me.reloadSlot = -1; }
+  cons.autoMaterial(); // si se terminó el material elegido, pasa solo al siguiente que alcance
   updateHp(); updateSlots();
 }
 
@@ -396,6 +417,7 @@ function setupMatch(snap) {
   ui.menu.classList.add('hidden');
   ui.hud.classList.remove('hidden');
   ui.killfeed.innerHTML = '';
+  cons.cancelar();
   Object.assign(me, {
     hp: 100, shield: 0, kills: 0, state: 'bus', spectate: null, sel: -1, build: null, ...estadoCaida(),
     reloading: 0, reloadSlot: -1, use: null, slots: Array(SLOTS).fill(null), mats: { madera: 0, piedra: 0, metal: 0 }, ammo: {},
@@ -412,7 +434,7 @@ function setupMatch(snap) {
     for (const i of snap.chests) world.openChest(i);
     for (const i of snap.trees) world.destroyResource('tree', i);
     for (const i of snap.rocks) world.destroyResource('rock', i);
-    for (const s of snap.structs) world.addStruct(s);
+    for (const s of snap.structs) { world.addStruct(s); cons.alAgregar(s); }
     for (const id of snap.piezas || []) world.romperPieza(id);
     for (const [i, y] of snap.cofresMovidos || []) world.moveChest(i, y);
   }
@@ -438,18 +460,6 @@ function updateHp() {
 
 function heldItem() { return me.sel >= 0 ? me.slots[me.sel] : null; }
 
-// Ayuda de abajo: se arma con las teclas que tenga asignadas el jugador.
-function updateHelp() {
-  const k = (id) => escapeHtml(teclaDe(id));
-  const mov = ['adelante', 'izquierda', 'atras', 'derecha'].map(teclaDe).join('');
-  $('help').innerHTML = [
-    `${escapeHtml(mov.length === 4 ? mov : mov.split('').join('/'))} moverse`, `${k('correr')} correr`, `${k('saltar')} saltar`,
-    `${k('disparar')} usar/disparar`, `${k('apuntar')} apuntar`, `${k('interactuar')} agarrar/abrir`, `${k('recargar')} recargar`,
-    `${k('construirPared')}/${k('construirPiso')}/${k('construirRampa')} construir pared/piso/rampa`, `${k('modoConstruccion')} salir de construcción`,
-    `${k('cambiarMaterial')} material`, `${k('tirar')} tirar`, `${k('bailar')} bailar`, `${k('chat')} chat`, 'Esc configuración',
-  ].join(' · ');
-}
-updateHelp();
 
 function updateSlots() {
   const cells = [];
@@ -476,12 +486,7 @@ function updateSlots() {
     el.querySelector('span').textContent = me.mats[m] || 0;
     el.classList.toggle('active', m === me.mat);
   });
-  ui.buildbar.classList.toggle('hidden', !me.build);
-  ui.slots.classList.toggle('hidden', !!me.build);
-  if (me.build) {
-    ui.buildbar.innerHTML = [['pared', 'construirPared', 'Pared'], ['piso', 'construirPiso', 'Piso'], ['rampa', 'construirRampa', 'Rampa']]
-      .map(([t, a, l]) => `<div class="${me.build === t ? 'active' : ''}">${escapeHtml(teclaDe(a))} ${l}</div>`).join('') + `<div>${MATERIALS[me.mat].name} · ${BUILD_COST}</div>`;
-  }
+  cons.hud(); // barra de piezas arriba del inventario y ayuda de construcción
   // Lo que tiene en la mano
   if (me.mesh) {
     const it = heldItem();
@@ -523,7 +528,7 @@ function onDeath(m) {
   if (m.by === myId && m.id !== myId) { sfx.elim(); showCenter(''); ui.center.innerHTML = `<small>Eliminaste a ${escapeHtml(nameOf(m.id))}</small>`; setTimeout(() => { if (ui.center.innerHTML.includes('Eliminaste')) showCenter(''); }, 2500); }
   if (m.id === myId) {
     me.state = 'dead'; me.hp = 0; me.shield = 0; updateHp();
-    me.mesh.visible = false; me.build = null; clearGhost();
+    me.mesh.visible = false; cons.cancelar();
     const alive = m.players.filter((p) => p.alive).length;
     showCenter('ELIMINADO', `${env ? `Te eliminó ${CAUSES[m.cause] || 'el entorno'}` : `Te eliminó ${escapeHtml(nameOf(m.by))}`} · Puesto #${alive + 1} · Clic para ver a otro jugador`);
     startSpectating(m.by);
@@ -561,7 +566,7 @@ function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&a
 // ---------- Entrada ----------
 // Las teclas salen del registro de controles.js (el jugador las cambia en Configuración).
 const PLAYING = ['bus', 'falling', 'glider', 'ground'];
-const contexto = () => (me.build ? 'construccion' : 'combate');
+const contexto = () => cons.contexto();
 canvas.addEventListener('click', () => {
   sfx.unlock();
   if (configAbierta()) return;
@@ -658,11 +663,9 @@ function hacer(a, e) {
     case 'ranuraSiguiente': case 'ranuraAnterior':
       if (!me.build) selectSlot(((me.sel + 1 + (a === 'ranuraSiguiente' ? 1 : -1) + SLOTS + 1) % (SLOTS + 1)) - 1);
       break;
-    case 'construirPared': setBuild('pared'); break;
-    case 'construirPiso': setBuild('piso'); break;
-    case 'construirRampa': setBuild('rampa'); break;
-    case 'modoConstruccion': setBuild(me.build ? null : 'pared'); break;
-    case 'cambiarMaterial': me.mat = MAT_ORDER[(MAT_ORDER.indexOf(me.mat) + 1) % 3]; ghostKey = ''; updateSlots(); break;
+    case 'construirPared': case 'construirPiso': case 'construirRampa': case 'construirTecho':
+    case 'modoConstruccion': case 'cambiarMaterial': case 'editar': case 'girar':
+      cons.accion(a); break;
     case 'chat':
       if (ui.hud.classList.contains('hidden')) break;
       document.exitPointerLock?.();
@@ -676,13 +679,13 @@ function hacer(a, e) {
 // Solo se apunta con un arma en la mano (con el pico, objetos o construyendo, el clic derecho no hace zoom).
 function canAim() {
   const it = heldItem();
-  return me.state === 'ground' && !me.build && it?.kind === 'weapon';
+  return me.state === 'ground' && !me.build && !cons.editando && it?.kind === 'weapon';
 }
 
 function selectSlot(i) {
-  if (i === me.sel && !me.build) return;
+  if (i === me.sel && !me.build && !cons.editando) return;
   me.sel = i;
-  me.build = null; clearGhost();
+  cons.salir(); // confirma la edición si había una y sale del modo construcción
   if (opcion('apuntarAlternar')) rmbDown = false;
   if (me.use) cancelUse();
   if (me.reloadSlot >= 0 && me.reloadSlot !== i) { me.reloading = 0; me.reloadSlot = -1; stopWeaponAction(me.mesh); }
@@ -692,14 +695,10 @@ function selectSlot(i) {
   const it = heldItem();
   if (it?.kind === 'weapon' && it.mag === 0) startReload();
 }
+// Para pruebas: entrar a construir una pieza (o salir con null).
 function setBuild(type) {
-  if (me.state !== 'ground' && me.state !== 'glider' && me.state !== 'falling') return;
-  me.build = type;
-  if (type && opcion('apuntarAlternar')) rmbDown = false;
-  if (me.use) cancelUse();
-  ghostKey = '';
-  if (!type) clearGhost();
-  updateSlots();
+  if (!type) cons.salir();
+  else cons.accion({ pared: 'construirPared', piso: 'construirPiso', rampa: 'construirRampa', techo: 'construirTecho' }[type]);
 }
 
 function onSpace() {
@@ -803,51 +802,6 @@ function updateUse(dt) {
   if (me.use.t >= me.use.total) { sendMsg({ t: 'useEnd' }); me.use = null; ui.usebar.classList.add('hidden'); }
 }
 
-// ---------- Construcción ----------
-function buildTarget() {
-  const d = Math.round(((-me.yaw / (Math.PI / 2)) % 4 + 4) % 4) % 4; // 0=-Z,1=+X,2=+Z,3=-X
-  const ci = Math.floor(me.pos.x / GRID), cj = Math.floor(me.pos.z / GRID);
-  // Altura en pasos de medio metro a partir de los pies, para que no quede enterrado ni flotando.
-  let level = Math.floor(me.pos.y * 2) / 2;
-  // Si estoy sobre una rampa o un piso propio, usar su nivel para que todo encaje.
-  for (const s of world.structs.values()) {
-    if (s.type === 'pared' || s.i !== ci || s.j !== cj) continue;
-    if (me.pos.y >= s.y - 0.3 && me.pos.y <= s.y + GRID + 0.6) {
-      level = s.type === 'rampa' && me.pos.y > s.y + GRID * 0.5 ? s.y + GRID : s.y;
-    }
-  }
-  const [dx, dz] = DIRS[d];
-  if (me.build === 'pared') {
-    // Normalizada igual que en el servidor: sólo bordes -Z (dir 0) y -X (dir 3).
-    if (d === 2) return { type: 'pared', i: ci, j: cj + 1, y: level, dir: 0 };
-    if (d === 1) return { type: 'pared', i: ci + 1, j: cj, y: level, dir: 3 };
-    return { type: 'pared', i: ci, j: cj, y: level, dir: d };
-  }
-  if (me.build === 'piso' && me.pitch > 0.45) return { type: 'piso', i: ci, j: cj, y: level + GRID, dir: d };
-  if (me.build === 'piso' && me.pitch < -0.6) return { type: 'piso', i: ci, j: cj, y: level, dir: d };
-  return { type: me.build, i: ci + dx, j: cj + dz, y: level, dir: d };
-}
-function clearGhost() { if (ghost) { scene.remove(ghost); ghost = null; ghostKey = ''; } }
-function updateBuild() {
-  if (!me.build || !['ground', 'glider', 'falling'].includes(me.state)) { clearGhost(); return; }
-  const t = buildTarget();
-  t.mat = me.mat;
-  const k = `${structKey(t)}:${t.dir}`;
-  if (k !== ghostKey) {
-    clearGhost();
-    ghost = makeStructMesh(t, true);
-    scene.add(ghost);
-    ghostKey = k;
-  }
-  ghost.userData.target = t;
-  const blocked = world.structs.has(structKey(t)) || (me.mats[me.mat] || 0) < BUILD_COST;
-  ghost.traverse((o) => { if (o.isMesh) o.material.color.set(blocked ? '#ff5a5a' : '#59b8ff'); });
-  if (mouseDown && !blocked && performance.now() - (me.lastBuild || 0) > 120) {
-    me.lastBuild = performance.now();
-    sendMsg({ t: 'build', type: t.type, i: t.i, j: t.j, y: t.y, dir: t.dir, mat: me.mat });
-  }
-}
-
 // ---------- Disparo / pico ----------
 const raycaster = new THREE.Raycaster();
 const _v = new THREE.Vector3(), _d = new THREE.Vector3();
@@ -913,7 +867,7 @@ function castRay(origin, dir, range, near) {
 
 function tryUseHeld() {
   if (me.state !== 'ground') return;
-  if (me.build) return;
+  if (me.build || cons.editando) return;
   const it = heldItem();
   if (!it) { if (mouseDown) trySwing(); return; }
   if (it.kind === 'consumable') { if (mouseClicked) startUse(); return; }
@@ -1274,8 +1228,8 @@ function updateCamera(dt, t) {
     // cámara al hombro, cerca del personaje (como en los battle royale en tercera persona); baja al deslizarse
     camAlto += ((me.desliz ? DESLIZ.ALTO_CAMARA : 1.68) - camAlto) * Math.min(1, dt * 8);
     focus = me.pos.clone().add(new THREE.Vector3(0, camAlto, 0));
-    dist = scoped ? 0.2 : me.aiming ? 1.9 : me.build ? 4.6 : 3.6;
-    side = scoped ? 0 : me.aiming ? 0.72 : me.build ? 0.9 : 0.8;
+    dist = scoped ? 0.2 : me.aiming ? 1.9 : me.build || cons.editando ? 4.6 : 3.6;
+    side = scoped ? 0 : me.aiming ? 0.72 : me.build || cons.editando ? 0.9 : 0.8;
     up = scoped ? 0 : me.aiming ? 0.12 : 0.28;
     collide = !scoped;
   }
@@ -1321,7 +1275,7 @@ const CROSS = { rifle: 'rifle', subfusil: 'smg', pistola: 'pistola', escopeta: '
 let crossType = '', crossGap = 8, crossKick = 0;
 function updateCrosshair(dt, scoped) {
   const it = heldItem();
-  let type = me.state !== 'ground' || scoped ? 'nada' : me.build ? 'construir' : !it ? 'pico' : it.kind === 'weapon' ? CROSS[it.w] || 'rifle' : 'objeto';
+  let type = me.state !== 'ground' || scoped ? 'nada' : me.build || cons.editando ? 'construir' : !it ? 'pico' : it.kind === 'weapon' ? CROSS[it.w] || 'rifle' : 'objeto';
   if (type !== crossType) { ui.crosshair.className = 'ch-' + type; crossType = type; }
   let gap = 5;
   if (it?.kind === 'weapon' && !me.build) {
@@ -1409,7 +1363,7 @@ function frame() {
   const t = now();
   if (world && room && room.phase !== 'lobby') {
     updateBus(t);
-    if (['falling', 'glider', 'ground'].includes(me.state)) { updateMe(dt); updateBuild(); updateUse(dt); }
+    if (['falling', 'glider', 'ground'].includes(me.state)) { updateMe(dt); cons.update(dt, mouseDown); updateUse(dt); }
     else if (me.state === 'bus') { me.pos.copy(bus.position); me.mesh.visible = false; }
     updateOthers(dt);
     updateItems(t);
@@ -1438,6 +1392,6 @@ frame();
 import * as ITEMS from "./items.js";
 window.__WEAPONS = ITEMS.WEAPONS;
 window.__game = {
-  me, others, items, camera, sendMsg, selectSlot, setBuild, doInteract, findInteract, trySwing, tryShoot, updateSlots, renderer,
+  me, others, items, camera, sendMsg, selectSlot, setBuild, doInteract, findInteract, trySwing, tryShoot, updateSlots, renderer, cons, pulsar, liberar,
   get room() { return room; }, get world() { return world; },
 };

@@ -10,6 +10,7 @@ import {
   WEAPONS, CONSUMABLES, AMMO, MATERIALS, BUILD_COST, MAX_MATS, PICKAXE, SLOTS, GRID, DIRS,
   randomWeapon, randomConsumable, randomAmmo, weaponDamage, weaponReload, structKey,
 } from './public/js/items.js';
+import { TIPOS, normalizar, tieneApoyo, sinApoyo, vidaDe, editValida, OBRA, ALCANCE_EDICION, cajaPieza } from './public/js/construccion.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -19,6 +20,8 @@ const BUS_HEIGHT = 260;
 const MAX_PLAYERS = 16;
 const TICK_MS = 100;
 const PICKUP_RANGE = 3.2;
+// Sólo para probar la construcción: SF_MATS=500 npm start arranca cada partida con 500 de cada material.
+const MATS_INICIALES = Math.max(0, Math.min(MAX_MATS, Number(process.env.SF_MATS) || 0));
 
 // ---------- HTTP estático ----------
 const MIME = {
@@ -95,7 +98,14 @@ function matchSnapshot(room) {
     cofresMovidos: room.chests.flatMap((c, i) => (c.movido ? [[i, c.y]] : [])),
   };
 }
-const structPublic = (s) => ({ key: s.key, type: s.type, i: s.i, j: s.j, y: s.y, dir: s.dir, mat: s.mat, hp: s.hp });
+// crece: segundos que le faltan para terminar de levantarse (obra: lo que tarda en total).
+function structPublic(s) {
+  const t = Date.now();
+  return {
+    key: s.key, type: s.type, i: s.i, j: s.j, y: s.y, dir: s.dir, mat: s.mat, e: s.e || 0, owner: s.owner,
+    hp: Math.ceil(vidaDe(s, t)), max: MATERIALS[s.mat].hp, obra: OBRA[s.mat], crece: +Math.max(0, OBRA[s.mat] - (t - s.born) / 1000).toFixed(2),
+  };
+}
 
 function invMsg(p) {
   return { t: 'inv', slots: p.slots, ammo: p.ammo, mats: p.mats, hp: Math.ceil(p.hp), shield: Math.ceil(p.shield) };
@@ -175,7 +185,7 @@ function resetPlayer(p, room) {
   p.pos = [...room.bus.from]; p.lastShot = 0; p.lastSwing = 0; p.use = null;
   p.slots = Array(SLOTS).fill(null);
   p.ammo = { ligera: 0, media: 0, pesada: 0, cartuchos: 0, cohetes: 0 };
-  p.mats = { madera: 0, piedra: 0, metal: 0 };
+  p.mats = { madera: MATS_INICIALES, piedra: MATS_INICIALES, metal: MATS_INICIALES };
 }
 
 function stormAt(storm, now) {
@@ -471,26 +481,37 @@ function handleGame(room, player, msg) {
       break;
     }
     case 'build': {
-      if (!player.alive || player.state === 'bus' || room.phase !== 'playing') break;
+      if (!player.alive || ['bus', 'falling', 'glider'].includes(player.state) || room.phase !== 'playing') break;
       const { type, i, j, y, dir, mat } = msg;
-      if (!['pared', 'piso', 'rampa'].includes(type) || !MATERIALS[mat]) break;
+      if (!TIPOS.includes(type) || !MATERIALS[mat]) break;
       if (![i, j, y * 2, dir].every(Number.isInteger) || dir < 0 || dir > 3) break;
       if (player.mats[mat] < BUILD_COST) break;
       const cx = i * GRID + GRID / 2, cz = j * GRID + GRID / 2;
       if (Math.hypot(cx - player.pos[0], cz - player.pos[2]) > GRID * 3 || Math.abs(y - player.pos[1]) > GRID * 2.5) break;
-      const s = { type, i, j, y, dir, mat };
+      const s = normalizar({ type, i, j, y, dir, mat, e: 0 });
       s.key = structKey(s);
       if (room.world.structs.has(s.key)) break;
-      if (type === 'pared') { // normalizar como la clave
-        if (dir === 2) { s.j += 1; s.dir = 0; }
-        if (dir === 1) { s.i += 1; s.dir = 3; }
-      }
-      s.hp = MATERIALS[mat].hp;
+      // tiene que apoyarse en el piso, en el mapa o en otra construcción
+      if (!tieneApoyo(room.world, s)) break;
+      s.born = Date.now(); s.dano = 0;
       s.owner = player.id;
       room.world.addStruct(s);
       player.mats[mat] -= BUILD_COST;
       broadcast(room, { t: 'structAdd', s: structPublic(s) });
       send(player.ws, invMsg(player));
+      break;
+    }
+    case 'edit': {
+      // Editar una construcción propia: pared 3x3, piso 2x2, rampa (dirección y carriles) y techo (esquinas).
+      if (!player.alive || room.phase !== 'playing') break;
+      const s = room.world.structs.get(msg.key);
+      if (!s || s.owner !== player.id) break;
+      const b = cajaPieza(s);
+      if (dist3([(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2], [player.pos[0], player.pos[1] + 1, player.pos[2]]) > ALCANCE_EDICION + 2) break;
+      if (!editValida(s.type, msg.e)) break;
+      const dir = s.type === 'rampa' && Number.isInteger(msg.dir) && msg.dir >= 0 && msg.dir <= 3 ? msg.dir : s.dir;
+      room.world.editStruct(s.key, msg.e, dir);
+      broadcast(room, { t: 'structEdit', key: s.key, e: s.e, dir: s.dir });
       break;
     }
     case 'useStart': {
@@ -578,6 +599,9 @@ function damagePieza(room, id, dmg) {
   for (const c of room.world.piezasSinApoyo(id)) if (room.world.romperPieza(c)) rotas.push(c);
   room.pzRotas.push(...rotas);
   broadcast(room, { t: 'pzRota', ids: rotas });
+  // construcciones de jugadores que se apoyaban en lo que se rompió
+  const caidas = derrumbar(room);
+  if (caidas.length) broadcast(room, { t: 'structDel', key: null, caidas });
   // lo que quedó en el aire cae
   const dentro = (p, a) => p[0] > a[0] - 0.3 && p[0] < a[3] + 0.3 && p[2] > a[2] - 0.3 && p[2] < a[5] + 0.3 && p[1] > a[1] - 0.3 && p[1] < a[4] + 1.5;
   const zonas = rotas.map((r) => room.world.piezas[r].aabb);
@@ -599,11 +623,21 @@ function damagePieza(room, id, dmg) {
 const RARITIESmul = (it) => 1 + it.rarity * 0.05;
 
 function damageStruct(room, s, dmg) {
-  s.hp -= dmg;
-  if (s.hp <= 0) {
+  if (!room.world.structs.has(s.key) || !(dmg > 0)) return;
+  s.dano = (s.dano || 0) + dmg;
+  const hp = vidaDe(s, Date.now());
+  if (hp <= 0) {
     room.world.removeStruct(s.key);
-    broadcast(room, { t: 'structDel', key: s.key });
-  } else broadcast(room, { t: 'structHp', key: s.key, hp: Math.ceil(s.hp) });
+    broadcast(room, { t: 'structDel', key: s.key, caidas: derrumbar(room) });
+  } else broadcast(room, { t: 'structHp', key: s.key, hp: Math.ceil(hp) });
+}
+
+// Saca las construcciones que quedaron sin apoyo (como en el género: lo que no llega al piso se cae). Devuelve sus claves.
+function derrumbar(room) {
+  if (!room.world.structs.size) return [];
+  const caidas = sinApoyo(room.world);
+  for (const k of caidas) room.world.removeStruct(k);
+  return caidas;
 }
 
 // ---------- WebSocket ----------
