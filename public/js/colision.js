@@ -101,14 +101,23 @@ export class Solidos {
   }
 
   // Empuja una cápsula vertical (pos = pies) fuera de las paredes.
-  push(pos, radius, height) {
+  // choque(s, nx, nz): si viene, se llama antes de cada empujón con la dirección (normalizada) en que el sólido
+  // empuja; si devuelve true, ese sólido no empuja (un auto que lo rompe al pasar, ver autos.js).
+  push(pos, radius, height, choque = null) {
+    const mover = (s, x, z) => {
+      if (choque) {
+        const dx = x - pos.x, dz = z - pos.z, d = Math.hypot(dx, dz);
+        if (d > 1e-9 && choque(s, dx / d, dz / d)) return;
+      }
+      pos.x = x; pos.z = z;
+    };
     this.near(pos.x, pos.z, radius + 0.1, (s) => {
       if (pos.y + height <= s.y0) return;
       if (s.cyl) {
         if (pos.y >= s.y1 - STEP) return;
         const dx = pos.x - s.x, dz = pos.z - s.z, d = Math.hypot(dx, dz), min = s.r + radius;
         if (d >= min) return;
-        if (d > 1e-4) { pos.x = s.x + (dx / d) * min; pos.z = s.z + (dz / d) * min; } else pos.x = s.x + min;
+        if (d > 1e-4) mover(s, s.x + (dx / d) * min, s.z + (dz / d) * min); else mover(s, s.x + min, pos.z);
         return;
       }
       const cx = Math.max(s.x0, Math.min(pos.x, s.x1));
@@ -120,12 +129,12 @@ export class Solidos {
       if (Solidos.topAt(s, cx, cz) <= pos.y + STEP) return;
       if (d2 > 1e-8) {
         const d = Math.sqrt(d2);
-        pos.x = cx + (dx / d) * radius; pos.z = cz + (dz / d) * radius;
+        mover(s, cx + (dx / d) * radius, cz + (dz / d) * radius);
       } else {
         const ex0 = s.x0 - radius - pos.x, ex1 = s.x1 + radius - pos.x, ez0 = s.z0 - radius - pos.z, ez1 = s.z1 + radius - pos.z;
         const bx = Math.abs(ex0) < Math.abs(ex1) ? ex0 : ex1;
         const bz = Math.abs(ez0) < Math.abs(ez1) ? ez0 : ez1;
-        if (Math.abs(bx) < Math.abs(bz)) pos.x += bx; else pos.z += bz;
+        if (Math.abs(bx) < Math.abs(bz)) mover(s, pos.x + bx, pos.z); else mover(s, pos.x, pos.z + bz);
       }
     });
   }

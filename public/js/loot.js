@@ -9,6 +9,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { ASSETS, cloneAsset } from './assets.js';
 import { createWeaponModel } from './models.js';
 import { RARITIES } from './items.js';
+import { pisoLoot, techoLoot } from './lugarLoot.js';
 
 const ALTURA = 0.5;          // altura del centro del objeto sobre el piso
 const LEJOS_FX = 45;         // más lejos que esto no se animan chispas ni aura
@@ -336,7 +337,9 @@ function animarCofre(g, ahora, cam) {
 // ---------------------------------------------------------------------------
 // Un cuadro: objetos del piso (flotan, giran, haz mirando a la cámara, chispas, salto desde el cofre) y cofres.
 const _a = new THREE.Vector3();
-export function animarLoot(items, cofres, t, camera) {
+// world (opcional): con él, el salto desde el cofre no corta pisos ni techos (el lugar final ya lo eligió el servidor
+// sin pasar paredes, ver lugarLoot.js).
+export function animarLoot(items, cofres, t, camera, world = null) {
   const ahora = performance.now();
   const cam = camera.position;
   if (cofres) for (const c of cofres) animarCofre(c, ahora, cam);
@@ -348,7 +351,7 @@ export function animarLoot(items, cofres, t, camera) {
       u.nacio = ahora;
       u.destino = mesh.position.clone();
       const c = cofres?.find((k) => k.userData.abriendo && ahora - k.userData.abriendo < 1500 && k.position.distanceToSquared(u.destino) < 3.5 * 3.5);
-      if (c) u.arco = { desde: c.position.clone().add(_a.set(0, 0.35, 0)), t0: ahora };
+      if (c) u.arco = { desde: c.position.clone().add(_a.set(0, 0.35, 0)), t0: ahora, f: c.position.y, alto: alturaArco(world, c.position, u.destino) };
     }
     const d2 = (u.destino || mesh.position).distanceToSquared(cam);
     if (d2 > LEJOS_VER * LEJOS_VER) { mesh.visible = false; continue; }
@@ -359,7 +362,12 @@ export function animarLoot(items, cofres, t, camera) {
     if (u.arco) {
       const p = Math.min(1, (ahora - u.arco.t0) / 600);
       mesh.position.lerpVectors(u.arco.desde, u.destino, p);
-      mesh.position.y += Math.sin(Math.PI * p) * 1.4;
+      mesh.position.y += Math.sin(Math.PI * p) * u.arco.alto;
+      if (world) {
+        // sigue el piso por el que pasa (balcón, escalón): si el destino está más abajo, cae recién al pasar el borde
+        u.arco.f = pisoLoot(world, mesh.position.x, mesh.position.z, u.arco.f);
+        if (mesh.position.y < u.arco.f) mesh.position.y = u.arco.f;
+      }
       const s = 0.35 + 0.65 * p;
       mesh.scale.setScalar(s);
       u.spin.rotation.y += (1 - p) * 8;
@@ -373,6 +381,18 @@ export function animarLoot(items, cofres, t, camera) {
     if (L.motas) { L.motas.visible = cerca; if (cerca) moverChispas(L.motas, t / 1000 + L.fase); }
     L.halo.material.opacity = (L.esArma ? 0.24 : 0.16) + Math.sin(t / 380 + L.fase) * 0.05;
   }
+}
+
+// Qué tan alto puede saltar el loot del cofre al destino sin tocar el techo (1,4 m si hay lugar).
+function alturaArco(world, desde, hasta) {
+  if (!world) return 1.4;
+  let techo = Infinity, f = desde.y;
+  for (let k = 0; k <= 8; k++) {
+    const x = desde.x + (hasta.x - desde.x) * (k / 8), z = desde.z + (hasta.z - desde.z) * (k / 8);
+    f = pisoLoot(world, x, z, f);
+    techo = Math.min(techo, techoLoot(world, x, z, f));
+  }
+  return Math.max(0, Math.min(1.4, techo - Math.max(desde.y + 0.35, hasta.y) - 0.9));
 }
 
 export { RARITIES };

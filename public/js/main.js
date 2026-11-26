@@ -170,6 +170,7 @@ const autos = crearManejo({
   scene, camera, me, getWorld: () => world, getMyId: () => myId, sendMsg, ui, sfx, others,
   explosion: (p) => explosionFx(p.clone(), '#ff8a2a', 1.3),
   feed: (texto, color) => feed(texto, color),
+  vida: (o) => golpes.vida(o),
   alSubir: () => {
     // al subir se corta lo que se estaba haciendo a pie
     cons.cancelar();
@@ -762,6 +763,7 @@ function liberar(code) {
   soltar(code);
   for (const a of accionesDe(code)) {
     if (a === 'disparar' && !activa('disparar')) mouseDown = false;
+    if (a === 'editar') cons.soltarEditar(); // "Confirmar la edición al soltar"
     if (a === 'apuntar' && !opcion('apuntarAlternar') && !activa('apuntar')) { rmbDown = false; me.aiming = false; }
   }
 }
@@ -1346,7 +1348,7 @@ function updateOthers(dt) {
 }
 
 function updateItems(t) {
-  animarLoot(items, world.chestMeshes, t, camera);
+  animarLoot(items, world.chestMeshes, t, camera, world);
 }
 
 const camTarget = new THREE.Vector3();
