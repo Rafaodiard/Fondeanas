@@ -19,14 +19,14 @@ Durante la partida (los maneja `handleGame` en [[server.js]]):
 - `pickup`, `drop`, `chest` → [[Loot y rarezas]]
 - `reload`, `shoot` → [[Armas y disparo]] (`hits` puede llevar `{ pz, n }`: pieza del mapa y cuántos perdigones le pegaron)
 - `swing` → [[Pico y recursos]] (con `pz` si el golpe fue a una pieza del mapa, ver [[Estructuras rompibles]])
-- `build` → [[Construcción]]
+- `build` (`type`: pared, piso, rampa o techo), `edit` (`key`, `e`, `dir`) → [[Construcción]]
 - `useStart`, `useCancel`, `useEnd` → [[Curación y escudo]]
 
 ## Servidor → cliente
 
 Los procesa `handle(m)` en [[main.js]]:
 
-`error`, `welcome`, `room`, `matchStart`, `phase`, `forceJump`, `jumped`, `state`, `shot`, `swing`, `boom`, `hitConfirm`, `inv`, `itemsAdd`, `itemsDel`, `chestOpen`, `resHit`, `resGone`, `structAdd`, `structDel`, `structHp`, `pzRota`, `chestMove`, `death`, `matchEnd`, `left`, `chat`.
+`error`, `welcome`, `room`, `matchStart`, `phase`, `forceJump`, `jumped`, `state`, `shot`, `swing`, `boom`, `hitConfirm`, `inv`, `itemsAdd`, `itemsDel`, `chestOpen`, `resHit`, `resGone`, `structAdd`, `structDel` (con `caidas`: las que se cayeron sin apoyo), `structHp`, `structEdit`, `pzRota`, `chestMove`, `death`, `matchEnd`, `left`, `chat`.
 
 - `inv` lleva vida, escudo, slots, munición y materiales del jugador (lo arma `invMsg` en el servidor).
 - `matchStart` y `welcome` (si la partida ya empezó) llevan un snapshot de la partida (`matchSnapshot`), con las piezas del mapa ya rotas (`piezas`) y los cofres que bajaron (`cofresMovidos`).

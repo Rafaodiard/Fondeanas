@@ -5,6 +5,9 @@ import { GRID, MATERIALS } from './items.js';
 import { PLANOS, Plano, piezasDe, vecinasDe, sinApoyo } from './planos.js';
 import { PUEBLOS, RUTAS, RIO, SUELTOS, TELEFERICO } from './isla.js';
 import { Solidos } from './colision.js';
+import { superficie, cajasPieza, DEBAJO } from './construccion.js';
+import { makeStructMesh, empezarObra, avanzarObra, liberar } from './construccion3d.js';
+export { makeStructMesh };
 import { Lote, materialesMapa, terrainDetail } from './mallas.js';
 
 export function rng(seed) {
@@ -80,6 +83,7 @@ export class World {
     this.pois = [];
     this.structs = new Map(); // construcciones de los jugadores
     this.structMeshes = [];
+    this.obras = new Set(); // construcciones que se están levantando (cliente)
     this.placed = []; // estructuras ubicadas {P, r, x, y, z, fp, piezas, ids}
     this.piezas = []; // piezas rompibles de las estructuras del mapa (mismo orden en el servidor y en el cliente)
     this.ribbons = []; // calles y rutas {pts, w, m, off, def}
@@ -620,16 +624,23 @@ export class World {
     if (s > h) h = s;
     for (const st of this.structs.values()) {
       if (st.type === 'pared') continue;
-      const x0 = st.i * GRID, z0 = st.j * GRID;
-      if (x < x0 || x > x0 + GRID || z < z0 || z > z0 + GRID) continue;
-      let top = st.y;
-      if (st.type === 'rampa') {
-        const t = st.dir === 0 ? z0 + GRID - z : st.dir === 2 ? z - z0 : st.dir === 1 ? x - x0 : x0 + GRID - x;
-        top = st.y + t;
-      }
-      if (y >= top - 1.2 && top > h) h = top;
+      const top = superficie(st, x, z);
+      if (top !== null && y >= top - 1.2 && top > h) h = top;
     }
     return h;
+  }
+
+  // Parte de abajo más baja de una construcción por encima de la cabeza (que arrancó en `cabeza`), o Infinity.
+  techoConstruido(x, z, cabeza) {
+    let c = Infinity;
+    for (const st of this.structs.values()) {
+      if (st.type === 'pared') continue;
+      const top = superficie(st, x, z);
+      if (top === null) continue;
+      const abajo = top - DEBAJO[st.type];
+      if (abajo >= cabeza - 0.05 && abajo < c) c = abajo;
+    }
+    return c;
   }
 
   ceilingHeight(x, z, feet) { return this.sol.ceiling(x, z, feet); }
@@ -642,7 +653,7 @@ export class World {
       const prevY = pos.y;
       pos.x += vel.x * h; pos.y += vel.y * h; pos.z += vel.z * h;
       if (vel.y > 0) {
-        const c = this.sol.ceiling(pos.x, pos.z, prevY);
+        const c = Math.min(this.sol.ceiling(pos.x, pos.z, prevY), this.structs.size ? this.techoConstruido(pos.x, pos.z, prevY + height) : Infinity);
         if (pos.y + height > c) { pos.y = Math.max(prevY, c - height); vel.y = 0; }
       }
       const g = this.groundHeight(pos.x, pos.z, Math.max(prevY, pos.y));
@@ -1177,44 +1188,54 @@ export class World {
   }
 
   // ---------- Construcciones ----------
+  // s: { key, type, i, j, y, dir, mat, e (edición), hp, max, crece (segundos que le faltan para levantarse) }
   addStruct(s) {
     if (this.structs.has(s.key)) return;
-    const x0 = s.i * GRID, z0 = s.j * GRID;
-    if (s.type === 'pared') {
-      const t = 0.15;
-      s.box = s.dir === 0
-        ? { minX: x0, maxX: x0 + GRID, minZ: z0 - t, maxZ: z0 + t, minY: s.y, maxY: s.y + GRID }
-        : { minX: x0 - t, maxX: x0 + t, minZ: z0, maxZ: z0 + GRID, minY: s.y, maxY: s.y + GRID };
-    }
+    s.e = s.e || 0;
+    s.boxes = cajasPieza(s);
     this.structs.set(s.key, s);
+    if (this.scene) this.mallaStruct(s, s.crece || 0);
+  }
+
+  mallaStruct(s, crece = 0) {
+    if (s.mesh) { this.scene.remove(s.mesh); this.structMeshes.splice(this.structMeshes.indexOf(s.mesh), 1); liberar(s.mesh); }
+    s.mesh = makeStructMesh(s);
+    s.mesh.userData.structKey = s.key;
+    this.scene.add(s.mesh);
+    this.structMeshes.push(s.mesh);
+    if (crece > 0) { empezarObra(s.mesh, s, s.obra || crece, crece); this.obras.add(s); }
+  }
+
+  // Cambia la edición de una pieza (y la dirección de la rampa): choques y malla nuevos.
+  editStruct(key, e, dir) {
+    const s = this.structs.get(key);
+    if (!s) return null;
+    s.e = e;
+    if (s.type === 'rampa' && Number.isInteger(dir)) s.dir = dir;
+    s.boxes = cajasPieza(s);
+    s.caja = null;
     if (this.scene) {
-      s.mesh = makeStructMesh(s);
-      s.mesh.userData.structKey = s.key;
-      this.scene.add(s.mesh);
-      this.structMeshes.push(s.mesh);
-      s.mesh.scale.setScalar(0.01);
-      s.born = performance.now();
+      const falta = s.mesh?.userData.obra ? Math.max(0, (s.mesh.userData.obra.fin - performance.now()) / 1000) : 0;
+      this.mallaStruct(s, falta);
     }
+    return s;
   }
 
   removeStruct(key) {
     const s = this.structs.get(key);
     if (!s) return;
     this.structs.delete(key);
+    this.obras.delete(s);
     if (s.mesh) {
       this.scene.remove(s.mesh);
       this.structMeshes.splice(this.structMeshes.indexOf(s.mesh), 1);
+      liberar(s.mesh);
     }
   }
 
+  // Piezas que se están levantando: avanzan su relleno.
   updateStructs() {
-    const t = performance.now();
-    for (const s of this.structs.values()) {
-      if (!s.mesh || s.grown) continue;
-      const k = Math.min(1, (t - s.born) / 180);
-      s.mesh.scale.setScalar(0.01 + 0.99 * k);
-      if (k >= 1) s.grown = true;
-    }
+    for (const s of this.obras) if (!s.mesh || avanzarObra(s.mesh)) this.obras.delete(s);
   }
   // Mueve una cápsula (pos = pies) resolviendo choques con paredes, árboles, rocas y construcciones.
   collide(pos, radius = 0.45, height = 1.8) {
@@ -1226,7 +1247,7 @@ export class World {
       if (d < min && d > 1e-4) { pos.x = c.x + (dx / d) * min; pos.z = c.z + (dz / d) * min; }
     }
     this.sol.push(pos, radius, height);
-    for (const s of this.structs.values()) if (s.box) pushOut(pos, s.box, radius, height);
+    for (const s of this.structs.values()) if (s.boxes) for (const b of s.boxes) pushOut(pos, b, radius, height);
   }
 
   // Distancia hasta donde un rayo choca con el terreno (marcha simple), o Infinity.
@@ -1416,55 +1437,3 @@ function pushOut(pos, b, radius, height) {
   }
 }
 
-const structMats = {};
-function structMat(m, ghost) {
-  const k = m + (ghost ? ':g' : '');
-  if (!structMats[k]) {
-    structMats[k] = ghost
-      ? new THREE.MeshBasicMaterial({ color: '#59b8ff', transparent: true, opacity: 0.35, depthWrite: false })
-      : new THREE.MeshStandardMaterial({ color: MATERIALS[m].color, flatShading: true, roughness: m === 'metal' ? 0.4 : 0.9, metalness: m === 'metal' ? 0.5 : 0 });
-  }
-  return structMats[k];
-}
-
-// Malla de una pieza de construcción. El grupo se ubica en la esquina (i*GRID, y, j*GRID).
-export function makeStructMesh(s, ghost = false) {
-  const g = new THREE.Group();
-  const mat = structMat(s.mat || 'madera', ghost);
-  const frameMat = ghost ? mat : new THREE.MeshStandardMaterial({ color: new THREE.Color(MATERIALS[s.mat || 'madera'].color).multiplyScalar(0.6), flatShading: true });
-  const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = !ghost; o.receiveShadow = !ghost; g.add(o); return o; };
-  const G = GRID;
-  if (s.type === 'pared') {
-    const horiz = s.dir === 0;
-    const geo = horiz ? new THREE.BoxGeometry(G, G, 0.25) : new THREE.BoxGeometry(0.25, G, G);
-    const cx = horiz ? G / 2 : 0, cz = horiz ? 0 : G / 2;
-    add(geo, mat, cx, G / 2, cz);
-    if (!ghost) {
-      // Marco para que se lea la pieza.
-      const fb = horiz ? [G, 0.25, 0.3] : [0.3, 0.25, G];
-      add(new THREE.BoxGeometry(...fb), frameMat, cx, 0.12, cz);
-      add(new THREE.BoxGeometry(...fb), frameMat, cx, G - 0.12, cz);
-      const fs = horiz ? [0.25, G, 0.3] : [0.3, G, 0.25];
-      add(new THREE.BoxGeometry(...fs), frameMat, horiz ? 0.12 : 0, G / 2, horiz ? 0 : 0.12);
-      add(new THREE.BoxGeometry(...fs), frameMat, horiz ? G - 0.12 : 0, G / 2, horiz ? 0 : G - 0.12);
-    }
-  } else if (s.type === 'piso') {
-    add(new THREE.BoxGeometry(G, 0.25, G), mat, G / 2, -0.125, G / 2);
-  } else if (s.type === 'rampa') {
-    const len = Math.hypot(G, G);
-    const ramp = new THREE.Group();
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(G, 0.25, len), mat);
-    slab.castShadow = !ghost; slab.receiveShadow = !ghost;
-    slab.rotation.x = Math.PI / 4; // sube hacia -Z local
-    ramp.add(slab);
-    ramp.position.set(G / 2, G / 2 - 0.12, G / 2);
-    ramp.rotation.y = [0, -Math.PI / 2, Math.PI, Math.PI / 2][s.dir];
-    g.add(ramp);
-    if (!ghost) for (const x of [-G / 2 + 0.15, G / 2 - 0.15]) {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, len), frameMat);
-      rail.rotation.x = Math.PI / 4; rail.position.set(x, 0.1, 0); ramp.add(rail);
-    }
-  }
-  g.position.set(s.i * G, s.y, s.j * G);
-  return g;
-}

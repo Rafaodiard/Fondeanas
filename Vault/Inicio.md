@@ -4,8 +4,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 
 - Repo: https://github.com/Rafaodiard/Fondeanas
 - Stack: Node (`server.js` con `ws`) + Three.js 0.170 como ES modules sin bundler. `npm start` levanta todo en el puerto 3000 (`PORT` lo cambia).
-- Vault actualizado con el cofre y los objetos del piso modelados y sus efectos (rama `claude/project-thread-cw9rz0`, 2026-11-26), sobre el commit `5398592` de `main`. El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
-- También tiene la caída libre, el paracaídas y deslizarse (rama `claude/project-thread-sx1i2r`, 2026-11-26).
+- Vault actualizado con la construcción estilo battle royale (rama `claude/project-thread-s1zvnx`, 2026-11-26), sobre el commit `eecf634` de `main` (que ya trae el cofre y los objetos del piso modelados, y la caída libre, el paracaídas y deslizarse). El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
 
 ## Cómo está armado
 
@@ -32,6 +31,9 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 | [[caida.js]] | `public/js/caida.js` | Física de la caída libre (planeo / picada), el paracaídas y deslizarse |
 | [[audio.js]] | `public/js/audio.js` | Sonidos sintetizados con WebAudio y volumen general |
 | [[controles.js]] | `public/js/controles.js` | Registro central de teclas (acciones con contexto) y opciones del juego, guardados en `localStorage` |
+| [[construccion.js]] | `public/js/construccion.js` | Reglas de la construcción: ediciones, superficies, choques, apoyo, derrumbes y vida (compartido) |
+| [[construccion3d.js]] | `public/js/construccion3d.js` | Mallas de las construcciones, vista previa, grilla de edición y relleno al levantarse |
+| [[construir.js]] | `public/js/construir.js` | La construcción en el juego: modo construcción, colocar, editar, material automático y su HUD |
 | [[configuracion.js]] | `public/js/configuracion.js` | Panel de configuración: Juego, Video, Sonido y Controles |
 
 ## Pantallas
@@ -56,6 +58,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 - [[Texturas]]: máscaras de cara y tatuaje hechas con Python.
 - `tools/caida/pruebas.mjs`: pruebas de la caída libre, el paracaídas y deslizarse (ver [[caida.js]]).
 - `tools/controles/pruebas.mjs`: pruebas del registro de controles y opciones (ver [[controles.js]]).
+- [[Pruebas de construcción]]: piezas editadas, apoyo, derrumbes, vida y que lo que se ve coincida con lo que se pisa.
 - [[Pruebas del mapa]]: pruebas automáticas de colisiones, escaleras, puertas, alcance del loot, lo que se ve (caras al revés, caras que titilan, pisos falsos) y derrumbes.
 
 ## Memoria
