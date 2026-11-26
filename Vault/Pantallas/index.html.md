@@ -12,3 +12,7 @@ Archivo: `public/index.html` (+ `public/style.css`). Es la página del juego; ca
 4. **Configuración** (`#config`): no está en el HTML, la arma [[configuracion.js]] la primera vez que se abre. Ver [[Configuración y controles]].
 
 La lógica de todas estas pantallas está en [[main.js]].
+
+## HUD del auto (2026-11-26)
+
+`#autohud` (abajo al centro): ayuda de teclas del auto (`#autohint`), velocímetro (`#autovel`, km/h) y barras de vida del auto (`#autovida`) y turbo (`#autoturbo`). Lo maneja [[manejar.js]]; mientras se va en un auto, `#hud.en-auto` esconde el inventario y los materiales.

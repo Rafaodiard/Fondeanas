@@ -16,6 +16,7 @@ import {
 import { accionesDe, activa, presionar, soltar, soltarTodo, teclaDe, listaAcciones, opcion, alCambiar, cargarDistribucion } from './controles.js';
 import { abrirConfig, cerrarConfig, abierto as configAbierta } from './configuracion.js';
 import { crearConstruccion } from './construir.js';
+import { crearManejo } from './manejar.js';
 
 const GRAVITY = 25, WALK = 6, SPRINT = 9.5, AIM_WALK = 3.5, JUMP = 8.5, SWIM_Y = -1.3;
 const PICKUP_RANGE = 3;
@@ -31,6 +32,7 @@ const ui = {
   hit: $('hitmarker'), damage: $('damage'), chatlog: $('chatlog'), chatInput: $('chatInput'), click: $('clickToPlay'),
   slots: $('slots'), prompt: $('prompt'), usebar: $('usebar'), usefill: $('usefill'), usetext: $('usetext'),
   pickupFeed: $('pickupFeed'), buildbar: $('buildbar'), buildhint: $('buildhint'), structhp: $('structhp'), scope: $('scope'), dmgnums: $('dmgnums'), crosshair: $('crosshair'),
+  autohud: $('autohud'), autovel: $('autovel'), autovida: $('autovida'), autoturbo: $('autoturbo'), autohint: $('autohint'),
 };
 ui.name.value = storageGet('br-name') || '';
 // Modelos de Blender: se cargan antes de habilitar el menú.
@@ -156,6 +158,22 @@ let minimapBase = null;
 let interact = null;
 // Construcción (construir.js): modo construcción, vista previa, edición y su HUD.
 const cons = crearConstruccion({ scene, camera, me, getWorld: () => world, getMyId: () => myId, sendMsg, ui, sfx, feed });
+// Autos (manejar.js): manejo, autos de los demás, subir y bajar, pose sentado y su HUD.
+const autos = crearManejo({
+  scene, camera, me, getWorld: () => world, getMyId: () => myId, sendMsg, ui, sfx, others,
+  explosion: (p) => explosionFx(p.clone(), '#ff8a2a', 1.3),
+  alSubir: () => {
+    // al subir se corta lo que se estaba haciendo a pie
+    cons.cancelar();
+    if (me.use) cancelUse();
+    if (me.reloadSlot >= 0) { me.reloading = 0; me.reloadSlot = -1; stopWeaponAction(me.mesh); }
+    if (me.desliz) terminarDeslizar(me);
+    me.dance = false; mouseDown = false; rmbDown = false; me.aiming = false;
+    ui.prompt.classList.add('hidden');
+    updateSlots();
+  },
+  alBajar: () => updateSlots(),
+});
 me.cancelUse = () => { if (me.use) cancelUse(); };
 me.onBuildChange = () => { if (me.build && opcion('apuntarAlternar')) rmbDown = false; updateSlots(); };
 
@@ -193,6 +211,7 @@ const urlCode = new URLSearchParams(location.search).get('sala');
 if (urlCode) ui.code.value = urlCode.toUpperCase();
 
 function handle(m) {
+  if (m.t.startsWith('auto') || m.t === 'bocina') { if (world) autos.mensaje(m); return; }
   switch (m.t) {
     case 'error': ui.menuError.textContent = m.message; break;
     case 'welcome':
@@ -303,6 +322,13 @@ function handle(m) {
     case 'death': onDeath(m); break;
     case 'matchEnd': onMatchEnd(m); break;
     case 'left': removeOther(m.id); break;
+    case 'empujon':
+      // me atropellaron: salgo volando para el lado que empujó el auto
+      if (me.state === 'ground' && Array.isArray(m.v)) {
+        if (me.desliz) terminarDeslizar(me);
+        me.vel.set(...m.v); me.onGround = false; me.minVy = 0;
+      }
+      break;
     case 'chat': addChat(`<b>${escapeHtml(m.name)}:</b> ${escapeHtml(m.text)}`); break;
   }
 }
@@ -438,6 +464,7 @@ function setupMatch(snap) {
     for (const id of snap.piezas || []) world.romperPieza(id);
     for (const [i, y] of snap.cofresMovidos || []) world.moveChest(i, y);
   }
+  autos.iniciar(snap?.autos);
   bus.visible = true;
   stormMesh.visible = true;
   updateHp(); updateSlots();
@@ -511,7 +538,7 @@ function nameOf(id) {
   return others.get(id)?.info?.name || '???';
 }
 
-const CAUSES = { storm: 'la tormenta', fall: 'una caída', pico: 'Pico' };
+const CAUSES = { storm: 'la tormenta', fall: 'una caída', pico: 'Pico', auto: 'un auto' };
 function onDeath(m) {
   for (const p of m.players) {
     if (p.id === myId) me.kills = p.kills;
@@ -519,7 +546,7 @@ function onDeath(m) {
     if (o) o.info = p;
   }
   const env = m.cause === 'storm' || m.cause === 'fall' || !m.by;
-  const how = WEAPONS[m.cause]?.name || CAUSES[m.cause] || '';
+  const how = WEAPONS[m.cause]?.name || (m.cause === 'auto' ? 'Auto' : CAUSES[m.cause]) || '';
   const line = env ? `${escapeHtml(nameOf(m.id))} fue eliminado por ${CAUSES[m.cause] || 'el entorno'}` : `${escapeHtml(nameOf(m.by))} <small>[${how}]</small> ${escapeHtml(nameOf(m.id))}`;
   const div = document.createElement('div');
   div.innerHTML = line;
@@ -528,7 +555,7 @@ function onDeath(m) {
   if (m.by === myId && m.id !== myId) { sfx.elim(); showCenter(''); ui.center.innerHTML = `<small>Eliminaste a ${escapeHtml(nameOf(m.id))}</small>`; setTimeout(() => { if (ui.center.innerHTML.includes('Eliminaste')) showCenter(''); }, 2500); }
   if (m.id === myId) {
     me.state = 'dead'; me.hp = 0; me.shield = 0; updateHp();
-    me.mesh.visible = false; cons.cancelar();
+    me.mesh.visible = false; cons.cancelar(); me.auto = null;
     const alive = m.players.filter((p) => p.alive).length;
     showCenter('ELIMINADO', `${env ? `Te eliminó ${CAUSES[m.cause] || 'el entorno'}` : `Te eliminó ${escapeHtml(nameOf(m.by))}`} · Puesto #${alive + 1} · Clic para ver a otro jugador`);
     startSpectating(m.by);
@@ -565,8 +592,8 @@ function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&a
 
 // ---------- Entrada ----------
 // Las teclas salen del registro de controles.js (el jugador las cambia en Configuración).
-const PLAYING = ['bus', 'falling', 'glider', 'ground'];
-const contexto = () => cons.contexto();
+const PLAYING = ['bus', 'falling', 'glider', 'ground', 'auto'];
+const contexto = () => (me.state === 'auto' ? 'vehiculo' : cons.contexto());
 canvas.addEventListener('click', () => {
   sfx.unlock();
   if (configAbierta()) return;
@@ -592,6 +619,7 @@ function abrirConfigDesdeJuego() {
 }
 document.addEventListener('mousemove', (e) => {
   if (!locked) return;
+  if (e.movementX || e.movementY) autos.movioMouse();
   const scoped = me.aiming && heldItem()?.kind === 'weapon' && WEAPONS[heldItem().w].scope;
   const sens = 0.0022 * opcion('sens') * (scoped ? opcion('sensMira') : me.aiming ? opcion('sensApunta') : 1);
   me.yaw -= e.movementX * sens;
@@ -666,6 +694,8 @@ function hacer(a, e) {
     case 'construirPared': case 'construirPiso': case 'construirRampa': case 'construirTecho':
     case 'modoConstruccion': case 'cambiarMaterial': case 'editar': case 'girar':
       cons.accion(a); break;
+    case 'bajarAuto': case 'cambiarAsiento': case 'bocina':
+      autos.accion(a); break;
     case 'chat':
       if (ui.hud.classList.contains('hidden')) break;
       document.exitPointerLock?.();
@@ -758,11 +788,15 @@ function findInteract() {
     const d = Math.hypot(c.x - me.pos.x, c.z - me.pos.z);
     if (d < PICKUP_RANGE && Math.abs(c.y - me.pos.y) < 2.5 && d - 1 < bd) { bd = d - 1; best = { kind: 'chest', idx }; }
   });
+  // autos: lo que está al lado gana (un arma tirada al lado del auto se agarra primero)
+  const auto = autos.cercano();
+  if (auto && (!best || auto.d < bd)) best = { kind: 'auto', i: auto.i, maneja: auto.maneja };
   return best;
 }
 function doInteract() {
   if (!interact) return;
   if (interact.kind === 'item') sendMsg({ t: 'pickup', id: interact.id, slot: Math.max(0, me.sel) });
+  else if (interact.kind === 'auto') autos.subir(interact.i);
   else sendMsg({ t: 'chest', idx: interact.idx });
 }
 function updatePrompt() {
@@ -771,6 +805,7 @@ function updatePrompt() {
   ui.prompt.classList.remove('hidden');
   const tecla = escapeHtml(teclaDe('interactuar'));
   if (interact.kind === 'chest') ui.prompt.innerHTML = `<b>${tecla}</b> Abrir cofre`;
+  else if (interact.kind === 'auto') ui.prompt.innerHTML = `<b>${tecla}</b> ${interact.maneja ? 'Manejar' : 'Subir al auto'}`;
   else {
     const it = interact.it;
     const full = it.kind === 'weapon' && me.slots.every(Boolean);
@@ -821,7 +856,7 @@ function structOf(obj) {
   return null;
 }
 
-// Primer impacto a lo largo del rayo: { dist, pid, head, key, res, idx, pz }
+// Primer impacto a lo largo del rayo: { dist, pid, head, key, res, idx, pz, auto }
 function castRay(origin, dir, range, near) {
   let best = { dist: range };
   raycaster.set(origin, dir);
@@ -852,6 +887,8 @@ function castRay(origin, dir, range, near) {
   }
   const tt = world.rayTerrain(origin, dir, best.dist);
   if (tt < best.dist) best = { dist: tt };
+  const ra = autos.rayo(origin, dir, near, best.dist);
+  if (ra) best = ra;
   for (const [id, o] of others) {
     if (!o.mesh.visible || o.state === 'dead' || o.state === 'bus') continue;
     const p = o.mesh.position;
@@ -893,6 +930,7 @@ function trySwing() {
   const at = camera.position.clone().addScaledVector(camDir, res.dist);
   if (res.pid) sendMsg({ t: 'swing', pid: res.pid });
   else if (res.key) { sendMsg({ t: 'swing', key: res.key }); sfx.pickaxe('struct'); }
+  else if (res.auto !== undefined) { sendMsg({ t: 'swing', auto: res.auto }); sfx.pickaxe('rock'); }
   else if (res.pz !== undefined) {
     const p = world.piezas[res.pz];
     sendMsg({ t: 'swing', pz: res.pz });
@@ -931,9 +969,9 @@ function tryShoot(it, def) {
     const res = castRay(camera.position, _d, def.range, near);
     const end = camera.position.clone().addScaledVector(_d, res.dist);
     if (i === 0) mainEnd = end;
-    if (res.pid || res.key || res.pz !== undefined) {
-      const k = res.pid ? `p${res.pid}` : res.key ? `s${res.key}` : `z${res.pz}`;
-      const e = tally.get(k) || { pid: res.pid, key: res.key, pz: res.pz, n: 0, head: false };
+    if (res.pid || res.key || res.pz !== undefined || res.auto !== undefined) {
+      const k = res.pid ? `p${res.pid}` : res.key ? `s${res.key}` : res.auto !== undefined ? `a${res.auto}` : `z${res.pz}`;
+      const e = tally.get(k) || { pid: res.pid, key: res.key, pz: res.pz, auto: res.auto, n: 0, head: false };
       e.n++; e.head = e.head || !!res.head;
       tally.set(k, e);
     }
@@ -1175,10 +1213,13 @@ function intentarDeslizar() {
 }
 
 function updateOthers(dt) {
-  for (const o of others.values()) {
+  for (const [id, o] of others) {
     const vis = o.seen && o.state !== 'bus' && o.state !== 'dead' && o.info?.alive !== false && room.phase !== 'lobby';
     o.mesh.visible = vis;
     if (!vis) continue;
+    // sentado en un auto: va donde está el asiento (manejar.js)
+    if (autos.sentarOtro(id, o.mesh, dt)) { o.speed = 0; o.vy = 0; continue; }
+    if (o.mesh.rotation.x || o.mesh.rotation.z) o.mesh.rotation.set(0, o.mesh.rotation.y, 0);
     o.prev.copy(o.mesh.position);
     o.mesh.position.lerp(o.target, 1 - Math.exp(-dt * 12));
     let dr = o.rotTarget - o.mesh.rotation.y;
@@ -1224,6 +1265,11 @@ function updateCamera(dt, t) {
   } else if (me.state === 'glider') {
     // más lejos y más alto: entra la vela del paracaídas en la pantalla
     focus = me.pos.clone().add(new THREE.Vector3(0, 2.0, 0)); dist = 9; up = 1.1; collide = true;
+  } else if (me.state === 'auto' && autos.mio) {
+    // en el auto: atrás y arriba, un poco más lejos cuanto más rápido va
+    const a = autos.mio.a;
+    focus = new THREE.Vector3(a.x, a.y + 1.75, a.z);
+    dist = 6.6 + Math.min(2.2, Math.hypot(a.vx, a.vz) * 0.07); up = 0.75; collide = true;
   } else {
     // cámara al hombro, cerca del personaje (como en los battle royale en tercera persona); baja al deslizarse
     camAlto += ((me.desliz ? DESLIZ.ALTO_CAMARA : 1.68) - camAlto) * Math.min(1, dt * 8);
@@ -1261,7 +1307,9 @@ function updateCamera(dt, t) {
   camera.position.copy(camTarget);
   camera.lookAt(camera.position.clone().add(dir));
   const fovBase = opcion('fov');
-  const fovTarget = scoped ? 18 : me.aiming ? fovBase - 18 : me.state === 'falling' ? fovBase + 8 + 8 * Math.max(0, me.caida) : me.desliz ? fovBase + 5 : fovBase;
+  const enAuto = me.state === 'auto' && autos.mio;
+  const fovTarget = scoped ? 18 : me.aiming ? fovBase - 18 : me.state === 'falling' ? fovBase + 8 + 8 * Math.max(0, me.caida) : me.desliz ? fovBase + 5
+    : enAuto ? fovBase + Math.min(9, Math.hypot(enAuto.a.vx, enAuto.a.vz) * 0.22) + (enAuto.a.turbando ? 5 : 0) : fovBase;
   camera.fov += (fovTarget - camera.fov) * Math.min(1, dt * 12);
   camera.updateProjectionMatrix();
   ui.scope.classList.toggle('hidden', !scoped);
@@ -1325,6 +1373,7 @@ function drawMinimap(s) {
     ctx.beginPath(); ctx.moveTo(toM(room.bus.from[0]), toM(room.bus.from[2])); ctx.lineTo(toM(room.bus.to[0]), toM(room.bus.to[2])); ctx.stroke();
     ctx.setLineDash([]);
   }
+  autos.minimapa(ctx, toM, W / size);
   const p = me.state === 'bus' ? bus.position : me.pos;
   ctx.save();
   ctx.translate(toM(p.x), toM(p.z));
@@ -1349,8 +1398,9 @@ function updateHud(t) {
     const que = me.state === 'falling' ? `${tecla} abre el paracaídas`
       : !me.paraBloq && alt >= PARACAIDAS.LIMITE ? `${tecla} lo cierra` : '';
     ui.center.innerHTML = `<small class="altura">${alt} m${que ? ' · ' + que : ''}</small>`;
-  } else if (me.state === 'ground' && (ui.center.innerHTML.includes('altura') || ui.center.innerHTML.includes('bus'))) showCenter('');
+  } else if ((me.state === 'ground' || me.state === 'auto') && (ui.center.innerHTML.includes('altura') || ui.center.innerHTML.includes('bus'))) showCenter('');
   if (me.state === 'ground') updatePrompt(); else ui.prompt.classList.add('hidden');
+  autos.hud();
 }
 
 let fpsN = 0, fpsT = 0;
@@ -1365,6 +1415,7 @@ function frame() {
     updateBus(t);
     if (['falling', 'glider', 'ground'].includes(me.state)) { updateMe(dt); cons.update(dt, mouseDown); updateUse(dt); }
     else if (me.state === 'bus') { me.pos.copy(bus.position); me.mesh.visible = false; }
+    autos.update(dt); // autos (el propio se simula acá) y yo sentado si voy en uno
     updateOthers(dt);
     updateItems(t);
     world.updateStructs();
@@ -1372,7 +1423,7 @@ function frame() {
     drawMinimap(s);
     updateHud(t);
     sendTimer -= dt;
-    if (sendTimer <= 0 && ['falling', 'glider', 'ground'].includes(me.state)) {
+    if (sendTimer <= 0 && ['falling', 'glider', 'ground', 'auto'].includes(me.state)) {
       sendTimer = 1 / 15;
       const it = heldItem();
       const h = me.build ? [null] : !it ? ['pico'] : it.kind === 'weapon' ? [it.w, RARITIES[it.rarity].color] : ['item', CONSUMABLES[it.c].color];
@@ -1381,7 +1432,7 @@ function frame() {
   }
   updateEffects(dt);
   updateCamera(dt, t);
-  const focus = ['ground', 'glider', 'falling'].includes(me.state) ? me.pos : camera.position;
+  const focus = ['ground', 'glider', 'falling', 'auto'].includes(me.state) ? me.pos : camera.position;
   sun.target.position.copy(focus);
   sun.position.copy(focus).addScaledVector(SUN_DIR, 300);
   renderer.render(scene, camera);
@@ -1392,6 +1443,6 @@ frame();
 import * as ITEMS from "./items.js";
 window.__WEAPONS = ITEMS.WEAPONS;
 window.__game = {
-  me, others, items, camera, sendMsg, selectSlot, setBuild, doInteract, findInteract, trySwing, tryShoot, updateSlots, renderer, cons, pulsar, liberar,
+  me, others, items, camera, sendMsg, selectSlot, setBuild, doInteract, findInteract, trySwing, tryShoot, updateSlots, renderer, scene, cons, pulsar, liberar, autos,
   get room() { return room; }, get world() { return world; },
 };

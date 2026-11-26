@@ -4,8 +4,10 @@
 // Para agregar un control nuevo desde otro módulo:
 //   registrarAccion('editar', 'Editar construcción', 'Construcción', ['KeyF'], 'construccion');
 //   ...y en el juego: if (accionesDe(code, contexto).includes('editar')) ...  o  activa('editar') para "mantener apretado".
-// Contextos: 'todos' (vale siempre), 'combate' (con arma/pico/objeto en la mano) y 'construccion' (en modo construcción).
-// Una tecla puede repetirse en 'combate' y 'construccion' (R recarga y en construcción gira); con 'todos' choca con cualquiera.
+// Contextos: 'todos' (a pie: vale en combate y en construcción), 'combate' (con arma/pico/objeto en la mano),
+// 'construccion' (en modo construcción), 'vehiculo' (sentado en un auto) y 'siempre' (a pie y en el auto: el chat).
+// Una tecla puede repetirse en 'combate' y 'construccion' (R recarga y en construcción gira); con 'todos' choca con las
+// de a pie. Las de 'vehiculo' solo chocan entre ellas (W acelera en el auto y camina a pie) y con 'siempre'.
 // Para agregar una opción nueva:
 //   registrarOpcion({ id: 'x', nombre: '…', grupo: 'Juego', tipo: 'si-no', def: true });
 //   ...y leerla con opcion('x'). Los cambios avisan con alCambiar(fn).
@@ -16,9 +18,9 @@
 const CLAVE_CONTROLES = 'sf-controles';
 const CLAVE_OPCIONES = 'sf-opciones';
 export const RESERVADAS = ['Escape'];
-export const GRUPOS = ['Movimiento', 'Combate', 'Inventario', 'Construcción', 'Otros'];
+export const GRUPOS = ['Movimiento', 'Combate', 'Inventario', 'Construcción', 'Vehículos', 'Otros'];
 
-export const CONTEXTOS = ['todos', 'combate', 'construccion'];
+export const CONTEXTOS = ['todos', 'combate', 'construccion', 'vehiculo', 'siempre'];
 const acciones = new Map(); // id -> { id, nombre, grupo, contexto, def: [a, b], teclas: [a, b] }
 const opciones = new Map(); // id -> { ...definición, valor }
 const oyentes = new Set();
@@ -53,7 +55,11 @@ function usadaPorOtra(code, id) {
   return false;
 }
 /** Dos acciones no pueden compartir tecla si pueden estar activas a la vez. */
-export const chocan = (a, b) => a.contexto === 'todos' || b.contexto === 'todos' || a.contexto === b.contexto;
+export function chocan(a, b) {
+  if (a.contexto === 'siempre' || b.contexto === 'siempre' || a.contexto === b.contexto) return true;
+  if (a.contexto === 'vehiculo' || b.contexto === 'vehiculo') return false;   // a pie y en el auto nunca a la vez
+  return a.contexto === 'todos' || b.contexto === 'todos';
+}
 function reindexar() {
   porCodigo = new Map();
   for (const a of acciones.values()) for (const c of a.teclas) if (c) {
@@ -64,10 +70,15 @@ function reindexar() {
 
 export const listaAcciones = () => [...acciones.values()];
 export const accion = (id) => acciones.get(id);
-/** Acciones que dispara un código (tecla, botón del mouse o rueda) en el contexto dado ('combate' o 'construccion'). Sin contexto: todas. */
+/** Acciones que dispara un código (tecla, botón del mouse o rueda) en el contexto dado ('combate', 'construccion' o
+ *  'vehiculo'). Sin contexto: todas. */
 export function accionesDe(code, contexto = null) {
   const ids = porCodigo.get(code) || [];
-  return contexto ? ids.filter((id) => { const c = acciones.get(id).contexto; return c === 'todos' || c === contexto; }) : ids;
+  if (!contexto) return ids;
+  return ids.filter((id) => {
+    const c = acciones.get(id).contexto;
+    return c === contexto || c === 'siempre' || (c === 'todos' && contexto !== 'vehiculo');
+  });
 }
 /** ¿Está apretada alguna de las teclas de la acción? (para las que se mantienen: caminar, correr…) */
 export function activa(id) {
@@ -189,7 +200,7 @@ A('bailar', 'Bailar', 'Movimiento', ['KeyB']);
 A('disparar', 'Disparar / usar', 'Combate', ['Mouse0']);
 A('apuntar', 'Apuntar', 'Combate', ['Mouse2'], 'combate');
 A('recargar', 'Recargar', 'Combate', ['KeyR'], 'combate');
-A('interactuar', 'Agarrar / abrir', 'Combate', ['KeyE']);
+A('interactuar', 'Agarrar / abrir / subir al auto', 'Combate', ['KeyE']);
 
 A('pico', 'Pico', 'Inventario', ['Digit1']);
 for (let i = 1; i <= 5; i++) A('ranura' + i, `Ranura ${i}`, 'Inventario', ['Digit' + (i + 1)]);
@@ -203,7 +214,18 @@ A('construirPiso', 'Piso', 'Construcción', ['KeyX']);
 A('construirRampa', 'Rampa', 'Construcción', ['KeyC']);
 A('cambiarMaterial', 'Cambiar material', 'Construcción', ['KeyV'], 'construccion');
 
-A('chat', 'Abrir el chat', 'Otros', ['Enter']);
+// Vehículos (los usa manejar.js): solo valen sentado en un auto, así que repiten las teclas de a pie.
+A('acelerar', 'Acelerar', 'Vehículos', ['KeyW', 'ArrowUp'], 'vehiculo');
+A('frenar', 'Frenar / marcha atrás', 'Vehículos', ['KeyS', 'ArrowDown'], 'vehiculo');
+A('doblarIzq', 'Doblar a la izquierda', 'Vehículos', ['KeyA', 'ArrowLeft'], 'vehiculo');
+A('doblarDer', 'Doblar a la derecha', 'Vehículos', ['KeyD', 'ArrowRight'], 'vehiculo');
+A('frenoMano', 'Freno de mano (derrapar)', 'Vehículos', ['Space'], 'vehiculo');
+A('turbo', 'Turbo', 'Vehículos', ['ShiftLeft'], 'vehiculo');
+A('bajarAuto', 'Bajarse del auto', 'Vehículos', ['KeyE'], 'vehiculo');
+A('cambiarAsiento', 'Cambiar de asiento', 'Vehículos', ['KeyF'], 'vehiculo');
+A('bocina', 'Bocina', 'Vehículos', ['Mouse0', 'KeyH'], 'vehiculo');
+
+A('chat', 'Abrir el chat', 'Otros', ['Enter'], 'siempre');
 
 // ---------- Opciones del juego ----------
 const pct = (v) => `${Math.round(v * 100)}%`;

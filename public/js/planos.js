@@ -1279,22 +1279,6 @@ export function fogon() {
   return P;
 }
 
-// Auto abandonado (para calles y rutas).
-export function auto({ m = 'rojo' } = {}) {
-  const P = new Plano();
-  P.grupo(() => autoPiezas(P, m));
-  return P;
-}
-function autoPiezas(P, m) {
-  P.box(-0.95, 0.3, -2.1, 0.95, 1.05, 2.1, m, false);
-  P.solid({ x0: -0.95, x1: 0.95, z0: -2.1, z1: 2.1, y0: 0, y1: 1.05 });
-  P.box(-0.85, 1.05, -1.1, 0.85, 1.65, 0.9, m);
-  P.box(-0.8, 1.1, -1.15, 0.8, 1.55, 0.95, 'vidrio', false);
-  for (const [x, z] of [[-0.95, -1.35], [0.95, -1.35], [-0.95, 1.35], [0.95, 1.35]]) P.tube([x - 0.12, 0.38, z], [x + 0.12, 0.38, z], 0.38, 'goma', 10);
-  P.box(-0.7, 0.6, 2.1, -0.4, 0.8, 2.15, 'luz', false); P.box(0.4, 0.6, 2.1, 0.7, 0.8, 2.15, 'luz', false);
-  P.box(-0.8, 0.6, -2.15, -0.5, 0.8, -2.1, 'luz_roja', false); P.box(0.5, 0.6, -2.15, 0.8, 0.8, -2.1, 'luz_roja', false);
-}
-
 // Tractor.
 export function tractor() {
   const P = new Plano();
@@ -2013,7 +1997,7 @@ export function merge(dst, src, dx = 0, dz = 0, dy = 0) {
 
 export const PLANOS = {
   casa, galpon, edificio, local, cobertizo, granero, silo, molino, tanqueAgua, faro, muelle, bote, grua, contenedor,
-  palafito, pasarela, adobe, puesto, carpa, torreVigia, capilla, estacion, parada, puente, fogon, auto, tractor, cerca,
+  palafito, pasarela, adobe, puesto, carpa, torreVigia, capilla, estacion, parada, puente, fogon, tractor, cerca,
   farol, fuente, calesita, rueda, kiosco, laboratorio, cupula, antena, cabana, lodge, torreTeleferico, tolva, andamio,
   malecon, caja3, barriles, campo, arco, montanaRusa, ruinas, banco, tacho, hidrante, cartel, seto, cantero, buzon, jardin, poste, indicador,
 };

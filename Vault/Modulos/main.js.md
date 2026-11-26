@@ -37,3 +37,7 @@ Ver [[Bus, caída y paracaídas]] y [[Deslizarse]].
 [[world.js]] · [[caida.js]] · [[assets.js]] · [[models.js]] · [[items.js]] · [[audio.js]] · [[rig.js]] (`setRigEnv`) · [[loot.js]] (`luzLoot`, `animarLoot`, `createChest`, `abrirCofre`) · [[controles.js]] · [[configuracion.js]] · [[construir.js]]
 
 Al arrancar completa `MODEL.clone` y `MODEL.baked` de [[world.js]] con las funciones de [[assets.js]].
+
+## Autos (2026-11-26)
+
+Los autos van en [[manejar.js]] (`crearManejo`). [[main.js]] le pasa los mensajes `auto*`, `bocina` y lo llama en cada cuadro (`autos.update`); el estado `auto` del jugador (sentado) cuenta como en partida (`PLAYING`) y manda `state` igual que a pie. Lo que se agregó acá: contexto `vehiculo` en `contexto()`, `case` de `bajarAuto` / `cambiarAsiento` / `bocina` en `hacer()`, el auto en `findInteract` (*E Manejar* o *Subir al auto*), los autos en `castRay` (disparos y pico: hits `{ auto }`), `updateOthers` sienta a los demás con `autos.sentarOtro`, la cámara del auto en `updateCamera` (atrás, más lejos y con más ángulo de visión cuanto más rápido), el mensaje `empujon` (atropellado), la causa de muerte `auto`, los autos en el minimapa y el HUD del auto. Ver [[Autos]].

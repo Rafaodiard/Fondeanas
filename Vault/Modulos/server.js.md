@@ -39,3 +39,7 @@ Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.
 - [[world.js]] (`World`)
 - [[items.js]] (armas, consumibles, munición, materiales, `structKey`, etc.)
 - [[construccion.js]] (reglas de la construcción)
+
+## Autos (2026-11-26)
+
+`room.autos` (de [[autos.js]] `nuevoAuto`, uno por `world.autoSpawns`) va en `matchSnapshot`. `player.auto = { a, k }` es el auto y el asiento; con eso el estado del jugador queda en `auto`. Mensajes `subir`, `bajar`, `asiento`, `auto`, `bocina`, `atropello` y `choque` ([[Protocolo de red]]). `avisarAsientos` manda `autoSeats`; `bajarDelAuto` libera el asiento (también al morir o desconectarse; si el que se desconecta simulaba un auto, el auto queda quieto). `danarAuto`: balas, pico (da metal), cohetes y choques; a 0 de vida explota (`autoBoom`): saca a los de adentro y lastima hasta 7 m (`70 × (1 − d/7) + 10`), con la causa `auto`. Ver [[Autos]].

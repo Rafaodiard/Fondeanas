@@ -8,6 +8,7 @@ Según el comentario de cabecera de [[server.js]]: **el cliente decide su movimi
 
 - El cliente ([[main.js]]) simula su propio personaje (física, colisiones con [[world.js]]) y manda su posición con el mensaje `state`.
 - El cliente calcula los impactos de sus disparos (raycasts) y los manda en `shoot` como lista de `hits`; el servidor revisa cargador, cooldown y rango antes de aplicar el daño.
+- Los autos siguen la misma idea: el que maneja simula su auto con [[autos.js]] y manda su estado; el servidor decide quién va en cada asiento, quién simula cada auto (`ctrl`: el conductor, o el último que lo manejó mientras frena solo), el daño, los atropellos y las explosiones. Ver [[Autos]].
 - El daño por caída también lo calcula el cliente y lo manda con `fall` (el servidor lo limita a 100).
 - El servidor maneja inventario, munición, cofres, recursos, estructuras, tormenta y muertes, y avisa a todos.
 - Ver [[Protocolo de red]] para la lista de mensajes.
@@ -18,7 +19,7 @@ El servidor crea `new World(seed, ISLAND_SIZE)` y cada cliente `new World(room.s
 
 ## Código compartido
 
-[[items.js]] no tiene dependencias y lo importan tanto [[server.js]] como [[main.js]] (y `world.js` usa `GRID` y `MATERIALS`). El servidor sirve `public/` como raíz web y `node_modules/three/` en `/vendor/three/`; [[index.html]] tiene un import map que apunta `three` y `three/addons/` ahí.
+[[items.js]] y [[autos.js]] no tienen dependencias y los importan tanto [[server.js]] como el cliente ([[main.js]], [[manejar.js]], [[world.js]]) (y `world.js` usa `GRID` y `MATERIALS`). El servidor sirve `public/` como raíz web y `node_modules/three/` en `/vendor/three/`; [[index.html]] tiene un import map que apunta `three` y `three/addons/` ahí.
 
 ## Cadena de modelos en el cliente
 
@@ -34,13 +35,14 @@ public/models/*.glb ──► assets.js (loadAssets, cloneAsset, bakedParts)
 
 ## Dependencias entre módulos (imports)
 
-- [[server.js]] → [[world.js]], [[items.js]], `ws`
-- [[main.js]] → [[world.js]], [[assets.js]], [[models.js]], [[items.js]], [[audio.js]], [[rig.js]], [[caida.js]]
+- [[server.js]] → [[world.js]], [[items.js]], [[autos.js]], `ws`
+- [[main.js]] → [[world.js]], [[assets.js]], [[models.js]], [[items.js]], [[audio.js]], [[rig.js]], [[caida.js]], [[manejar.js]]
+- [[manejar.js]] → [[autos.js]], [[models.js]], [[controles.js]], [[rig.js]]
 - [[caida.js]] → `three` (solo vectores; no toca la escena)
 - [[models.js]] → [[assets.js]], [[rig.js]]
 - [[rig.js]] → [[assets.js]]
-- [[world.js]] → [[items.js]], [[planos.js]], [[isla.js]], [[colision.js]], [[mallas.js]]
-- [[mapa.html]] → [[world.js]], [[assets.js]]
+- [[world.js]] → [[items.js]], [[planos.js]], [[isla.js]], [[colision.js]], [[mallas.js]], [[autos.js]]
+- [[mapa.html]] → [[world.js]], [[assets.js]], [[models.js]] (los autos estacionados)
 - [[visor.html]] → [[rig.js]], [[assets.js]], [[models.js]], [[items.js]]
 
 Ver también [[Grafo del código]].

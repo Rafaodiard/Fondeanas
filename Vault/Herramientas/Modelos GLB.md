@@ -10,6 +10,7 @@ Carpeta `public/models/`. Los carga [[assets.js]]; si alguno falla, [[models.js]
 | `animaciones_armas.glb` | Solo esqueleto + clips de recarga y bombeo | se suman a los clips de `personaje` en [[assets.js]] | |
 | `armas.glb` | Seis armas + pico (nodo por arma, piezas móviles como nodos propios) | [[models.js]], [[rig.js]] | `Rareza` |
 | `bus.glb` | Bus volador: nodos `Carroceria`, `Helice_D`, `Helice_I` bajo `Bus` | [[models.js]] | (ninguno; `Baliza` y `Destello` destellan) |
+| `auto.glb` | Auto: nodos `Carroceria`, `Rueda_DI`, `Rueda_DD`, `Rueda_TI`, `Rueda_TD` (pivote en el buje) y `Volante` (inclinado, gira sobre su Z) bajo `Auto` | [[models.js]] (`createAuto`), [[manejar.js]] | `Pintura` (color de cada auto) |
 | `animaciones_caida.glb` | Solo esqueleto + clips de caída libre, paracaídas, aterrizaje y deslizarse | se suman a los clips de `personaje` en [[assets.js]] | |
 | `paracaidas.glb` | Paracaídas (vela con formas `Plegado`, `FrenoL`, `FrenoR` y vacíos `Freno_L/R` para las cuerdas de los frenos) | [[models.js]], [[rig.js]] | `Tela` |
 | `objetos.glb` | Objetos del piso: un nodo `objetos_<nombre>` por objeto (vendas, botiquín, frasco, bidón, `municion_<tipo>` ×5, `material_<material>` ×3) | [[loot.js]] | `Tinte` (franja de la munición y banda del cohete) |
@@ -23,6 +24,7 @@ Carpeta `public/models/`. Los carga [[assets.js]]; si alguno falla, [[models.js]
 - `personaje.glb`: `heroe_export.py` → [[Pipeline del héroe]].
 - `armas.glb` y `animaciones_armas.glb`: `armas_export.py` → [[Pipeline de armas]].
 - `bus.glb`: `bus.py` → [[Pipeline del bus]].
+- `auto.glb`: `auto.py` → [[Pipeline del auto]].
 - `cofre.glb` y `objetos.glb`: `loot_modelos.py` + `loot_export.py` → [[Pipeline del loot]].
 - `animaciones_caida.glb`: `heroe_caida.py` (`exportar_caida`) → [[Pipeline del héroe]].
 - `paracaidas.glb`: `paracaidas.py` (`hacer_paracaidas`, `exportar_paracaidas`) → [[Pipeline del héroe]].

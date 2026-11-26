@@ -215,6 +215,7 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
   const u = char.userData;
   const A = u.acts;
   dt = Math.min(dt, 0.1);
+  if (state === 'auto') return animarSentado(char, u, dt, x);
   const desliz = state === 'ground' && !!x.desliz && !!A.Deslizar;
   const air = state === 'ground' && !!x.air && !desliz;
   const dance = state === 'ground' && !air && !desliz && x.dance && speed < 0.5;
@@ -414,6 +415,93 @@ export function animateRig(char, state, speed, dt, aiming, x = {}) {
     rotWorld(B.head, _right, pitch * 0.3);
   }
   retroceso(u, B, dt, aiming);
+}
+
+// ---------- Sentado en un auto (autos.js / manejar.js) ----------
+// Sobre la pose quieta se doblan las piernas (muslos adelante, rodillas abajo) y los brazos van con IK de dos huesos:
+// el conductor con las manos en el volante (x.manos: dos puntos del mundo) y los pasajeros con las manos en los muslos.
+// x.asiento: 0 conductor, 1 acompañante, 2 y 3 atrás.
+// Altura de la cadera de la pose sentada sobre la suela (para apoyar la cola en el almohadón).
+export const CADERA_SENTADO = 0.93;
+const PIERNA = { 0: [1.32, -1.05, 0.22], 1: [1.42, -1.38, 0.12], 2: [1.45, -1.55, 0.1], 3: [1.45, -1.55, 0.1] };
+const _t = new THREE.Vector3(), _c = new THREE.Vector3(), _a1 = new THREE.Vector3(), _fw = new THREE.Vector3(), _upS = new THREE.Vector3();
+
+function animarSentado(char, u, dt, x) {
+  const A = u.acts;
+  u.prevState = 'auto';
+  for (const n in A) {
+    const a = A[n], w = n === 'Quieto' ? 1 : 0;
+    a.wp = a.wt = a.wb = w;
+    a.p.time = a.t.time = a.b.time = (a.clock += dt) % a.dur;
+    a.p.setEffectiveWeight(w); a.t.setEffectiveWeight(w); a.b.setEffectiveWeight(w);
+  }
+  u.accion = null;
+  u.mixer.update(0);
+  if (u.glider) u.glider.visible = false;
+  if (u.para) animarParacaidas(char, u, 'auto', dt, 0, 0);
+  u.gun.visible = false;
+  inclinar(u, 'auto', 0, 0, dt);
+  char.updateMatrixWorld(true);
+  _right.set(1, 0, 0).applyQuaternion(char.quaternion);
+  _fw.set(0, 0, -1).applyQuaternion(char.quaternion);
+  _upS.set(0, 1, 0).applyQuaternion(char.quaternion);
+  const m = u.model, B = u.B;
+  const k = x.asiento | 0;
+  const [muslo, rodilla, pie] = PIERNA[k] || PIERNA[1];
+  for (const l of 'LR') {
+    const abre = (l === 'L' ? -1 : 1) * 0.06;
+    rotWorld(m.getObjectByName('UpperLeg' + l), _right, muslo);
+    rotWorld(m.getObjectByName('UpperLeg' + l), _fw, abre);
+    rotWorld(m.getObjectByName('LowerLeg' + l), _right, rodilla);
+    rotWorld(m.getObjectByName('Foot' + l), _right, pie);
+  }
+  // espalda apoyada en el respaldo y la cabeza derecha
+  rotWorld(B.spine, _right, 0.1);
+  rotWorld(B.neck, _right, -0.06);
+  const giro = x.giro || 0;
+  for (const l of 'LR') {
+    const brazo = m.getObjectByName('UpperArm' + l), ante = m.getObjectByName('LowerArm' + l), mano = m.getObjectByName('Hand' + l);
+    if (!brazo || !ante || !mano) continue;
+    let destino;
+    if (k === 0 && x.manos) destino = x.manos[l === 'L' ? 0 : 1];
+    else {
+      // mano sobre el muslo, un poco antes de la rodilla
+      const rod = m.getObjectByName('LowerLeg' + l);
+      rod.getWorldPosition(_t);
+      m.getObjectByName('UpperLeg' + l).getWorldPosition(_c);
+      destino = _t.lerp(_c, 0.35).addScaledVector(_upS, 0.14).addScaledVector(_right, (l === 'L' ? 1 : -1) * 0.03);
+    }
+    // el codo apunta afuera y abajo
+    _a1.copy(_right).multiplyScalar(l === 'L' ? -1 : 1).addScaledVector(_upS, -0.8);
+    ik(brazo, ante, mano, destino, _a1);
+    if (k === 0) rotWorld(mano, _fw, (l === 'L' ? 1 : -1) * 0.25 - giro * 0.3);
+  }
+}
+
+// IK de dos huesos: lleva la punta (mano) a 'destino' con el codo hacia 'polo'.
+function ik(sup, inf, punta, destino, polo) {
+  const S = new THREE.Vector3(), C = new THREE.Vector3(), H = new THREE.Vector3(), D = destino.clone();
+  sup.getWorldPosition(S); inf.getWorldPosition(C); punta.getWorldPosition(H);
+  const l1 = C.distanceTo(S), l2 = H.distanceTo(C);
+  const dir = D.clone().sub(S);
+  const d = Math.max(0.05, Math.min(l1 + l2 - 1e-3, dir.length()));
+  dir.normalize();
+  const cosA = Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d)));
+  const perp = polo.clone().addScaledVector(dir, -polo.dot(dir));
+  if (perp.lengthSq() < 1e-8) perp.set(0, -1, 0);
+  perp.normalize();
+  const codo = S.clone().addScaledVector(dir, l1 * cosA).addScaledVector(perp, l1 * Math.sqrt(1 - cosA * cosA));
+  alinear(sup, C.clone().sub(S), codo.clone().sub(S));
+  inf.getWorldPosition(C); punta.getWorldPosition(H);
+  alinear(inf, H.clone().sub(C), S.clone().addScaledVector(dir, d).sub(C));
+}
+// Gira un hueso (en el mundo) para que el vector a pase a apuntar como b.
+function alinear(bone, a, b) {
+  a.normalize(); b.normalize();
+  const eje = new THREE.Vector3().crossVectors(a, b);
+  const s = eje.length();
+  if (s < 1e-6) return;
+  rotWorld(bone, eje.divideScalar(s), Math.atan2(s, a.dot(b)));
 }
 
 // Inclinación de todo el cuerpo en el aire: al doblar se ladea hacia la curva (en caída libre sobre la cadera, con el

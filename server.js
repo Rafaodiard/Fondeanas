@@ -11,6 +11,7 @@ import {
   randomWeapon, randomConsumable, randomAmmo, weaponDamage, weaponReload, structKey,
 } from './public/js/items.js';
 import { TIPOS, normalizar, tieneApoyo, sinApoyo, vidaDe, editValida, OBRA, ALCANCE_EDICION, cajaPieza } from './public/js/construccion.js';
+import { AUTO, nuevoAuto, aplicarRed, estadoRed, autoPublico, asientoLibre, rapidez } from './public/js/autos.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -66,7 +67,7 @@ function createRoom() {
   const room = {
     code: makeCode(), seed: Math.floor(Math.random() * 1e9), phase: 'lobby', players: new Map(), hostId: null,
     bus: null, storm: null, winner: null, world: null, items: new Map(), chests: [], nextItem: 1,
-    trees: [], rocks: [],
+    trees: [], rocks: [], autos: [],
   };
   rooms.set(room.code, room);
   return room;
@@ -96,6 +97,7 @@ function matchSnapshot(room) {
     structs: [...room.world.structs.values()].map(structPublic),
     piezas: room.pzRotas, // piezas del mapa ya rotas (en orden)
     cofresMovidos: room.chests.flatMap((c, i) => (c.movido ? [[i, c.y]] : [])),
+    autos: room.autos.map(autoPublico),
   };
 }
 // crece: segundos que le faltan para terminar de levantarse (obra: lo que tarda en total).
@@ -140,6 +142,8 @@ function startMatch(room) {
   // piezas rompibles del mapa (paredes, losas, techos, muebles...): vida por pieza y lista de rotas
   room.pzHp = room.world.piezas.map((pz) => (pz.fija ? 0 : pz.hp));
   room.pzRotas = [];
+  // autos manejables, estacionados en las calles (autos.js); el que maneja cada uno lo simula y lo manda
+  room.autos = room.world.autoSpawns.map((sp, i) => nuevoAuto(i, sp));
   // Loot del piso: arma con su munición, o consumible, o munición.
   for (const s of room.world.lootSpots) {
     const r = Math.random();
@@ -182,7 +186,7 @@ function startMatch(room) {
 
 function resetPlayer(p, room) {
   p.hp = 100; p.shield = 0; p.alive = true; p.kills = 0; p.state = 'bus';
-  p.pos = [...room.bus.from]; p.lastShot = 0; p.lastSwing = 0; p.use = null;
+  p.pos = [...room.bus.from]; p.lastShot = 0; p.lastSwing = 0; p.use = null; p.auto = null;
   p.slots = Array(SLOTS).fill(null);
   p.ammo = { ligera: 0, media: 0, pesada: 0, cartuchos: 0, cohetes: 0 };
   p.mats = { madera: MATS_INICIALES, piedra: MATS_INICIALES, metal: MATS_INICIALES };
@@ -217,6 +221,7 @@ function dist3(a, b) { return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 function killPlayer(room, victim, killer, cause) {
   if (!victim.alive) return;
+  if (victim.auto) bajarDelAuto(room, victim);
   victim.alive = false; victim.hp = 0; victim.shield = 0; victim.state = 'dead';
   if (killer && killer !== victim) killer.kills++;
   // Tira todo lo que tenía.
@@ -325,7 +330,8 @@ function handleGame(room, player, msg) {
       const p = msg.p;
       if (!Array.isArray(p) || p.length !== 3 || !p.every(Number.isFinite)) break;
       player.pos = p;
-      if (['falling', 'glider', 'ground'].includes(msg.s)) player.state = msg.s;
+      if (player.auto) player.state = 'auto';
+      else if (['falling', 'glider', 'ground'].includes(msg.s)) player.state = msg.s;
       const rl = Math.min(5, Math.max(0, Number(msg.rl) || 0));
       // parámetros de animación de la caída, el paracaídas y el deslizamiento (caida.js): 4 enteros chicos
       const x = Array.isArray(msg.x) ? msg.x.slice(0, 4).map((v) => Math.max(-100, Math.min(100, Math.round(Number(v) || 0)))) : undefined;
@@ -365,7 +371,7 @@ function handleGame(room, player, msg) {
     }
     case 'chest': {
       const c = room.chests[msg.idx];
-      if (!c || c.open || !player.alive || dist3(player.pos, [c.x, c.y, c.z]) > PICKUP_RANGE + 1) break;
+      if (!c || c.open || !player.alive || player.state !== 'ground' || dist3(player.pos, [c.x, c.y, c.z]) > PICKUP_RANGE + 1) break;
       c.open = true;
       broadcast(room, { t: 'chestOpen', idx: msg.idx });
       const w = randomWeapon(true);
@@ -418,7 +424,10 @@ function handleGame(room, player, msg) {
       for (const h of hits) {
         const n = Math.max(1, Math.min(def.pellets - pelletsUsed, h.n | 0));
         pelletsUsed += n;
-        if (h.key) {
+        if (Number.isInteger(h.auto)) {
+          const a = room.autos[h.auto];
+          if (a && dist3([a.x, a.y, a.z], player.pos) <= def.range + 8) danarAuto(room, a, def.struct * RARITIESmul(it) * (n / def.pellets), player);
+        } else if (h.key) {
           const s = room.world.structs.get(h.key);
           if (s) damageStruct(room, s, def.struct * RARITIESmul(it) * (n / def.pellets) * (def.pellets > 1 ? 1 : 1));
         } else if (Number.isInteger(h.pz)) {
@@ -450,6 +459,15 @@ function handleGame(room, player, msg) {
       } else if (msg.key) {
         const s = room.world.structs.get(msg.key);
         if (s) damageStruct(room, s, PICKAXE.struct);
+      } else if (Number.isInteger(msg.auto)) {
+        // los autos se pican como el metal
+        const a = room.autos[msg.auto];
+        if (!a || a.rota || dist3([a.x, a.y + 0.8, a.z], player.pos) > PICKAXE.range + 4) break;
+        const rompio = danarAuto(room, a, PICKAXE.struct, player);
+        const [gainMat, base] = PICKAXE.gain.metal;
+        const amount = rompio ? base * 2 : base;
+        player.mats[gainMat] = Math.min(MAX_MATS, player.mats[gainMat] + amount);
+        send(player.ws, { ...invMsg(player), gained: [gainMat, amount] });
       } else if (Number.isInteger(msg.pz)) {
         const pz = room.world.piezas[msg.pz];
         if (!pz || pz.fija || pz.rota || distPieza(room, msg.pz, player.pos) > PICKAXE.range + 2) break;
@@ -481,7 +499,7 @@ function handleGame(room, player, msg) {
       break;
     }
     case 'build': {
-      if (!player.alive || ['bus', 'falling', 'glider'].includes(player.state) || room.phase !== 'playing') break;
+      if (!player.alive || ['bus', 'falling', 'glider', 'auto'].includes(player.state) || room.phase !== 'playing') break;
       const { type, i, j, y, dir, mat } = msg;
       if (!TIPOS.includes(type) || !MATERIALS[mat]) break;
       if (![i, j, y * 2, dir].every(Number.isInteger) || dir < 0 || dir > 3) break;
@@ -541,6 +559,83 @@ function handleGame(room, player, msg) {
       send(player.ws, invMsg(player));
       break;
     }
+    // ---------- Autos ----------
+    case 'subir': {
+      const a = room.autos[msg.a];
+      if (!a || a.rota || !player.alive || player.state !== 'ground' || player.auto || room.phase !== 'playing') break;
+      if (Math.hypot(a.x - player.pos[0], a.z - player.pos[2]) > AUTO.ALCANCE + 1 || Math.abs(a.y - player.pos[1]) > 3) break;
+      const k = asientoLibre(a);
+      if (k < 0) break;
+      if (player.use) player.use = null;
+      a.seats[k] = player.id;
+      player.auto = { a: a.id, k };
+      player.state = 'auto';
+      if (k === 0) a.ctrl = player.id;
+      avisarAsientos(room, a);
+      break;
+    }
+    case 'bajar':
+      if (player.auto) bajarDelAuto(room, player);
+      break;
+    case 'asiento': {
+      if (!player.auto || !player.alive) break;
+      const a = room.autos[player.auto.a];
+      const k = asientoLibre(a, player.auto.k);
+      if (k < 0 || k === player.auto.k) break;
+      a.seats[player.auto.k] = null;
+      a.seats[k] = player.id;
+      player.auto.k = k;
+      if (k === 0) a.ctrl = player.id;
+      avisarAsientos(room, a);
+      break;
+    }
+    case 'auto': {
+      // estado del auto que simula este jugador (el conductor, o el último que lo manejó mientras frena solo)
+      const a = room.autos[msg.a];
+      if (!a || a.ctrl !== player.id || !player.alive) break;
+      const antes = [a.x, a.y, a.z], t = a.tRed || 0;
+      const prueba = { ...a };
+      if (!aplicarRed(prueba, msg)) break;
+      // sin teletransportes: a lo sumo lo que se puede recorrer a toda velocidad desde el último estado
+      const dtR = t ? Math.min(2, (now - t) / 1000) : 2;
+      if (dist3(antes, [prueba.x, prueba.y, prueba.z]) > AUTO.TURBO_MAX * 1.6 * dtR + 4) break;
+      aplicarRed(a, msg);
+      a.tRed = now;
+      for (const id of a.seats) {
+        const q = id !== null && room.players.get(id);
+        if (q) q.pos = [a.x, a.y + 0.6, a.z];
+      }
+      broadcast(room, { t: 'auto', a: a.id, ...estadoRed(a) }, player.id);
+      break;
+    }
+    case 'bocina':
+      if (player.auto) broadcast(room, { t: 'bocina', a: player.auto.a }, player.id);
+      break;
+    case 'atropello': {
+      // el conductor pisó a alguien: el daño sale de la velocidad que conoce el servidor
+      const a = player.auto && player.auto.k === 0 ? room.autos[player.auto.a] : null;
+      const target = room.players.get(msg.pid);
+      if (!a || !target || !target.alive || target === player || target.auto || target.state !== 'ground') break;
+      if (Math.hypot(target.pos[0] - a.x, target.pos[2] - a.z) > 4.5) break;
+      const v = Math.min(45, rapidez(a));
+      if (v < AUTO.ATROPELLO || now - (target.atropellado || 0) < 700) break;
+      target.atropellado = now;
+      const dmg = Math.round(Math.min(80, 10 + (v - AUTO.ATROPELLO) * 3));
+      const dx = target.pos[0] - a.x, dz = target.pos[2] - a.z, d = Math.hypot(dx, dz) || 1;
+      send(target.ws, { t: 'empujon', v: [+(dx / d * v * 0.45 + a.vx * 0.35).toFixed(2), 7, +(dz / d * v * 0.45 + a.vz * 0.35).toFixed(2)] });
+      send(player.ws, { t: 'hitConfirm', id: target.id, dmg, head: false, shield: target.shield > 0, pos: target.pos });
+      damagePlayer(room, target, dmg, player, 'auto');
+      break;
+    }
+    case 'choque': {
+      // golpe fuerte contra algo: el auto se abolla (el que lo simula avisa, el servidor limita)
+      const a = room.autos[msg.a];
+      const v = Math.min(40, Number(msg.v) || 0);
+      if (!a || a.ctrl !== player.id || a.rota || v < 12 || now - (a.tChoque || 0) < 400) break;
+      a.tChoque = now;
+      danarAuto(room, a, (v - 12) * 9, null);
+      break;
+    }
     case 'fall': {
       const dmg = Math.min(100, Math.max(0, Number(msg.dmg) || 0));
       if (player.alive && dmg > 0 && player.state === 'ground') {
@@ -578,7 +673,45 @@ function explode(room, attacker, at, def, base) {
     if (d < def.splash && d < (golpes.get(s.pz) ?? Infinity)) golpes.set(s.pz, d);
   });
   for (const [id, d] of golpes) damagePieza(room, id, def.struct * (1 - (d / def.splash) * 0.5));
+  for (const a of room.autos) {
+    const d = dist3([a.x, a.y + 0.8, a.z], at);
+    if (d < def.splash + 2.3) danarAuto(room, a, def.struct * (1 - Math.max(0, d - 2.3) / def.splash * 0.5), attacker);
+  }
 }
+
+// ---------- Autos ----------
+function avisarAsientos(room, a) {
+  broadcast(room, { t: 'autoSeats', a: a.id, seats: a.seats, ctrl: a.ctrl });
+}
+function bajarDelAuto(room, p) {
+  const a = room.autos[p.auto.a];
+  if (a && a.seats[p.auto.k] === p.id) a.seats[p.auto.k] = null;
+  p.auto = null;
+  if (p.state === 'auto') p.state = 'ground';
+  if (a) avisarAsientos(room, a);
+}
+// Daño a un auto. Al romperse explota: lastima a los de adentro y a los de al lado, y los saca. Devuelve true si se rompió.
+function danarAuto(room, a, dmg, atacante) {
+  if (a.rota || !(dmg > 0)) return false;
+  a.hp -= dmg;
+  if (a.hp > 0) { broadcast(room, { t: 'autoHp', a: a.id, hp: Math.ceil(a.hp) }); return false; }
+  a.hp = 0; a.rota = true; a.vx = a.vy = a.vz = 0;
+  broadcast(room, { t: 'autoBoom', a: a.id });
+  for (const id of a.seats) {
+    const q = id !== null && room.players.get(id);
+    if (q && q.auto) bajarDelAuto(room, q);
+  }
+  for (const target of room.players.values()) {
+    if (!target.alive || target.state === 'bus') continue;
+    const d = dist3(target.pos, [a.x, a.y + 0.6, a.z]);
+    if (d > 7) continue;
+    const golpe = Math.round(70 * (1 - d / 7) + 10);
+    if (atacante && target !== atacante) send(atacante.ws, { t: 'hitConfirm', id: target.id, dmg: golpe, head: false, shield: target.shield > 0, pos: target.pos });
+    damagePlayer(room, target, golpe, atacante && atacante !== target ? atacante : null, 'auto');
+  }
+  return true;
+}
+
 
 // Distancia de un punto a la caja de una pieza del mapa.
 function distPieza(room, id, p) {
@@ -689,6 +822,8 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     if (!player || !room) return;
+    if (player.auto) bajarDelAuto(room, player);
+    for (const a of room.autos) if (a.ctrl === player.id) { a.ctrl = null; a.vx = a.vy = a.vz = 0; broadcast(room, { t: 'auto', a: a.id, ...estadoRed(a) }); }
     room.players.delete(player.id);
     if (room.players.size === 0) { rooms.delete(room.code); return; }
     if (room.hostId === player.id) room.hostId = room.players.keys().next().value;

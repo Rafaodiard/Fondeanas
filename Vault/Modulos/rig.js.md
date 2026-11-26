@@ -27,3 +27,7 @@ Archivo: `public/js/rig.js`. Personaje con esqueleto y animaciones hechas en Ble
 `setRigEnv` (iluminación de entorno con `RoomEnvironment`), `hasRig`, `createRigCharacter`, `placeGlider`, `placeParachute`, `ARNES`, `animateRig`, `weaponRig`, `rigAction`, `rigStopAction`, `rigShot`.
 
 Usa [[assets.js]]. Lo usan [[models.js]], [[main.js]] y [[visor.html]].
+
+## Sentado en un auto (2026-11-26)
+
+Con `state === 'auto'`, `animateRig` llama a `animarSentado`: pose `Quieto`, piernas dobladas por asiento (tabla `PIERNA`: el conductor con los pies en los pedales, atrás más encogidos), espalda contra el respaldo y brazos con IK de dos huesos (`ik`, `alinear`): el conductor lleva las manos a `x.manos` (dos puntos del aro del volante que le pasa [[manejar.js]]) y gira las muñecas con `x.giro`; los pasajeros apoyan las manos en los muslos. El arma no se ve. `CADERA_SENTADO` es la altura de la cadera sobre la suela en esa pose (para apoyar la cola en el almohadón). Ver [[Autos]].
