@@ -2,7 +2,7 @@
 
 Volver a [[Inicio]] · código en [[planos.js]], [[world.js]], [[mallas.js]], [[server.js]] y [[main.js]] · pruebas en [[Pruebas del mapa]]
 
-Todas las estructuras del mapa se rompen con el pico, a tiros y con explosiones, pieza por pieza. Lo que queda colgando cuando se rompe lo que lo sostiene se cae. Pedido en [[Errores del mapa]].
+Todas las estructuras del mapa se rompen con el pico, a tiros, con explosiones y chocándolas con un auto rápido (ver [[Autos]]), pieza por pieza. Lo que queda colgando cuando se rompe lo que lo sostiene se cae. Pedido en [[Errores del mapa]].
 
 ## Piezas
 
@@ -21,7 +21,7 @@ Todas las estructuras del mapa se rompen con el pico, a tiros y con explosiones,
 
 ## Cuando se rompe
 
-`damagePieza` en [[server.js]]: rompe la pieza y las que quedan sin apoyo, manda `pzRota` con todos los ids, baja el loot que estaba encima (`itemsDel` + `itemsAdd` con la altura nueva) y los cofres (`chestMove`). Las piezas rotas van en el snapshot de la partida (`piezas`, `cofresMovidos`) para el que entra tarde.
+`damagePieza` en [[server.js]]: rompe la pieza y las que quedan sin apoyo, manda `pzRota` con todos los ids, baja el loot que estaba encima o sobre construcciones que se cayeron (`acomodarItems`, ver [[lugarLoot.js]]; `itemsDel` + `itemsAdd` con el lugar nuevo) y los cofres (`chestMove`). Las piezas rotas van en el snapshot de la partida (`piezas`, `cofresMovidos`) para el que entra tarde.
 
 En el cliente ([[main.js]]): `castRay` sabe qué pieza tocó por la malla de choque (`userData.triPz`, un id por triángulo, de [[mallas.js]]); `pzRota` llama a `world.romperPieza`, tira escombros del color de la pieza (`escombros`) y suena `structBreak`.
 

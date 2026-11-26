@@ -12,7 +12,8 @@ import {
   randomWeapon, randomConsumable, randomAmmo, weaponDamage, weaponReload, structKey,
 } from './public/js/items.js';
 import { TIPOS, normalizar, motivoNoEncaja, sinApoyo, vidaDe, editValida, OBRA, ALCANCE_EDICION, cajaPieza, superficie, DEBAJO } from './public/js/construccion.js';
-import { AUTO, nuevoAuto, aplicarRed, estadoRed, autoPublico, asientoLibre, rapidez } from './public/js/autos.js';
+import { AUTO, nuevoAuto, aplicarRed, estadoRed, autoPublico, asientoLibre, rapidez, materialChoque, impacto, claveChoque } from './public/js/autos.js';
+import { repartirLoot, acomodarLoot, LOOT_RADIO, LOOT_ALTO } from './public/js/lugarLoot.js';
 import { totalValido, dificultadValida, cuantosBots } from './public/js/opcionesBots.js';
 import { nuevoBot, nombresBots, prepararBots, actualizarBots, alRecibirDanio, alMatar } from './servidor/bots.js';
 
@@ -151,16 +152,31 @@ function spawnItem(room, item, x, y, z) {
   return it;
 }
 
+// Reparte objetos alrededor de (x,y,z) (cofre, jugador que suelta algo o que murió) sin pasar paredes: ver lugarLoot.js.
 function spawnAround(room, list, x, y, z) {
-  const out = list.map((item, k) => {
-    const a = (k / list.length) * Math.PI * 2 + Math.random();
-    const r = 1 + Math.random() * 0.8;
-    const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
-    return spawnItem(room, item, px, Math.max(y, room.world.groundHeight(px, pz, y + 1)), pz);
-  });
+  const lugares = repartirLoot(room.world, list.length, x, y, z);
+  const out = list.map((item, k) => spawnItem(room, item, lugares[k].x, lugares[k].y, lugares[k].z));
   if (out.length) broadcast(room, { t: 'itemsAdd', items: out });
   return out;
 }
+
+// Algo cambió en las cajas (se construyó, editó o rompió una pieza): el loot que quedó adentro sale para su lado
+// y el que quedó en el aire cae. caja = { x0, y0, z0, x1, y1, z1 }.
+function acomodarItems(room, cajas) {
+  if (!cajas.length) return;
+  const m = LOOT_RADIO + 0.3;
+  const cerca = (it, a) => it.x > a.x0 - m && it.x < a.x1 + m && it.z > a.z0 - m && it.z < a.z1 + m && it.y > a.y0 - LOOT_ALTO - 0.3 && it.y < a.y1 + 1.5;
+  const movidos = [];
+  for (const it of room.items.values()) {
+    if (!cajas.some((a) => cerca(it, a))) continue;
+    const p = acomodarLoot(room.world, it);
+    if (Math.hypot(p.x - it.x, p.y - it.y, p.z - it.z) < 0.02) continue;
+    it.x = p.x; it.y = p.y; it.z = p.z;
+    movidos.push(it);
+  }
+  if (movidos.length) { broadcast(room, { t: 'itemsDel', ids: movidos.map((it) => it.id) }); broadcast(room, { t: 'itemsAdd', items: movidos }); }
+}
+const cajaDeAabb = (a) => ({ x0: a[0], y0: a[1], z0: a[2], x1: a[3], y1: a[4], z1: a[5] });
 
 function startMatch(room) {
   room.phase = 'bus';
@@ -612,6 +628,7 @@ function handleGame(room, player, msg) {
       player.mats[mat] -= BUILD_COST;
       broadcast(room, { t: 'structAdd', s: structPublic(s) });
       send(player.ws, invMsg(player));
+      acomodarItems(room, [cajaPieza(s)]); // el loot que quedó adentro de la pieza nueva sale para su lado
       break;
     }
     case 'edit': {
@@ -625,6 +642,7 @@ function handleGame(room, player, msg) {
       const dir = s.type === 'rampa' && Number.isInteger(msg.dir) && msg.dir >= 0 && msg.dir <= 3 ? msg.dir : s.dir;
       room.world.editStruct(s.key, msg.e, dir);
       broadcast(room, { t: 'structEdit', key: s.key, e: s.e, dir: s.dir });
+      acomodarItems(room, [cajaPieza(s)]); // al cerrar un hueco el loot que estaba ahí sale para su lado
       break;
     }
     case 'useStart': {
@@ -698,6 +716,7 @@ function handleGame(room, player, msg) {
       // sin teletransportes: a lo sumo lo que se puede recorrer a toda velocidad desde el último estado
       const dtR = t ? Math.min(2, (now - t) / 1000) : 2;
       if (dist3(antes, [prueba.x, prueba.y, prueba.z]) > AUTO.TURBO_MAX * 1.6 * dtR + 4) break;
+      a.vAntes = rapidez(a); // para validar las embestidas (la velocidad pudo bajar justo al chocar)
       aplicarRed(a, msg);
       a.tRed = now;
       for (const id of a.seats) {
@@ -733,6 +752,31 @@ function handleGame(room, player, msg) {
       if (!a || a.ctrl !== player.id || a.rota || v < 12 || now - (a.tChoque || 0) < 400) break;
       a.tChoque = now;
       danarAuto(room, a, (v - 12) * 9, null);
+      break;
+    }
+    case 'embestida': {
+      // el auto le pegó a algo rompible (autos.js, embestir): el servidor decide con la vida de verdad y con la
+      // velocidad que conoce si lo daña o lo rompe, y cuánto se daña el auto al atravesarlo
+      const a = room.autos[msg.a];
+      if (!a || a.ctrl !== player.id || a.rota || !player.alive || room.phase !== 'playing') break;
+      const o = cosaEmbestida(msg.o);
+      const m = o && materialChoque(room.world, o);
+      if (!m) break;
+      // a lo sumo un poco más que la velocidad de los últimos estados (llegan 15 por segundo)
+      const v = Math.min(Number(msg.v) || 0, Math.max(rapidez(a), a.vAntes || 0) + 3, AUTO.TURBO_MAX + 3);
+      if (!(v > 0) || distEmbestida(room, o, a) > AUTO.LARGO / 2 + AUTO.RADIO + 1.5 + v * 0.15) break;
+      if (!a.embestidas) a.embestidas = new Map();
+      const id = claveChoque(o);
+      if (now - (a.embestidas.get(id) || 0) < 250) break;
+      a.embestidas.set(id, now);
+      if (a.embestidas.size > 40) for (const [k, t] of a.embestidas) if (now - t > 1000) a.embestidas.delete(k);
+      const hp = vidaEmbestida(room, o, now);
+      const r = impacto(m.mat, hp, v, m.esc);
+      if (!(r.dano > 0)) break;
+      if (o.pz !== undefined) damagePieza(room, o.pz, r.dano);
+      else if (o.key) damageStruct(room, room.world.structs.get(o.key), r.dano);
+      else danarRecurso(room, o.res, o.idx, r.dano);
+      if (r.rompe) danarAuto(room, a, r.danoAuto, null);
       break;
     }
     case 'fall': {
@@ -815,6 +859,46 @@ function danarAuto(room, a, dmg, atacante) {
 }
 
 
+// ---------- Embestidas (autos que rompen lo que chocan) ----------
+// Cosa chocada que manda el cliente, validada: { pz } | { key } | { res, idx }, o null.
+function cosaEmbestida(o) {
+  if (!o || typeof o !== 'object') return null;
+  if (Number.isInteger(o.pz) && o.pz >= 0) return { pz: o.pz };
+  if (typeof o.key === 'string' && o.key.length < 40) return { key: o.key };
+  if ((o.res === 'tree' || o.res === 'rock') && Number.isInteger(o.idx) && o.idx >= 0) return { res: o.res, idx: o.idx };
+  return null;
+}
+// Distancia (horizontal) del centro del auto a la cosa.
+function distEmbestida(room, o, a) {
+  const W = room.world;
+  const caja = (b) => Math.hypot(Math.max(b[0] - a.x, 0, a.x - b[3]), Math.max(b[2] - a.z, 0, a.z - b[5]));
+  if (o.pz !== undefined) {
+    const p = W.piezas[o.pz];
+    return p && a.y + 1.6 > p.aabb[1] && a.y < p.aabb[4] ? caja(p.aabb) : Infinity;
+  }
+  if (o.key) {
+    const s = W.structs.get(o.key);
+    return s?.boxes?.length ? Math.min(...s.boxes.map((b) => caja([b.minX, b.minY, b.minZ, b.maxX, b.maxY, b.maxZ]))) : Infinity;
+  }
+  const r = (o.res === 'tree' ? W.trees : W.rocks)[o.idx];
+  return r ? Math.max(0, Math.hypot(r.x - a.x, r.z - a.z) - (r.circle?.r || 0)) : Infinity;
+}
+function vidaEmbestida(room, o, now) {
+  if (o.pz !== undefined) return room.pzHp[o.pz];
+  if (o.key) { const s = room.world.structs.get(o.key); return s ? vidaDe(s, now) : 0; }
+  return (o.res === 'tree' ? room.trees : room.rocks)[o.idx] ?? 0;
+}
+// Daño a un árbol o una roca (sin dar materiales: los da el pico). Devuelve true si se rompió.
+function danarRecurso(room, res, idx, dmg) {
+  const list = res === 'tree' ? room.trees : room.rocks;
+  if (!(list[idx] > 0)) return false;
+  list[idx] -= dmg;
+  if (list[idx] > 0) { broadcast(room, { t: 'resHit', res, idx }); return false; }
+  room.world.destroyResource(res, idx);
+  broadcast(room, { t: 'resGone', res, idx });
+  return true;
+}
+
 // Distancia de un punto a la caja de una pieza del mapa.
 function distPieza(room, id, p) {
   const a = room.world.piezas[id]?.aabb;
@@ -841,18 +925,13 @@ function damagePieza(room, id, dmg, avisar = true) {
   // las rutas de los bots que pasaban por ahí se vuelven a calcular
   if (room.nav) for (const r of rotas) room.nav.invalidar(room.world.piezas[r].aabb);
   // construcciones de jugadores que se apoyaban en lo que se rompió
-  const caidas = derrumbar(room);
+  const cajasCaidas = [];
+  const caidas = derrumbar(room, cajasCaidas);
   if (caidas.length) broadcast(room, { t: 'structDel', key: null, caidas });
-  // lo que quedó en el aire cae
+  // lo que quedó en el aire cae (y lo que estaba sobre construcciones que se cayeron)
   const dentro = (p, a) => p[0] > a[0] - 0.3 && p[0] < a[3] + 0.3 && p[2] > a[2] - 0.3 && p[2] < a[5] + 0.3 && p[1] > a[1] - 0.3 && p[1] < a[4] + 1.5;
   const zonas = rotas.map((r) => room.world.piezas[r].aabb);
-  const movidos = [];
-  for (const it of room.items.values()) {
-    if (!zonas.some((a) => dentro([it.x, it.y, it.z], a))) continue;
-    const g = room.world.groundHeight(it.x, it.z, it.y + 0.3);
-    if (g < it.y - 0.05) { it.y = +g.toFixed(2); movidos.push(it); }
-  }
-  if (movidos.length) { broadcast(room, { t: 'itemsDel', ids: movidos.map((it) => it.id) }); broadcast(room, { t: 'itemsAdd', items: movidos }); }
+  acomodarItems(room, [...zonas.map(cajaDeAabb), ...cajasCaidas]);
   room.chests.forEach((c, idx) => {
     if (!zonas.some((a) => dentro([c.x, c.y, c.z], a))) return;
     const g = room.world.groundHeight(c.x, c.z, c.y + 0.3);
@@ -973,15 +1052,22 @@ function damageStruct(room, s, dmg) {
   const hp = vidaDe(s, Date.now());
   if (hp <= 0) {
     room.world.removeStruct(s.key);
-    broadcast(room, { t: 'structDel', key: s.key, caidas: derrumbar(room) });
+    const cajas = [cajaPieza(s)];
+    broadcast(room, { t: 'structDel', key: s.key, caidas: derrumbar(room, cajas) });
+    acomodarItems(room, cajas);
   } else broadcast(room, { t: 'structHp', key: s.key, hp: Math.ceil(hp), dano: Math.round(s.dano) });
 }
 
 // Saca las construcciones que quedaron sin apoyo (como en el género: lo que no llega al piso se cae). Devuelve sus claves.
-function derrumbar(room) {
+// cajas: si viene, se le agregan las cajas de lo que se cayó (para acomodar el loot que tenía arriba).
+function derrumbar(room, cajas = null) {
   if (!room.world.structs.size) return [];
   const caidas = sinApoyo(room.world);
-  for (const k of caidas) room.world.removeStruct(k);
+  for (const k of caidas) {
+    const s = room.world.structs.get(k);
+    if (cajas && s) cajas.push(cajaPieza(s));
+    room.world.removeStruct(k);
+  }
   return caidas;
 }
 

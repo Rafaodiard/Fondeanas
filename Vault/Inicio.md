@@ -27,6 +27,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 | [[assets.js]] | `public/js/assets.js` | Carga de los GLB y clonado con tintes |
 | [[models.js]] | `public/js/models.js` | Personajes, bus y armas (GLB o primitivas de respaldo) |
 | [[loot.js]] | `public/js/loot.js` | Objetos del piso y cofres en el juego, con sus efectos y animaciones |
+| [[lugarLoot.js]] | `public/js/lugarLoot.js` | Dónde cae el loot sin atravesar paredes (compartido) |
 | [[iconos.js]] | `public/js/iconos.js` | Fotos de las armas y objetos para la barra de items, sacadas de sus modelos 3D |
 | [[rig.js]] | `public/js/rig.js` | Esqueleto y animaciones del personaje por capas, paracaídas colgado de los hombros |
 | [[caida.js]] | `public/js/caida.js` | Física de la caída libre (planeo / picada), el paracaídas y deslizarse |
@@ -62,7 +63,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 - [[Pipeline de armas]]: scripts de Blender de las armas (modelado, horneado, recargas, export).
 - [[Pipeline del bus]]: script de Blender del bus volador (modelado, fotos y export).
 - [[Pipeline del auto]]: script de Blender del auto (carrocería paramétrica, ruedas, interior, fotos y export).
-- `tools/autos/pruebas.mjs`: pruebas de los autos (ver [[autos.js]]).
+- `tools/autos/pruebas.mjs`: pruebas de los autos (ver [[autos.js]]). `tools/autos/embestidas.mjs` y `tools/autos/servidor.mjs`: pruebas de los autos que rompen lo que chocan según la velocidad (física y contra el servidor, ver [[Autos]]).
 - `tools/bots/pruebas.mjs` y `tools/bots/partida.mjs`: pruebas de los bots y una partida entera solo con bots (ver [[Bots]]).
 - `tools/iconos/pruebas.mjs`: pruebas de las fotos de la barra de items en el navegador (ver [[iconos.js]]).
 - `tools/golpes/pruebas.mjs`: pruebas del punto débil y la vida de lo dañado contra el servidor (ver [[Daño visible y punto débil]]).
@@ -71,6 +72,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 - `tools/caida/pruebas.mjs`: pruebas de la caída libre, el paracaídas y deslizarse (ver [[caida.js]]).
 - `tools/controles/pruebas.mjs`: pruebas del registro de controles y opciones (ver [[controles.js]]).
 - [[Pruebas de construcción]]: piezas editadas, apoyo, derrumbes, vida y que lo que se ve coincida con lo que se pisa.
+- [[Pruebas del loot]]: el loot de cofres, jugadores y construcciones nunca atraviesa paredes y queda apoyado.
 - [[Pruebas del mapa]]: pruebas automáticas de colisiones, escaleras, puertas, alcance del loot, lo que se ve (caras al revés, caras que titilan, pisos falsos) y derrumbes.
 
 ## Memoria
