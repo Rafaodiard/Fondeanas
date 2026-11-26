@@ -27,7 +27,7 @@ Autos manejables estacionados en las calles. Se suben hasta cuatro jugadores (co
 - HUD del auto: velocímetro en km/h, vida del auto, turbo y las teclas; se ocultan el inventario y los materiales.
 - El personaje va sentado (pose de [[rig.js]]), el conductor con las manos en el volante, que gira con la dirección. Ruedas que giran y doblan, luces de freno, llama en los escapes con turbo y un sacudón al chocar.
 - Sonidos ([[audio.js]]): motor que sube de tono con la velocidad (también el del auto andando más cercano), derrape, bocina, choque, puerta y turbo.
-- En el minimapa cada auto es un rectángulo de su color.
+- En el minimapa y en el mapa grande ([[Mapa y marcas]]) cada auto es un rectángulo de su color.
 
 ## Si no andan
 

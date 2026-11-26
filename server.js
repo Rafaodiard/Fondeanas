@@ -130,6 +130,7 @@ function matchSnapshot(room) {
     pzHp: room.pzHp.flatMap((hp, id) => { const pz = room.world.piezas[id]; return !pz.fija && !pz.rota && hp < pz.hp ? [[id, Math.ceil(hp)]] : []; }), // dañadas
     cofresMovidos: room.chests.flatMap((c, i) => (c.movido ? [[i, c.y]] : [])),
     autos: room.autos.map(autoPublico),
+    marcas: [...room.players.values()].filter((p) => p.alive && p.marca).map((p) => [p.id, p.marca]), // marcas del mapa
   };
 }
 // crece: segundos que le faltan para terminar de levantarse (obra: lo que tarda en total).
@@ -238,7 +239,7 @@ function sacarBots(room) {
 
 function resetPlayer(p, room) {
   p.hp = 100; p.shield = 0; p.alive = true; p.kills = 0; p.state = 'bus';
-  p.pos = [...room.bus.from]; p.lastShot = 0; p.lastSwing = 0; p.debil = null; p.use = null; p.auto = null;
+  p.pos = [...room.bus.from]; p.lastShot = 0; p.lastSwing = 0; p.debil = null; p.use = null; p.auto = null; p.marca = null;
   p.slots = Array(SLOTS).fill(null);
   p.ammo = { ligera: 0, media: 0, pesada: 0, cartuchos: 0, cohetes: 0 };
   p.mats = { madera: MATS_INICIALES, piedra: MATS_INICIALES, metal: MATS_INICIALES };
@@ -276,6 +277,7 @@ function killPlayer(room, victim, killer, cause) {
   if (!victim.alive) return;
   if (victim.auto) bajarDelAuto(room, victim);
   victim.alive = false; victim.hp = 0; victim.shield = 0; victim.state = 'dead';
+  victim.marca = null; // los clientes sacan su marca al recibir 'death'
   if (killer && killer !== victim) { killer.kills++; if (killer.bot) alMatar(room, killer, Date.now()); }
   // Tira todo lo que tenía.
   const drops = victim.slots.filter(Boolean);
@@ -733,6 +735,25 @@ function handleGame(room, player, msg) {
       if (!a || a.ctrl !== player.id || a.rota || v < 12 || now - (a.tChoque || 0) < 400) break;
       a.tChoque = now;
       danarAuto(room, a, (v - 12) * 9, null);
+      break;
+    }
+    case 'marca': {
+      // marca en el mapa (mapaHud.js): [x, y, z] o null para sacarla; se le pasa al resto de la sala
+      if (!player.alive) break;
+      // límite de mensajes: hasta 8 seguidos y después uno cada 125 ms
+      player.marcaFichas = Math.min(8, (player.marcaFichas ?? 8) + (now - (player.marcaT || now)) / 125);
+      player.marcaT = now;
+      if (player.marcaFichas < 1) break;
+      player.marcaFichas--;
+      let p = null;
+      if (msg.p !== null) {
+        if (!Array.isArray(msg.p) || msg.p.length !== 3 || !msg.p.every(Number.isFinite)) break;
+        const lim = ISLAND_SIZE / 2 + 5;
+        if (Math.abs(msg.p[0]) > lim || Math.abs(msg.p[2]) > lim || msg.p[1] < -20 || msg.p[1] > 400) break;
+        p = msg.p.map((v) => Math.round(v * 10) / 10);
+      }
+      player.marca = p;
+      broadcast(room, { t: 'marca', id: player.id, p }, player.id);
       break;
     }
     case 'fall': {

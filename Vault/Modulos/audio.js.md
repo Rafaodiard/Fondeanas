@@ -14,3 +14,7 @@ Archivo: `public/js/audio.js`. Efectos de sonido sintetizados con WebAudio, sin 
 
 - `sfx.motor(v, rpm)`: dos osciladores (diente de sierra y cuadrada al doble) por un pasabajos; el tono y el filtro suben con `rpm`. Lo llama [[manejar.js]] cada cuadro: el auto propio a pleno, o el auto andando más cercano (hasta 50 m) más bajo.
 - `sfx.derrape(v)` (loop), `sfx.bocina(dist)`, `sfx.choque(fuerza, dist)`, `sfx.puerta()`, `sfx.turbo()`.
+
+## Marcas del mapa (2026-11-26)
+
+- `sfx.marca()` (dos tonos que suben) al poner una marca y `sfx.quitarMarca()` (tono que baja) al sacarla. Los usa [[mapaHud.js]].

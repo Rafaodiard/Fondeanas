@@ -87,7 +87,8 @@ Para recorrer la isla sin jugar, con el servidor levantado abrí http://localhos
 - **Daño visible y golpes críticos:** las paredes, pisos, techos y demás piezas del mapa, y las construcciones, se van agrietando y oscureciendo a medida que pierden vida (lo ven todos en la sala). Debajo de la mira aparece la barra de vida de lo que golpeás o mirás con el pico, con la parte recién perdida en blanco. Al picar una estructura, un árbol o una roca aparece un **punto débil** (círculo celeste) cerca del golpe: pegarle ahí es un crítico que hace el doble de daño (100 en vez de 50), con número celeste, destello y sonido propio, y el punto se mueve a otro lado. Si le pegás a otro lado el punto se queda; si dejás de picar 6 s, se va.
 - **Construcción** (ver abajo): pared, piso, rampa y techo en una grilla de 4 m, en madera, piedra o metal, que se pueden editar.
 - **Escudo y curación:** vendas, botiquín, frasco azul y bidón azul.
-- Al morir, el jugador tira todo lo que tenía. También hay daño por caída, tormenta por fases, números de daño, minimapa, killfeed, chat, modo espectador y sonidos sintetizados.
+- **Mapa, brújula y marcas:** arriba a la derecha hay un minimapa que te sigue (con el norte arriba; se aleja en el bus y en la caída) con la tormenta, la próxima zona, el recorrido del bus, los autos y tus marcas; si estás afuera de la zona, una línea te muestra por dónde ir. Arriba al centro, una brújula con hacia dónde mirás y a cuántos metros está cada marca. Con **M** se abre el mapa grande de la isla (relieve, agua, río, calles, casas, grilla A–J / 1–10 y los pueblos): rueda para acercar, arrastrar para moverlo y **clic para marcar** un lugar (otro clic la mueve, clic sobre ella o clic derecho la saca). También se marca sin abrir el mapa con el **clic de la rueda** (o T) mirando a un lugar. Cada jugador tiene una marca de su color que se ve en el mapa, en el minimapa, en la brújula y en el mundo como un haz de luz con la distancia. La ve toda la sala (se puede desactivar en Configuración).
+- Al morir, el jugador tira todo lo que tenía. También hay daño por caída, tormenta por fases, números de daño, killfeed, chat, modo espectador y sonidos sintetizados.
 
 ## Construcción
 
@@ -133,8 +134,10 @@ Estas son las teclas de fábrica. **Todas se pueden cambiar** desde **⚙ Config
 | F | Editar la construcción que mirás / confirmar la edición |
 | G | Tirar el objeto que tenés en la mano |
 | B | Bailar |
+| M | Abrir y cerrar el mapa (con el mapa abierto: clic marca, clic derecho saca la marca, rueda acerca, arrastrar mueve) |
+| Clic de la rueda o T | Marcar el lugar al que apuntás (otra vez en el mismo lugar la saca) |
 | Enter | Chat |
-| Esc | Soltar el mouse / abrir la configuración |
+| Esc | Soltar el mouse / abrir la configuración (con el mapa abierto, lo cierra) |
 
 En el auto:
 
@@ -154,7 +157,7 @@ En pantalla no hay una lista de controles: en el auto aparece una ayuda corta co
 
 El panel tiene cuatro pestañas y todo se guarda en el navegador (`localStorage`), así que queda para la próxima vez:
 
-- **Juego:** sensibilidad del mouse, sensibilidad apuntando y con mira telescópica, invertir el eje vertical, apuntar manteniendo o alternando, correr siempre, números de daño, y los bots de las salas que crees (hasta cuántos jugadores completan y su dificultad).
+- **Juego:** sensibilidad del mouse, sensibilidad apuntando y con mira telescópica, invertir el eje vertical, apuntar manteniendo o alternando, correr siempre, números de daño, compartir tus marcas con la sala, zoom del minimapa (cerca, medio o lejos), y los bots de las salas que crees (hasta cuántos jugadores completan y su dificultad).
 - **Video:** calidad gráfica (baja sin sombras, media y alta), resolución 3D, campo de visión, color de la mira y contador de FPS.
 - **Sonido:** volumen general.
 - **Controles:** cambiar cualquier tecla. Si elegís una que ya usaba otra acción, se la saca a esa y te avisa. Una tecla puede repetirse entre combate y construcción (por ejemplo, R recarga y en modo construcción gira la rampa) porque no se usan a la vez. Lo mismo con los controles del auto (grupo *Vehículos*): solo valen sentado en un auto, así que repiten las de a pie.
@@ -195,7 +198,8 @@ node tools/controles/pruebas.mjs
 - `tools/blender/`: scripts de Blender que generan el personaje (`heroe_*.py`; `heroe_caida.py` hace los clips de caída, paracaídas, aterrizaje y deslizarse sobre el esqueleto que trae `heroe_importar.py` del GLB del juego), el paracaídas (`paracaidas.py`), las armas (`armas_*.py`), el bus volador (`bus.py`) y sus animaciones, el auto (`auto.py`), y el cofre y los objetos del piso (`loot_modelos.py`, `loot_export.py`). `heroe_reemplazar_clips.mjs` cambia solo algunos clips del personaje sin tocar el resto del GLB. `recargas_control.py`, `armas_choque.py` y `brazos_choque.py` revisan las animaciones sin renderizar (brazos, saltos entre cuadros, cuánto se mete el arma en el cuerpo y cuánto se meten los brazos y las manos en el cuerpo con las mismas mezclas del juego, mirando derecho, abajo y arriba). `tools/texturas/`: máscaras de la cara y el tatuaje.
 - `Vault/`: vault de Obsidian que documenta el proyecto (empezar por `Vault/Inicio.md`) y grafo del código generado con graphify en `Vault/graphify-out`.
 - `public/js/caida.js`: física de la caída libre (planeo / picada), el paracaídas (altura límite, frenos) y el deslizamiento, y los parámetros de animación que viajan por la red. Pruebas: `node tools/caida/pruebas.mjs`.
-- `public/js/main.js`: el juego en sí (cámara en tercera persona, física, disparo, HUD, minimapa, red).
+- `public/js/main.js`: el juego en sí (cámara en tercera persona, física, disparo, HUD, red).
+- `public/js/mapaHud.js`: minimapa que sigue al jugador, mapa grande (M), brújula y marcas (en el mapa y en el mundo, compartidas con la sala). Pinta la isla una vez por partida con los datos del mundo (relieve, agua, río, calles, casas). Estilos en `public/mapaHud.css`. Pruebas (Node, servidor y navegador): `node tools/mapaHud/pruebas.mjs`.
 - `public/js/construccion.js`: reglas de la construcción, compartidas por el cliente y el servidor: ediciones válidas, superficie que se pisa y cajas que chocan de cada pieza editada, apoyo, derrumbes, vida que crece y qué baldosa se mira al editar.
 - `public/js/construccion3d.js`: mallas de las construcciones (texturas de tablas, bloques de piedra y chapa con remaches, marcos que rodean también los huecos editados), holograma de la vista previa, grilla de edición y el relleno de la pieza mientras se levanta.
 - `public/js/construir.js`: la construcción en el juego: modo construcción, dónde va cada pieza, colocar seguido, edición, material automático y la barra de piezas del HUD (la vida de lo que se mira la muestra `golpes.js`). Registra sus controles en `controles.js`.

@@ -30,7 +30,7 @@ Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.
 - `stormAt` → [[Tormenta]]
 - `damagePlayer` (el escudo absorbe primero), `killPlayer` (tira todo lo que tenía), `checkWinner`.
 - `addToInventory`, `spawnItem`, `spawnAround` → [[Loot y rarezas]]
-- `handleGame`: un `case` por mensaje de juego (salto, estado, loot, cofres, recarga, disparo, pico, construcción, consumibles, caída).
+- `handleGame`: un `case` por mensaje de juego (salto, estado, loot, cofres, recarga, disparo, pico, construcción, consumibles, caída, marcas del mapa: `marca`, ver [[Mapa y marcas]]).
 - `explode` (lanzacohetes, daño en área; el que dispara recibe la mitad; también daña las piezas del mapa dentro del radio) y `damageStruct` (suma daño y compara con `vidaDe`) → [[Armas y disparo]], [[Construcción]]
 - `derrumbar` (saca las construcciones sin apoyo, también después de romperse una pieza del mapa), `structPublic` y los `case 'build'` / `case 'edit'` → [[Construcción]]. `SF_MATS` (variable de entorno) da materiales al empezar, para probar.
 - Punto débil del pico: `puntoGolpe`, `esCritico`, `nuevoDebil`, `avisarDebil` (`player.debil`) → [[Daño visible y punto débil]]

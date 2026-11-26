@@ -25,4 +25,5 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 - [[Caída, paracaídas y deslizarse]]: el pedido de la caída libre con más control, el paracaídas con altura límite y deslizarse.
 
 - [[Jugar con bots]]: el pedido de jugar con bots y lo que se decidió (nombres, fin de partida, límite de 24).
+- [[Mapa abrible y marcas]]: el pedido de ver, abrir y marcar el mapa, y lo que se decidió (teclas, una marca por jugador, la ve toda la sala).
 - [[Fotos de armas en la barra]]: el pedido de ver las armas en la barra de items y lo que se decidió (fotos sacadas de los modelos 3D).
