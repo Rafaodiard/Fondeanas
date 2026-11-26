@@ -9,7 +9,7 @@ Carpeta `public/models/`. Los carga [[assets.js]]; si alguno falla, [[models.js]
 | `personaje.glb` | Héroe con esqueleto y clips | [[rig.js]], [[models.js]] | `Ropa` (color del jugador) |
 | `animaciones_armas.glb` | Solo esqueleto + clips de recarga y bombeo | se suman a los clips de `personaje` en [[assets.js]] | |
 | `armas.glb` | Seis armas + pico (nodo por arma, piezas móviles como nodos propios) | [[models.js]], [[rig.js]] | `Rareza` |
-| `bus.glb` | Bus volador | [[models.js]] | |
+| `bus.glb` | Bus volador: nodos `Carroceria`, `Helice_D`, `Helice_I` bajo `Bus` | [[models.js]] | (ninguno; `Baliza` y `Destello` destellan) |
 | `planeador.glb` | Planeador | [[models.js]], [[rig.js]] | `Tela` |
 | `objetos.glb` | Objetos del piso (consumibles, munición, materiales) | [[models.js]] | `Tinte`, `Mat` |
 | `casa.glb` | Casa (vieja) | nadie: ya no se carga, las casas del mapa salen de [[planos.js]] | |
@@ -21,7 +21,8 @@ Carpeta `public/models/`. Los carga [[assets.js]]; si alguno falla, [[models.js]
 
 - `personaje.glb`: `heroe_export.py` → [[Pipeline del héroe]].
 - `armas.glb` y `animaciones_armas.glb`: `armas_export.py` → [[Pipeline de armas]].
-- Bus, planeador, casa, cofre, árboles, roca y objetos: no hay script en el repo que los genere; están solo los GLB.
+- `bus.glb`: `bus.py` → [[Pipeline del bus]].
+- Planeador, casa, cofre, árboles, roca y objetos: no hay script en el repo que los genere; están solo los GLB.
 
 ## Convenciones (según los comentarios de los scripts)
 
