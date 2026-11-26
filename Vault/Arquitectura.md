@@ -12,6 +12,7 @@ Según el comentario de cabecera de [[server.js]]: **el cliente decide su movimi
 - El daño por caída también lo calcula el cliente y lo manda con `fall` (el servidor lo limita a 100).
 - El servidor maneja inventario, munición, cofres, recursos, estructuras, tormenta y muertes, y avisa a todos.
 - Ver [[Protocolo de red]] para la lista de mensajes.
+- **Cuentas, pavos, casino y tienda** (`server/`): el servidor decide todo (saldo, apuestas, resultados, premios y compras) y lo guarda en SQLite ([[db.js]]). El cliente habla con [[api.js]] por HTTP (`/api/*`) y el WebSocket solo lee la sesión al conectarse. Ver [[Cuentas y pavos]], [[Casino]] y [[Tienda y skins]].
 
 ## Mismo mundo en todos lados
 
@@ -35,7 +36,8 @@ public/models/*.glb ──► assets.js (loadAssets, cloneAsset, bakedParts)
 
 ## Dependencias entre módulos (imports)
 
-- [[server.js]] → [[world.js]], [[items.js]], [[autos.js]], `ws`
+- [[server.js]] → [[world.js]], [[items.js]], [[autos.js]], [[db.js]], [[cuentas.js]], [[casino.js]], [[tienda.js]], [[premios.js]], [[api.js]], `ws`
+- [[main.js]] → además [[cuenta.js]], [[lobby.js]], [[casino.js]], [[tienda.js]], [[anuncios.js]]
 - [[main.js]] → [[world.js]], [[assets.js]], [[models.js]], [[items.js]], [[audio.js]], [[rig.js]], [[caida.js]], [[manejar.js]]
 - [[manejar.js]] → [[autos.js]], [[models.js]], [[controles.js]], [[rig.js]]
 - [[caida.js]] → `three` (solo vectores; no toca la escena)

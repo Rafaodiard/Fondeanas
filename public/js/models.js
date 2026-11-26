@@ -1,6 +1,7 @@
 // Personajes, bus, paracaídas, armas y objetos: usa los GLB hechos en Blender y, si alguno no cargó, modelos low-poly procedurales de respaldo.
 import * as THREE from 'three';
 import { cloneAsset } from './assets.js';
+import { skinDe } from './skins.js';
 import { hasRig, createRigCharacter, animateRig, placeGlider, placeParachute, weaponRig, rigAction, rigStopAction, rigShot } from './rig.js';
 
 export { rigAction as weaponAction, rigStopAction as stopWeaponAction, rigShot as weaponShot };
@@ -15,13 +16,17 @@ function box(w, h, d, mat, x = 0, y = 0, z = 0) {
 }
 
 // Personaje articulado: el grupo raíz está en los pies, mira hacia -Z.
-export function createCharacter(color) {
+// skin: id del catálogo (skins.js) o la skin misma; tiñe la ropa y la vela. Sin skin usa el color de la sala.
+export function createCharacter(color, skin = null) {
+  const sk = typeof skin === 'string' ? skinDe(skin) : skin;
+  const tela = sk?.tela || sk?.ropa || color;
+  color = sk?.ropa || color;
   if (hasRig()) {
     const root = createRigCharacter(color);
-    const para = cloneAsset('paracaidas', null, { Tela: color });
+    const para = cloneAsset('paracaidas', null, { Tela: tela });
     if (para) placeParachute(root, para);
     else {
-      const glider = createGlider(color);
+      const glider = createGlider(tela);
       glider.visible = false;
       placeGlider(root, glider);
     }

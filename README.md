@@ -1,15 +1,54 @@
 # Salto Final
 
-Battle royale 3D para navegador: una isla con 10 pueblos distintos, bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica y salas privadas a las que se entra con un código.
+Battle royale 3D para navegador: una isla con 10 pueblos distintos, bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica y salas privadas a las que se entra con un código. Con cuentas, lobby 3D, **pavos** (la moneda del juego), casino y tienda de skins.
 
 ## Cómo jugar en tu compu
+
+Hace falta Node 22.13 o más nuevo (trae SQLite, que guarda las cuentas).
 
 ```bash
 npm install
 npm start
 ```
 
-Abrí http://localhost:3000, poné tu nombre y tocá **Crear sala**. Tus amigos entran con el código de 5 letras (o con el link `http://TU-IP:3000/?sala=CODIGO` si están en tu misma red). Para jugar por internet hay que subir el servidor a un hosting con Node y WebSockets (Render, Railway, Fly.io, etc.).
+Abrí http://localhost:3000, creá una cuenta (o tocá **Jugar sin cuenta**), y en el lobby tocá **Jugar** → **Crear sala**. Tus amigos entran con el código de 5 letras (o con el link `http://TU-IP:3000/?sala=CODIGO` si están en tu misma red). Para jugar por internet hay que subir el servidor a un hosting con Node y WebSockets (Render, Railway, Fly.io, etc.).
+
+Las cuentas se guardan en `datos/salto.db` (`SF_DB` cambia la ruta). En un hosting hay que montar un **disco persistente** en esa carpeta; si no, las cuentas se borran en cada deploy. Detrás de un proxy (Render, Railway...) arrancá con `SF_CONFIAR_PROXY=1` para que el servidor vea la IP real y sepa que va por HTTPS.
+
+## Cuentas, lobby y pavos
+
+- **Iniciar sesión / crear cuenta** con usuario y contraseña (usuario de 3 a 16 letras, números o `_`; contraseña de 8 o más). La contraseña se guarda con scrypt y la sesión dura 30 días en una cookie `HttpOnly`. Hay límite de intentos (10 por minuto) y de cuentas nuevas por conexión (5 por día).
+- **Jugar sin cuenta:** se juega igual, pero sin pavos: casino, tienda, casillero y anuncios aparecen con candado.
+- **Lobby 3D:** tu personaje sobre una plataforma (arrastrá para girarlo, y puede bailar), el bus volador pasando de fondo y tus pavos arriba. Desde ahí: Jugar, Casino, Tienda, Casillero, Ver anuncio y Configuración. Desde la sala de espera se puede volver al lobby.
+- **Pavos:**
+  - **1000** al crear la cuenta.
+  - **100 por cada eliminación** en una partida. Para que no se pueda farmear, no pagan: matarse a uno mismo, la tormenta o las caídas, una partida que empezó con un solo jugador, ni eliminar a un invitado de la misma IP. Además hay un tope de 2000 pavos por eliminaciones cada 24 horas. Eliminar a otra cuenta de la misma red (amigos en la misma casa) sí paga.
+  - **500 por ver un anuncio:** el espacio está listo (botón, tabla en la base y los valores) pero **todavía no está activado**; falta elegir el proveedor de anuncios. Ver `server/premios.js` y `public/js/anuncios.js`.
+- Los pavos **no se compran con plata ni se cambian por nada**: son solo del juego.
+
+## Casino
+
+Cada uno juega solo contra la casa. El azar sale del servidor (`crypto.randomInt`) y cada apuesta y premio queda registrado; el navegador solo anima. Apuesta de 10 a 500 pavos por jugada.
+
+- **Ruleta europea** (un solo 0): rueda dibujada con el orden real de los números y la bola que cae donde salió. Pleno (paga 35 a 1), rojo/negro, par/impar, 1-18/19-36 (1 a 1), docenas y columnas (2 a 1); varias fichas por tirada, deshacer, borrar y repetir. Devuelve el 97,3 %.
+- **Blackjack:** zapato de 6 barajas que se mezcla cuando queda un cuarto, el crupier se planta en 17 (también en 17 blando), blackjack paga 3 a 2, doblar con las dos primeras cartas (también después de dividir) y dividir una vez. La mano queda guardada en el servidor: si recargás la página, se retoma. Con estrategia básica devuelve el 99,4 %. Teclas: H pedir, S plantarse, D doblar, P dividir.
+- **Tragamonedas** "Salto de la Fortuna": tres rodillos con símbolos del juego (bus, cohete, cofre, paracaídas, pico y escudo). Tres iguales pagan de ×5 a ×500; dos cofres en cualquier lugar ×5 y uno solo devuelve la apuesta. Devuelve el 95,4 %.
+
+Las pruebas revisan los pagos, los casos raros (blackjack contra blackjack, ases divididos, 17 blando...) y el retorno de cada juego con un millón de jugadas:
+
+```bash
+node tools/casino/pruebas.mjs
+```
+
+## Tienda y casillero
+
+Las pantallas están, pero **todavía no hay skins**: se ven los espacios vacíos con "Próximamente". Comprar y ponerse una skin ya funciona en el servidor (lo prueban las pruebas de cuentas con una skin de prueba). Para agregar skins se suman a `public/js/skins.js` (el formato está explicado ahí). El personaje ya sabe teñirse con la skin, y los demás jugadores la ven en la partida.
+
+Las pruebas de cuentas, saldo, eliminaciones y tienda (levantan el servidor en un puerto libre y prueban la API y el WebSocket):
+
+```bash
+node --disable-warning=ExperimentalWarning tools/cuentas/pruebas.mjs
+```
 
 ## El mapa
 
@@ -142,7 +181,19 @@ node tools/controles/pruebas.mjs
 
 ## Estructura
 
-- `server.js`: servidor HTTP + WebSocket. Maneja salas por código, el recorrido del bus, la tormenta, la vida, el daño, las piezas del mapa que se rompen y quién gana.
+- `server.js`: servidor HTTP + WebSocket. Maneja salas por código, el recorrido del bus, la tormenta, la vida, el daño, las piezas del mapa que se rompen y quién gana. Lee la sesión de la cuenta al conectarse el WebSocket y paga los pavos por eliminación.
+- `server/db.js`: base SQLite (`node:sqlite`): usuarios, sesiones, skins compradas, movimientos de pavos, la mano de blackjack de cada uno y la tabla de anuncios (sin usar todavía). Todo cambio de saldo pasa por una transacción que nunca lo deja negativo.
+- `server/cuentas.js`: registro, inicio de sesión, sesiones en cookie y límites de intentos.
+- `server/api.js`: las rutas `/api/*` (cuentas, casino, tienda).
+- `server/casino.js`: el casino del lado del servidor (azar, apuestas y premios).
+- `server/tienda.js`: compra de skins y casillero.
+- `server/premios.js`: pavos por eliminación (con las reglas contra el farmeo) y el espacio para los anuncios con premio.
+- `public/js/casino/`: reglas de la ruleta, el blackjack y el tragamonedas (las usan el servidor y el cliente).
+- `public/js/cuenta.js`: pantalla de cuenta, estado de la sesión y los pavos, y el cliente de la API.
+- `public/js/lobby.js`: el lobby 3D.
+- `public/js/casino.js` y `public/js/mesas/`: la interfaz del casino (rueda, paño, cartas, rodillos y fichas).
+- `public/js/tienda.js` y `public/js/skins.js`: tienda y casillero, y el catálogo de skins (vacío).
+- `public/js/anuncios.js`: interfaz de los anuncios con premio (sin activar).
 - `public/js/world.js`: arma la isla (terreno, pueblos, rutas, río, árboles, rocas, cofres y agua) igual en el servidor y en todos los clientes, y mueve al jugador contra el mapa en pasos chicos (piso, techo y paredes).
 - `public/js/isla.js`: diseño de la isla: pueblos con sus calles y estructuras, rutas (con el remate de cada punta que no llega a otra calle), río, teleférico y lugares chicos entre pueblos.
 - `public/js/planos.js`: planos de todas las estructuras (casas, edificios, faro, grúa, granero, cúpula, etc.). De la misma lista de piezas salen lo que se ve, lo que choca y las piezas que se rompen.

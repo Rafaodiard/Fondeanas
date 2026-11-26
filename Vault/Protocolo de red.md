@@ -7,6 +7,7 @@ WebSocket sobre el mismo servidor HTTP de [[server.js]]. Cada mensaje es un JSON
 ## Cliente → servidor
 
 Antes de estar en una sala:
+- Al conectarse, el servidor lee la cookie `sf_sesion`: con cuenta, el nombre es el de la cuenta (se ignora `name`) y la skin puesta va en `skin`; sin cuenta es invitado. Ver [[Cuentas y pavos]].
 - `create` (con `name`): crea una sala y entra como anfitrión.
 - `join` (con `code`, `name`): entra a una sala existente. Errores: sala inexistente o llena (máximo 16).
 
@@ -27,8 +28,14 @@ Durante la partida (los maneja `handleGame` en [[server.js]]):
 
 Los procesa `handle(m)` en [[main.js]]:
 
-`error`, `welcome`, `room`, `matchStart`, `phase`, `forceJump`, `jumped`, `state`, `shot`, `swing`, `boom`, `hitConfirm`, `inv`, `itemsAdd`, `itemsDel`, `chestOpen`, `resHit`, `resGone`, `structAdd`, `structDel` (con `caidas`: las que se cayeron sin apoyo), `structHp`, `structEdit`, `pzRota`, `chestMove`, `death`, `matchEnd`, `left`, `chat`, y los de los autos (los procesa [[manejar.js]]): `auto` (estado de un auto, a todos menos al que lo simula), `autoSeats` (`a`, `seats`, `ctrl`: quién va en cada asiento y quién simula el auto), `autoHp`, `autoBoom` (explotó), `bocina`, y `empujon` (`v`: al que atropellaron, sale volando con esa velocidad).
+`pavos` (`saldo`, `delta`, `motivo`: pavos ganados en la partida, por ahora por eliminación), `error`, `welcome`, `room`, `matchStart`, `phase`, `forceJump`, `jumped`, `state`, `shot`, `swing`, `boom`, `hitConfirm`, `inv`, `itemsAdd`, `itemsDel`, `chestOpen`, `resHit`, `resGone`, `structAdd`, `structDel` (con `caidas`: las que se cayeron sin apoyo), `structHp`, `structEdit`, `pzRota`, `chestMove`, `death`, `matchEnd`, `left`, `chat`, y los de los autos (los procesa [[manejar.js]]): `auto` (estado de un auto, a todos menos al que lo simula), `autoSeats` (`a`, `seats`, `ctrl`: quién va en cada asiento y quién simula el auto), `autoHp`, `autoBoom` (explotó), `bocina`, y `empujon` (`v`: al que atropellaron, sale volando con esa velocidad).
 
 - `inv` lleva vida, escudo, slots, munición y materiales del jugador (lo arma `invMsg` en el servidor).
 - `matchStart` y `welcome` (si la partida ya empezó) llevan un snapshot de la partida (`matchSnapshot`), con las piezas del mapa ya rotas (`piezas`) y los cofres que bajaron (`cofresMovidos`), y los autos (`autos`: posición, vida, si está roto, asientos y color).
 - `pzRota` (`ids`): piezas del mapa que se rompieron; la primera es la que recibió el golpe y las demás se cayeron por quedar sin apoyo. `chestMove` (`idx`, `y`): un cofre bajó porque se rompió el piso donde estaba.
+
+## HTTP (`/api/*`)
+
+Cuentas, casino y tienda van por HTTP, no por el WebSocket. Lista de rutas en [[api.js]].
+
+Los jugadores en `room.players` (`publicPlayer`) llevan además `skin` (id o `null`) y `cuenta` (true si entró con cuenta).

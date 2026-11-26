@@ -17,6 +17,11 @@ import { accionesDe, activa, presionar, soltar, soltarTodo, teclaDe, listaAccion
 import { abrirConfig, cerrarConfig, abierto as configAbierta } from './configuracion.js';
 import { crearConstruccion } from './construir.js';
 import { crearManejo } from './manejar.js';
+import { estado as cuenta, cargarCuenta, conCuenta, salir as salirCuenta, montarPantallaCuenta, alCambiarCuenta, ponerSaldo, fmt, MONEDA } from './cuenta.js';
+import { crearLobby } from './lobby.js';
+import { montarCasino } from './casino.js';
+import { montarTienda } from './tienda.js';
+import { disponible as anunciosDisponibles } from './anuncios.js';
 
 const GRAVITY = 25, WALK = 6, SPRINT = 9.5, AIM_WALK = 3.5, JUMP = 8.5, SWIM_Y = -1.3;
 const PICKUP_RANGE = 3;
@@ -35,14 +40,9 @@ const ui = {
   autohud: $('autohud'), autovel: $('autovel'), autovida: $('autovida'), autoturbo: $('autoturbo'), autohint: $('autohint'),
 };
 ui.name.value = storageGet('br-name') || '';
-// Modelos de Blender: se cargan antes de habilitar el menú.
-const btns = [$('btnCreate'), $('btnJoin')];
-btns.forEach((b) => { b.disabled = true; });
-ui.menuError.textContent = 'Cargando modelos…';
-await loadAssets((k) => { ui.menuError.textContent = `Cargando modelos… ${Math.round(k * 100)}%`; });
+// Modelos de Blender: se cargan antes de mostrar la pantalla de cuenta y el lobby.
+await loadAssets((k) => { $('cargaTexto').textContent = `Cargando modelos… ${Math.round(k * 100)}%`; $('cargaFill').style.width = `${Math.round(k * 100)}%`; });
 MODEL.clone = cloneAsset; MODEL.baked = bakedParts; MODEL.cofre = createChest; MODEL.abrirCofre = abrirCofre;
-btns.forEach((b) => { b.disabled = false; });
-ui.menuError.textContent = '';
 function storageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function storageSet(k, v) { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } }
 
@@ -185,17 +185,49 @@ function connect(onOpen) {
   ws = new WebSocket(`${proto}://${location.host}`);
   ws.onopen = onOpen;
   ws.onmessage = (e) => handle(JSON.parse(e.data));
+  const este = ws;
   ws.onclose = () => {
-    if (myId) showCenter('Se perdió la conexión con el servidor', 'Recargá la página para volver a entrar');
-    else ui.menuError.textContent = 'No se pudo conectar con el servidor.';
+    if (este !== ws) return; // una conexión vieja que se cerró a propósito
+    ws = null;
+    if (myId && room && room.phase !== 'lobby' && !ui.hud.classList.contains('hidden')) {
+      showCenter('Se perdió la conexión con el servidor', 'Recargá la página para volver a entrar');
+      return;
+    }
+    // en la sala de espera o en el menú: volver al menú de salas con el aviso
+    const estaba = !!myId;
+    dejarSala();
+    mostrarMenu();
+    ui.menuError.textContent = ultimoError || (estaba ? 'Se perdió la conexión con el servidor.' : 'No se pudo conectar con el servidor.');
+    ultimoError = '';
   };
+}
+let ultimoError = '';
+// Corta la conexión (la sesión de la cuenta se lee al conectar, así que al cambiar de cuenta hay que reconectar).
+function desconectar() {
+  if (!ws) return;
+  const v = ws; ws = null;
+  v.onclose = null; v.close();
+}
+// Sale de la sala sin recargar: olvida la sala, los demás y el loot (el mundo queda armado para la próxima).
+function dejarSala() {
+  desconectar();
+  myId = null; room = null;
+  for (const id of [...others.keys()]) removeOther(id);
+  for (const it of items.values()) scene.remove(it.mesh);
+  items.clear();
+  me.state = 'lobby';
+  if (me.mesh) me.mesh.visible = false;
+  if (bus) bus.visible = false;
+  stormMesh.visible = false;
+  ui.hud.classList.add('hidden');
+  document.exitPointerLock?.();
 }
 function sendMsg(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); }
 
 function enter(type) {
   sfx.unlock();
-  const name = ui.name.value.trim() || 'Jugador';
-  storageSet('br-name', name);
+  const name = conCuenta() ? cuenta.cuenta.usuario : ui.name.value.trim() || 'Jugador';
+  if (!conCuenta()) { storageSet('br-name', name); cuenta.invitado = name; }
   const code = ui.code.value.trim().toUpperCase();
   if (type === 'join' && code.length < 4) { ui.menuError.textContent = 'Escribí el código de la sala.'; return; }
   ui.menuError.textContent = '';
@@ -207,13 +239,98 @@ $('btnJoin').onclick = () => enter('join');
 ui.code.addEventListener('keydown', (e) => { if (e.key === 'Enter') enter('join'); });
 ui.btnStart.onclick = () => sendMsg({ t: 'start' });
 ui.roomCode.onclick = () => navigator.clipboard?.writeText(room.code).catch(() => {});
-const urlCode = new URLSearchParams(location.search).get('sala');
+let urlCode = new URLSearchParams(location.search).get('sala');
 if (urlCode) ui.code.value = urlCode.toUpperCase();
+
+// ---------- Cuenta, lobby 3D, casino y tienda ----------
+const COLOR_LOBBY = '#3fa7ff';
+const lobby3d = crearLobby({ renderer, canvas });
+const pantallaCuenta = montarPantallaCuenta({ raiz: $('cuenta'), alListo: mostrarInicio, guardar: storageSet, leer: storageGet, sfx });
+const casino = montarCasino({ raiz: $('casino'), sfx });
+const tienda = montarTienda({ raiz: $('tienda'), sfx, alCambiarSkin: (id) => lobby3d.ponerPersonaje(COLOR_LOBBY, id) });
+const PANTALLAS = ['carga', 'cuenta', 'inicio', 'menu', 'lobby'];
+function pantalla(nombre) {
+  for (const p of PANTALLAS) $(p).classList.toggle('hidden', p !== nombre);
+  lobby3d.activo = nombre === 'inicio';
+}
+let skinLobby;
+function pintarInicio() {
+  const c = cuenta.cuenta;
+  $('iniSaldo').innerHTML = c ? `${MONEDA}<b>${fmt(c.pavos)}</b>` : '<span class="invitado-chip">Invitado</span>';
+  $('iniUsuario').textContent = c ? c.usuario : cuenta.invitado || '';
+  $('btnSalirCuenta').textContent = c ? 'Cerrar sesión' : 'Iniciar sesión';
+  document.querySelectorAll('#inicio [data-cuenta]').forEach((b) => b.classList.toggle('bloqueado', !c));
+  $('btnAnuncio').disabled = !anunciosDisponibles();
+  $('hudPavos').classList.toggle('hidden', !c);
+  if (c) $('hudPavos').innerHTML = `${MONEDA} ${fmt(c.pavos)}`;
+  const skin = c?.skin || null;
+  if (skin !== skinLobby) { skinLobby = skin; lobby3d.ponerPersonaje(COLOR_LOBBY, skin); }
+}
+alCambiarCuenta((_, extra) => {
+  pintarInicio();
+  // cambió la cuenta (no solo el saldo): la conexión vieja tiene la sesión anterior
+  if (!extra?.saldo && !room) desconectar();
+});
+function mostrarInicio() {
+  sfx.unlock();
+  pantalla('inicio');
+  pintarInicio();
+  $('iniAviso').textContent = '';
+  if (urlCode) { urlCode = null; mostrarMenu(); }
+}
+function mostrarMenu() {
+  pantalla('menu');
+  $('menuNombre').classList.toggle('hidden', conCuenta());
+  if (!conCuenta() && cuenta.invitado) ui.name.value = cuenta.invitado;
+  $('menuComo').innerHTML = conCuenta() ? `Jugás como <b>${escapeHtml(cuenta.cuenta.usuario)}</b> · ${MONEDA} ${fmt(cuenta.pavosPorKill)} por eliminación` : 'Jugás como invitado (sin pavos).';
+}
+let avisoT = 0;
+function avisoInicio(txt) {
+  $('iniAviso').textContent = txt;
+  clearTimeout(avisoT); avisoT = setTimeout(() => { $('iniAviso').textContent = ''; }, 3000);
+}
+function soloCuenta(fn) {
+  return () => {
+    sfx.click();
+    if (!conCuenta()) { avisoInicio('Creá una cuenta (o iniciá sesión) para usar esto.'); return; }
+    fn();
+  };
+}
+$('btnJugar').onclick = () => { sfx.click(); mostrarMenu(); };
+$('btnCasino').onclick = soloCuenta(() => { lobby3d.activo = false; casino.abrir('ruleta', () => { lobby3d.activo = true; }); });
+$('btnTienda').onclick = soloCuenta(() => tienda.abrir('tienda'));
+$('btnCasillero').onclick = soloCuenta(() => tienda.abrir('casillero'));
+$('btnAnuncio').onclick = soloCuenta(() => avisoInicio('Los anuncios con premio llegan pronto.'));
+$('btnBailar').onclick = () => { lobby3d.bailar = !lobby3d.bailar; $('btnBailar').classList.toggle('activo', lobby3d.bailar); };
+$('btnConfigInicio').onclick = () => abrirConfig();
+$('btnSalirCuenta').onclick = async () => {
+  sfx.click();
+  if (conCuenta()) await salirCuenta();
+  desconectar();
+  pantalla('cuenta');
+  pantallaCuenta.mostrar('login');
+};
+$('btnVolverMenu').onclick = () => { sfx.click(); ui.menuError.textContent = ''; desconectar(); mostrarInicio(); };
+$('btnSalirSala').onclick = () => { sfx.click(); dejarSala(); mostrarInicio(); };
+
+// Arranque: con sesión guardada va directo al lobby; si no, a la pantalla de cuenta.
+await cargarCuenta();
+if (conCuenta()) mostrarInicio();
+else { pantalla('cuenta'); pantallaCuenta.mostrar(storageGet('sf-usuario') ? 'login' : 'registro'); }
 
 function handle(m) {
   if (m.t.startsWith('auto') || m.t === 'bocina') { if (world) autos.mensaje(m); return; }
   switch (m.t) {
-    case 'error': ui.menuError.textContent = m.message; break;
+    case 'error': ui.menuError.textContent = m.message; ultimoError = m.message; break;
+    case 'pavos': {
+      // pavos ganados en la partida (por ahora, por eliminación)
+      ponerSaldo(m.saldo, m.delta);
+      const t = $('pavosToast');
+      t.innerHTML = `+${fmt(m.delta)} ${MONEDA}`;
+      t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+      sfx.monedas();
+      break;
+    }
     case 'welcome':
       myId = m.id;
       setRoom(m.room);
@@ -358,10 +475,10 @@ function setRoom(r) {
   const ids = new Set(r.players.map((p) => p.id));
   for (const id of [...others.keys()]) if (!ids.has(id)) removeOther(id);
   for (const p of r.players) {
-    if (p.id === myId) { me.kills = p.kills; me.color = p.color; me.name = p.name; continue; }
+    if (p.id === myId) { me.kills = p.kills; me.color = p.color; me.name = p.name; me.skin = p.skin; continue; }
     let o = others.get(p.id);
     if (!o) {
-      const mesh = createCharacter(p.color);
+      const mesh = createCharacter(p.color, p.skin);
       const tag = createNameTag(p.name, p.color);
       mesh.add(tag);
       mesh.visible = false;
@@ -420,9 +537,8 @@ function removeItem(id) {
 
 // ---------- Pantallas ----------
 function showLobby() {
-  ui.menu.classList.add('hidden');
+  pantalla('lobby');
   ui.hud.classList.add('hidden');
-  ui.lobby.classList.remove('hidden');
   me.state = 'lobby';
   if (me.mesh) me.mesh.visible = false;
   for (const o of others.values()) o.mesh.visible = false;
@@ -439,8 +555,7 @@ function showLobby() {
 }
 
 function setupMatch(snap) {
-  ui.lobby.classList.add('hidden');
-  ui.menu.classList.add('hidden');
+  pantalla(null);
   ui.hud.classList.remove('hidden');
   ui.killfeed.innerHTML = '';
   cons.cancelar();
@@ -451,7 +566,7 @@ function setupMatch(snap) {
   me.vel.set(0, 0, 0);
   me.yaw = Math.atan2(-(room.bus.to[0] - room.bus.from[0]), -(room.bus.to[2] - room.bus.from[2]));
   if (me.mesh) scene.remove(me.mesh);
-  me.mesh = createCharacter(me.color || '#ffffff');
+  me.mesh = createCharacter(me.color || '#ffffff', me.skin);
   me.mesh.visible = false;
   scene.add(me.mesh);
   for (const o of others.values()) { o.state = 'bus'; o.mesh.visible = false; o.seen = false; }
@@ -1432,6 +1547,8 @@ function frame() {
   }
   updateEffects(dt);
   updateCamera(dt, t);
+  // sin sala (cuenta, lobby 3D, menú, casino, tienda): se dibuja el lobby 3D
+  if (!room) { lobby3d.render(dt); return; }
   const focus = ['ground', 'glider', 'falling', 'auto'].includes(me.state) ? me.pos : camera.position;
   sun.target.position.copy(focus);
   sun.position.copy(focus).addScaledVector(SUN_DIR, 300);

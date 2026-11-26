@@ -1,6 +1,6 @@
 # Salto Final · Inicio
 
-Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]), autos que se manejan ([[Autos]]), bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica y salas privadas a las que se entra con un código de 5 letras.
+Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]), autos que se manejan ([[Autos]]), bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica y salas privadas a las que se entra con un código de 5 letras. Con cuentas, lobby 3D, pavos, casino y tienda de skins ([[Cuentas y pavos]], [[Casino]], [[Tienda y skins]]).
 
 - Repo: https://github.com/Rafaodiard/Fondeanas
 - Stack: Node (`server.js` con `ws`) + Three.js 0.170 como ES modules sin bundler. `npm start` levanta todo en el puerto 3000 (`PORT` lo cambia).
@@ -8,7 +8,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 
 ## Planes
 
-- [[Cuentas, lobby, casino y tienda]]: login, lobby, pavos, casino y tienda de skins (sin implementar).
+- [[Cuentas, lobby, casino y tienda]]: login, lobby, pavos, casino y tienda de skins (hecho el 2026-11-26, salvo los anuncios y las skins).
 
 ## Cómo está armado
 
@@ -41,6 +41,16 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 | [[configuracion.js]] | `public/js/configuracion.js` | Panel de configuración: Juego, Video, Sonido y Controles |
 | [[autos.js]] | `public/js/autos.js` | Autos: medidas, asientos, física de manejo, choques y estado de red (compartido) |
 | [[manejar.js]] | `public/js/manejar.js` | Los autos en el juego: manejar, autos de los demás, subir y bajar, gente sentada, HUD y sonidos |
+| [[cuenta.js]] | `public/js/cuenta.js` | Pantalla de cuenta, sesión, saldo de pavos y cliente de la API |
+| [[lobby.js]] | `public/js/lobby.js` | Lobby 3D con el personaje |
+| [[casino.js]] | `public/js/casino.js`, `public/js/mesas/`, `server/casino.js` | Casino: ruleta, blackjack y tragamonedas (reglas en `public/js/casino/`) |
+| [[tienda.js]] | `public/js/tienda.js`, `server/tienda.js` | Tienda y casillero |
+| [[skins.js]] | `public/js/skins.js` | Catálogo de skins (vacío) |
+| [[anuncios.js]] | `public/js/anuncios.js` | Anuncios con premio (sin activar) |
+| [[db.js]] | `server/db.js` | Base SQLite: cuentas, sesiones, movimientos de pavos |
+| [[cuentas.js]] | `server/cuentas.js` | Registro, login, sesiones y límites |
+| [[api.js]] | `server/api.js` | Rutas `/api/*` |
+| [[premios.js]] | `server/premios.js` | Pavos por eliminación y espacio de los anuncios |
 
 ## Pantallas
 

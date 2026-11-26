@@ -166,4 +166,17 @@ export const sfx = {
   puerta() { burst({ dur: 0.09, freq: 900, q: 1.5, vol: 0.6, type: 'bandpass' }); tone({ f1: 160, f2: 90, dur: 0.1, vol: 0.25, type: 'sine', delay: 0.03 }); },
   turbo() { burst({ dur: 0.45, freq: 2200, q: 0.4, vol: 0.4, type: 'highpass' }); },
   click() { tone({ f1: 1200, f2: 1100, dur: 0.03, vol: 0.12, type: 'square' }); },
+  // casino (public/js/casino.js)
+  ficha() { burst({ dur: 0.04, freq: 3200, q: 4, vol: 0.5, type: 'bandpass' }); tone({ f1: 2400, f2: 2200, dur: 0.04, vol: 0.08, type: 'triangle', delay: 0.01 }); },
+  carta() { burst({ dur: 0.07, freq: 2600, q: 0.9, vol: 0.45, type: 'bandpass' }); },
+  bola(v = 1) { tone({ f1: 2600, f2: 2400, dur: 0.018, vol: 0.06 * v, type: 'triangle' }); },
+  bolaCae() { [0, 0.09, 0.16, 0.21].forEach((d, i) => tone({ f1: 1900 - i * 150, f2: 1700 - i * 150, dur: 0.03, vol: 0.12 - i * 0.02, type: 'triangle', delay: d })); },
+  rodillo() { burst({ dur: 0.06, freq: 500, q: 2, vol: 0.7, type: 'bandpass' }); tone({ f1: 140, f2: 90, dur: 0.08, vol: 0.2, type: 'sine' }); },
+  girarRodillos() { burst({ dur: 0.2, freq: 1500, q: 0.7, vol: 0.25, type: 'bandpass' }); },
+  ganar(grande = false) {
+    const notas = grande ? [523, 659, 784, 1046, 1318, 1568] : [659, 784, 1046];
+    notas.forEach((f, i) => tone({ f1: f, f2: f, dur: grande ? 0.22 : 0.16, vol: 0.16, type: 'triangle', delay: i * (grande ? 0.09 : 0.08) }));
+  },
+  perder() { tone({ f1: 330, f2: 220, dur: 0.28, vol: 0.12, type: 'triangle' }); },
+  monedas() { for (let i = 0; i < 6; i++) tone({ f1: 1800 + i * 120, f2: 2100 + i * 120, dur: 0.05, vol: 0.09, type: 'square', delay: i * 0.05 }); },
 };

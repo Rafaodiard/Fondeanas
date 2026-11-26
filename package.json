@@ -4,7 +4,7 @@
   "description": "Battle royale 3D multijugador para navegador",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node --disable-warning=ExperimentalWarning server.js"
   },
   "keywords": [],
   "author": "",
@@ -14,7 +14,7 @@
     "ws": "^8.18.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.13"
   },
   "type": "module"
 }

@@ -7,7 +7,8 @@ Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.
 ## Qué hace
 
 1. **HTTP estático**: sirve `public/` en `/` y `node_modules/three/` en `/vendor/three/` (lo usa el import map de [[index.html]]).
-2. **WebSocket** (`ws`) sobre el mismo servidor: salas, partida y chat. Ver [[Protocolo de red]].
+2. **WebSocket** (`ws`) sobre el mismo servidor: salas, partida y chat. Ver [[Protocolo de red]]. Lee la sesión de la cuenta al conectarse y, en `killPlayer`, paga los pavos por eliminación ([[premios.js]]).
+2. **API** `/api/*` ([[api.js]]): cuentas, casino y tienda, con la base de [[db.js]].
 3. **Tick** cada 100 ms (`TICK_MS`): pasa de `bus` a `playing`, fuerza el salto cuando termina el recorrido del bus y aplica la [[Tormenta]].
 
 ## Constantes

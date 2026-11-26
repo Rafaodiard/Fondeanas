@@ -22,4 +22,4 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 - [[Caminos prolijos]]: ninguna calle se corta de golpe; remates y la prueba de caminos.
 - [[Autos funcionales]]: el pedido de autos manejables y qué se decidió (teclas, asientos, quién simula).
 - [[Caída, paracaídas y deslizarse]]: el pedido de la caída libre con más control, el paracaídas con altura límite y deslizarse.
-- [[Cuentas, casino y tienda]]: pedido de login, lobby, 1000 pavos, casino y tienda de skins (plan en [[Cuentas, lobby, casino y tienda]], sin implementar).
+- [[Cuentas, casino y tienda]]: pedido de login, lobby, 1000 pavos, casino y tienda de skins (plan en [[Cuentas, lobby, casino y tienda]]; hecho salvo anuncios y skins).

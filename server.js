@@ -12,6 +12,12 @@ import {
 } from './public/js/items.js';
 import { TIPOS, normalizar, tieneApoyo, sinApoyo, vidaDe, editValida, OBRA, ALCANCE_EDICION, cajaPieza } from './public/js/construccion.js';
 import { AUTO, nuevoAuto, aplicarRed, estadoRed, autoPublico, asientoLibre, rapidez } from './public/js/autos.js';
+import { abrirDB } from './server/db.js';
+import { crearCuentas, leerCookies, COOKIE, ipDe, origenValido } from './server/cuentas.js';
+import { crearCasino } from './server/casino.js';
+import { crearTienda } from './server/tienda.js';
+import { crearPremios } from './server/premios.js';
+import { crearApi } from './server/api.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -24,6 +30,15 @@ const PICKUP_RANGE = 3.2;
 // Sólo para probar la construcción: SF_MATS=500 npm start arranca cada partida con 500 de cada material.
 const MATS_INICIALES = Math.max(0, Math.min(MAX_MATS, Number(process.env.SF_MATS) || 0));
 
+// ---------- Cuentas, pavos, casino y tienda (server/) ----------
+const base = abrirDB();
+const cuentas = crearCuentas(base);
+const casino = crearCasino(base);
+const tienda = crearTienda(base);
+const premios = crearPremios(base);
+const api = crearApi({ cuentas, casino, tienda, base });
+setInterval(() => cuentas.limpiarVencidas(), 3600e3).unref();
+
 // ---------- HTTP estático ----------
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -33,8 +48,10 @@ const ROOTS = {
   '/vendor/three/': path.join(__dirname, 'node_modules/three/'),
   '/': path.join(__dirname, 'public/'),
 };
-const server = http.createServer((req, res) => {
-  let url = decodeURIComponent(req.url.split('?')[0]);
+const server = http.createServer(async (req, res) => {
+  let url;
+  try { url = decodeURIComponent(req.url.split('?')[0]); } catch { res.writeHead(400); return res.end(); }
+  if (await api(req, res, url)) return;
   if (url === '/') url = '/index.html';
   for (const [prefix, dir] of Object.entries(ROOTS)) {
     if (!url.startsWith(prefix)) continue;
@@ -78,7 +95,7 @@ function broadcast(room, msg, exceptId) {
   const data = JSON.stringify(msg);
   for (const p of room.players.values()) if (p.id !== exceptId && p.ws.readyState === 1) p.ws.send(data);
 }
-const publicPlayer = (p) => ({ id: p.id, name: p.name, color: p.color, alive: p.alive, kills: p.kills, state: p.state });
+const publicPlayer = (p) => ({ id: p.id, name: p.name, color: p.color, skin: p.skin || null, cuenta: !!p.cuenta, alive: p.alive, kills: p.kills, state: p.state });
 
 function roomInfo(room) {
   return {
@@ -132,6 +149,7 @@ function spawnAround(room, list, x, y, z) {
 
 function startMatch(room) {
   room.phase = 'bus';
+  room.jugadoresAlEmpezar = room.players.size; // para los pavos por eliminación (server/premios.js)
   room.winner = null;
   room.world = new World(room.seed, ISLAND_SIZE);
   room.items = new Map();
@@ -223,7 +241,12 @@ function killPlayer(room, victim, killer, cause) {
   if (!victim.alive) return;
   if (victim.auto) bajarDelAuto(room, victim);
   victim.alive = false; victim.hp = 0; victim.shield = 0; victim.state = 'dead';
-  if (killer && killer !== victim) killer.kills++;
+  if (killer && killer !== victim) {
+    killer.kills++;
+    // pavos por eliminación (solo cuentas; reglas contra el farmeo en server/premios.js)
+    const pago = premios.pagarKill(killer, victim, room.jugadoresAlEmpezar);
+    if (pago.delta > 0) send(killer.ws, { t: 'pavos', saldo: pago.saldo, delta: pago.delta, motivo: 'kill' });
+  }
   // Tira todo lo que tenía.
   const drops = victim.slots.filter(Boolean);
   for (const [a, n] of Object.entries(victim.ammo)) if (n > 0) drops.push({ kind: 'ammo', a, count: n });
@@ -774,10 +797,14 @@ function derrumbar(room) {
 }
 
 // ---------- WebSocket ----------
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ server, verifyClient: ({ req }) => origenValido(req) });
+const conectadas = new Map(); // id de cuenta -> ws en una sala (una cuenta juega en una sola sala a la vez)
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   let player = null;
+  // la sesión viaja en la cookie; sin sesión válida se juega como invitado
+  const cuenta = cuentas.deToken(leerCookies(req.headers.cookie)[COOKIE]);
+  const ip = ipDe(req);
   let room = null;
 
   ws.on('message', (raw) => {
@@ -793,10 +820,17 @@ wss.on('connection', (ws) => {
         if (!room) return send(ws, { t: 'error', message: 'No existe una sala con ese código.' });
         if (room.players.size >= MAX_PLAYERS) { room = null; return send(ws, { t: 'error', message: 'La sala está llena.' }); }
       }
-      const name = String(msg.name || 'Jugador').replace(/[<>]/g, '').slice(0, 16) || 'Jugador';
+      const name = cuenta ? cuenta.usuario : String(msg.name || 'Jugador').replace(/[<>]/g, '').slice(0, 16) || 'Jugador';
+      if (cuenta) {
+        // si la cuenta ya estaba en otra sala (otra pestaña), esa conexión se cierra
+        const vieja = conectadas.get(cuenta.id);
+        if (vieja && vieja !== ws) { send(vieja, { t: 'error', message: 'Entraste con tu cuenta desde otro lado.' }); vieja.close(); }
+        conectadas.set(cuenta.id, ws);
+      }
       const used = new Set([...room.players.values()].map((p) => p.color));
       player = {
         id: nextId++, ws, name, color: COLORS.find((c) => !used.has(c)) || COLORS[0],
+        cuenta, ip, skin: cuenta ? tienda.puesta(cuenta.id) : null,
         hp: 100, shield: 0, alive: room.phase === 'lobby', kills: 0,
         state: room.phase === 'lobby' ? 'lobby' : 'dead', pos: [0, 0, 0],
         slots: Array(SLOTS).fill(null), ammo: { ligera: 0, media: 0, pesada: 0, cartuchos: 0, cohetes: 0 }, mats: { madera: 0, piedra: 0, metal: 0 },
@@ -821,6 +855,7 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
+    if (cuenta && conectadas.get(cuenta.id) === ws) conectadas.delete(cuenta.id);
     if (!player || !room) return;
     if (player.auto) bajarDelAuto(room, player);
     for (const a of room.autos) if (a.ctrl === player.id) { a.ctrl = null; a.vx = a.vy = a.vz = 0; broadcast(room, { t: 'auto', a: a.id, ...estadoRed(a) }); }

@@ -5,19 +5,76 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Salto Final</title>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="lobby.css">
 <script type="importmap">
   { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
 </script>
 </head>
 <body>
 <canvas id="game"></canvas>
+<!-- degradado de la moneda de pavo (cuenta.js: MONEDA) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><radialGradient id="pavoOro" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff6b0"/><stop offset=".45" stop-color="#ffd23f"/><stop offset="1" stop-color="#d98a00"/></radialGradient></defs></svg>
 
-<!-- Menú principal -->
-<div id="menu" class="screen">
+<!-- Cargando -->
+<div id="carga" class="screen"><div class="panel carga"><h1>SALTO FINAL</h1><p id="cargaTexto" class="sub">Cargando modelos…</p><div class="carga-barra"><i id="cargaFill"></i></div></div></div>
+
+<!-- Cuenta: iniciar sesión, crear cuenta o jugar sin cuenta (cuenta.js) -->
+<div id="cuenta" class="screen hidden">
+  <div class="panel cuenta-panel">
+    <h1>SALTO FINAL</h1>
+    <div class="tabs" role="tablist">
+      <button type="button" data-modo="login" class="activo">Iniciar sesión</button>
+      <button type="button" data-modo="registro">Crear cuenta</button>
+    </div>
+    <form id="cuentaForm" autocomplete="on">
+      <label>Usuario <input id="cuentaUsuario" name="username" maxlength="16" autocomplete="username" required pattern="[A-Za-z0-9_]{3,16}" title="De 3 a 16 letras, números o guiones bajos"></label>
+      <label>Contraseña <input id="cuentaPass" name="password" type="password" maxlength="128" minlength="8" required></label>
+      <label class="solo-registro">Repetí la contraseña <input id="cuentaPass2" type="password" maxlength="128" autocomplete="new-password"></label>
+      <p class="solo-registro bono">Al crear tu cuenta recibís <b>1.000 pavos</b> de regalo.</p>
+      <button id="cuentaEnviar" class="primary" type="submit">Entrar</button>
+      <p id="cuentaError" class="error"></p>
+    </form>
+    <div class="separador"><span>o</span></div>
+    <div class="invitado">
+      <div class="row"><input id="invitadoNombre" maxlength="16" placeholder="Tu nombre" aria-label="Tu nombre para jugar sin cuenta"><button id="btnInvitado" type="button">Jugar sin cuenta</button></div>
+      <p class="hint">Sin cuenta podés jugar partidas, pero no tenés pavos, casino ni tienda.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Lobby 3D: el personaje en la plataforma y los botones (lobby.js dibuja la escena) -->
+<div id="inicio" class="hidden">
+  <header class="ini-top">
+    <div class="logo">SALTO FINAL</div>
+    <div class="ini-cuenta">
+      <div id="iniSaldo" class="saldo-chip" title="Tus pavos"></div>
+      <div id="iniUsuario" class="ini-usuario"></div>
+      <button id="btnSalirCuenta" class="chico" type="button"></button>
+    </div>
+  </header>
+  <nav class="ini-menu">
+    <button id="btnJugar" class="primary grande" type="button">Jugar</button>
+    <button id="btnCasino" class="ini-btn" type="button" data-cuenta><span class="ico">🎰</span>Casino<small>Ruleta · Blackjack · Tragamonedas</small></button>
+    <button id="btnTienda" class="ini-btn" type="button" data-cuenta><span class="ico">🛒</span>Tienda<small>Skins</small></button>
+    <button id="btnCasillero" class="ini-btn" type="button" data-cuenta><span class="ico">🎽</span>Casillero<small>Tu skin</small></button>
+    <button id="btnAnuncio" class="ini-btn anuncio" type="button" data-cuenta disabled><span class="ico">▶</span>Ver anuncio<small>+500 pavos · Próximamente</small></button>
+    <div class="ini-fila">
+      <button id="btnBailar" class="btn-config" type="button">💃 Bailar</button>
+      <button id="btnConfigInicio" class="btn-config" type="button">⚙ Configuración</button>
+    </div>
+    <p id="iniAviso" class="ini-aviso"></p>
+  </nav>
+  <p class="ini-ayuda">Arrastrá para girar a tu personaje</p>
+</div>
+
+<!-- Menú de salas: crear o unirse con código -->
+<div id="menu" class="screen hidden">
   <div class="panel">
+    <button id="btnVolverMenu" class="volver" type="button">← Lobby</button>
     <h1>SALTO FINAL</h1>
     <p class="sub">Saltá del bus, sobreviví a la tormenta, quedá último en pie.</p>
-    <label>Tu nombre <input id="name" maxlength="16" placeholder="Jugador"></label>
+    <p id="menuComo" class="hint"></p>
+    <label id="menuNombre">Tu nombre <input id="name" maxlength="16" placeholder="Jugador"></label>
     <button id="btnCreate" class="primary">Crear sala</button>
     <div class="row">
       <input id="code" maxlength="5" placeholder="CÓDIGO" autocomplete="off">
@@ -37,7 +94,53 @@
     <ul id="playerList"></ul>
     <button id="btnStart" class="primary">Empezar partida</button>
     <p id="waitHost" class="hint">Esperando a que el anfitrión empiece…</p>
-    <button id="btnConfigSala" class="btn-config" type="button">⚙ Configuración</button>
+    <div class="ini-fila">
+      <button id="btnSalirSala" class="btn-config" type="button">← Salir al lobby</button>
+      <button id="btnConfigSala" class="btn-config" type="button">⚙ Configuración</button>
+    </div>
+  </div>
+</div>
+
+<!-- Casino (casino.js y mesas/) -->
+<div id="casino" class="overlay hidden" role="dialog" aria-label="Casino">
+  <div class="ov-caja casino-caja">
+    <header class="ov-top">
+      <h2>Casino</h2>
+      <nav class="tabs">
+        <button type="button" data-juego="ruleta">Ruleta</button>
+        <button type="button" data-juego="blackjack">Blackjack</button>
+        <button type="button" data-juego="slots">Tragamonedas</button>
+      </nav>
+      <div id="casinoSaldo" class="saldo-chip"></div>
+      <button id="casinoCerrar" class="cerrar" type="button" aria-label="Cerrar">✕</button>
+    </header>
+    <div class="ov-cuerpo">
+      <section id="mesaRuleta" class="mesa hidden" tabindex="-1"></section>
+      <section id="mesaBlackjack" class="mesa hidden" tabindex="-1"></section>
+      <section id="mesaSlots" class="mesa hidden" tabindex="-1"></section>
+    </div>
+    <footer class="ov-pie">Se juega solo con pavos del juego. Los pavos no se compran con plata ni se cambian por nada.</footer>
+    <div id="casinoAviso" class="casino-aviso"></div>
+  </div>
+</div>
+
+<!-- Tienda y casillero (tienda.js) -->
+<div id="tienda" class="overlay hidden" role="dialog" aria-label="Tienda">
+  <div class="ov-caja tienda-caja">
+    <header class="ov-top">
+      <h2 id="tiendaTitulo">Tienda</h2>
+      <nav class="tabs">
+        <button type="button" data-modo-tienda="tienda">Tienda</button>
+        <button type="button" data-modo-tienda="casillero">Casillero</button>
+      </nav>
+      <div id="tiendaSaldo" class="saldo-chip"></div>
+      <button id="tiendaCerrar" class="cerrar" type="button" aria-label="Cerrar">✕</button>
+    </header>
+    <div class="ov-cuerpo">
+      <p id="tiendaSub" class="tienda-sub"></p>
+      <div id="tiendaGrilla" class="tienda-grilla"></div>
+      <p id="tiendaAviso" class="error"></p>
+    </div>
   </div>
 </div>
 
@@ -51,6 +154,7 @@
   <div id="topbar">
     <span id="alive">👤 0</span>
     <span id="kills">💀 0</span>
+    <span id="hudPavos" class="hidden"></span>
     <span id="stormInfo"></span>
     <span id="fps" class="hidden"></span>
   </div>
@@ -91,6 +195,7 @@
   <div id="chatlog"></div>
   <input id="chatInput" class="hidden" maxlength="120" placeholder="Escribí y apretá Enter">
   <div id="damage"></div>
+  <div id="pavosToast"></div>
   <div id="clickToPlay" class="hidden">Hacé clic para jugar<button id="btnPausaConfig" type="button">⚙ Configuración <small>Esc</small></button></div>
 </div>
 

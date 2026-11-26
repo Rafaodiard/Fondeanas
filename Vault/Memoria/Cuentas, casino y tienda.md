@@ -19,4 +19,11 @@ Volver a [[Índice de memoria]]
 - **Casino:** cada uno juega solo contra la casa.
 - **Skins:** no se arman todavía. La tienda y el casillero quedan con los espacios vacíos.
 - **Login:** solo usuario y contraseña.
-- Agregados del plan, no pedidos explícitamente: topes contra el farmeo de eliminaciones y de anuncios. Falta elegir el proveedor de anuncios.
+- Agregados del plan, no pedidos explícitamente (se mantienen): topes contra el farmeo de eliminaciones y de anuncios. Falta elegir el proveedor de anuncios.
+
+**2026-11-26 · pedido**
+
+"Lo de los anuncios no lo hagas, solo dejá el espacio listo para hacerlo. El resto hacelo."
+
+- Se implementó todo menos los anuncios: cuentas, invitado, lobby 3D, pavos (1000 al registrarse, 100 por eliminación), casino (ruleta, blackjack y tragamonedas) y tienda/casillero con espacios vacíos.
+- Anuncios: quedan el botón deshabilitado ("Próximamente"), la tabla `anuncios`, los valores en `server/premios.js` y la interfaz `public/js/anuncios.js`, con los pasos para activarlos. Falta elegir el proveedor.

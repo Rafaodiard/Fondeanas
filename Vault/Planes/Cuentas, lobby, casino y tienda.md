@@ -2,7 +2,11 @@
 
 Volver a [[Inicio]] · Pedido y decisiones: [[Cuentas, casino y tienda]]
 
-Estado: **plan, sin implementar**. Decisiones tomadas el 2026-11-26.
+Estado: **hecho el 2026-11-26**, salvo los anuncios (queda el espacio listo) y las skins (catálogo vacío). Cómo quedó: [[Cuentas y pavos]], [[Casino]], [[Tienda y skins]].
+
+Diferencias con el plan:
+- Eliminaciones: en vez de "la víctima tiene que ser de otra IP", no paga eliminar a un **invitado** de la misma IP; a otra cuenta de la misma red sí (amigos en la misma casa).
+- El retorno medido del blackjack con estrategia básica dio 99,4 %.
 
 ## Qué cambia para el jugador
 
