@@ -414,7 +414,7 @@ TROTE = dict(T=22, duty=0.33, y_land=-0.30, y_off=0.30, ancho=0.115, giro_pie=-7
              balanceo=0.014, giro_cadera=7.0, ladeo_cadera=3.5, incl_cadera=4.0, incl=7.0, giro_hombros=9.0,
              cabeza=1.0, vuelo=[(0.25, 0.0, 0.30, 0.31, 60.0, -5.0), (0.52, -0.005, 0.0, 0.36, 26.0, 0.0),
                                 (0.8, 0.0, -0.31, 0.22, -6.0, 0.0)],
-             brazo_adelante=(-0.04, -0.28, -0.19), brazo_atras=(0.07, 0.15, -0.40), brazo_polo=(0.45, 0.9, -0.3),
+             brazo_adelante=(-0.04, -0.34, -0.19), brazo_atras=(0.07, 0.15, -0.40), brazo_polo=(0.45, 0.9, -0.3),
              arco=3.0, puno=(50.0, 30.0), giro_antebrazo=-45.0)
 
 CORRER = dict(T=20, duty=0.26, y_land=-0.36, y_off=0.34, ancho=0.11, giro_pie=-8.0,
