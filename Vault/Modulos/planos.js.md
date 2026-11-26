@@ -16,7 +16,7 @@ Archivo: `public/js/planos.js`. Planos de todas las estructuras del mapa. **Una 
 
 ## Estructuras (`PLANOS`)
 
-Casas (1 o 2 pisos, con escalera, porche y balcón opcional), edificio de ciudad (varios pisos, escalera en U y terraza), local, galpón con entrepiso, cobertizo, granero con altillo, silo, molino, tanque de agua, faro con escalera interior hasta el balcón, muelle, bote, grúa con torre de escaleras y cabina, contenedor, palafito, pasarela, casa de adobe con terraza, puesto, carpa, torre de vigía, capilla en ruinas, estación de servicio, parada, puente, fogón, auto, tractor, cerca, farol, fuente, calesita, rueda de la fortuna, kiosco, laboratorio, cúpula del observatorio (con ranura y telescopio), antena, cabaña, lodge, torre de teleférico, tolva, andamio, malecón, cajas, barriles, campo sembrado, arco, montaña rusa, ruinas, banco, tacho, hidrante, cartel, seto, cantero, buzón, jardín, poste de luz e indicador de caminos.
+Casas (1 o 2 pisos, con escalera, porche y balcón opcional), edificio de ciudad (varios pisos, escalera en U y terraza), local, galpón con entrepiso, cobertizo, granero con altillo, silo, molino, tanque de agua, faro con escalera interior hasta el balcón, muelle, bote, grúa con torre de escaleras y cabina, contenedor, palafito, pasarela, casa de adobe con terraza, puesto, carpa, torre de vigía, capilla en ruinas, estación de servicio, parada, puente, fogón, tractor, cerca, farol, fuente, calesita, rueda de la fortuna, kiosco, laboratorio, cúpula del observatorio (con ranura y telescopio), antena, cabaña, lodge, torre de teleférico, tolva, andamio, malecón, cajas, barriles, campo sembrado, arco, montaña rusa, ruinas, banco, tacho, hidrante, cartel, seto, cantero, buzón, jardín, poste de luz e indicador de caminos.
 
 Muebles internos: `mesa`, `silla`, `cama`, `sillon`, `estante`, `heladera`, `mesada`, `caja`, `barril`.
 
@@ -33,3 +33,5 @@ Ver [[Estructuras rompibles]].
 ## Reglas que cumplen todos los planos
 
 Las revisa [[Pruebas del mapa]]: todo el loot y los cofres se alcanzan caminando, las escaleras se suben de punta a punta, hay 1,8 m libres para pararse en cada piso, no hay caras al revés ni caras encimadas que titilen, todo lo que se ve choca y ninguna pieza arranca sin apoyo.
+
+El plano `auto` (un auto de cajas) se borró el 2026-11-26: las entradas `auto` de [[isla.js]] ahora son autos manejables ([[Autos]]).

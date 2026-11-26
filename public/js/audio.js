@@ -90,6 +90,24 @@ function nivelLoop(nombre, v, freq, q, tipo, vol, fmin, fmax) {
   L.f.frequency.setTargetAtTime(fmin + (fmax - fmin) * v, t, 0.12);
 }
 
+
+// Motor del auto en el que se va (manejar.js): dos osciladores (el ronroneo y un armónico) por un pasabajos.
+// v = 0 apagado, 1 encendido; rpm de 0 (ralentí) a 1 (a fondo).
+let motorN = null;
+function motorNodos() {
+  if (motorN) return motorN;
+  const c = ac(); if (!c) return null;
+  const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 400; f.Q.value = 3;
+  const g = c.createGain(); g.gain.value = 0;
+  const o1 = c.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = 38;
+  const o2 = c.createOscillator(); o2.type = 'square'; o2.frequency.value = 76;
+  const g2 = c.createGain(); g2.gain.value = 0.35;
+  o1.connect(f); o2.connect(g2); g2.connect(f); f.connect(g); g.connect(master);
+  o1.start(); o2.start();
+  motorN = { o1, o2, f, g, v: -1, rpm: -1 };
+  return motorN;
+}
+
 export const sfx = {
   unlock: () => ac(),
   // viento de la caída (0 = nada, 1 = picada a fondo)
@@ -122,5 +140,30 @@ export const sfx = {
   boom(distance = 0) { const v = Math.max(0.08, 1 - distance / 200); burst({ dur: 0.8, freq: 300, vol: 2 * v }); tone({ f1: 90, f2: 30, dur: 0.6, vol: 0.6 * v, type: 'sine' }); },
   glider() { burst({ dur: 0.3, freq: 1200, q: 0.3, vol: 0.4, type: 'highpass' }); },
   elim() { tone({ f1: 400, f2: 400, dur: 0.12, vol: 0.25, type: 'square' }); tone({ f1: 800, f2: 800, dur: 0.2, vol: 0.25, type: 'square', delay: 0.12 }); },
+  motor(v, rpm = 0) {
+    if (!ctx && v <= 0) return;
+    const M = motorNodos(); if (!M) return;
+    if (Math.abs(v - M.v) < 0.01 && Math.abs(rpm - M.rpm) < 0.01) return;
+    M.v = v; M.rpm = rpm;
+    const t = ctx.currentTime, hz = 34 + rpm * 95;
+    M.g.gain.setTargetAtTime(v * (0.32 + rpm * 0.25), t, 0.08);
+    M.o1.frequency.setTargetAtTime(hz, t, 0.06);
+    M.o2.frequency.setTargetAtTime(hz * 2.01, t, 0.06);
+    M.f.frequency.setTargetAtTime(260 + rpm * 1300, t, 0.08);
+  },
+  // ruedas que patinan (freno de mano o derrape)
+  derrape(v) { nivelLoop('derrape', v, 1600, 2.5, 'bandpass', 0.35, 1100, 2100); },
+  bocina(distance = 0) {
+    const v = Math.max(0.05, 1 - distance / 120) * 0.16;
+    tone({ f1: 415, f2: 415, dur: 0.42, vol: v, type: 'square' });
+    tone({ f1: 523, f2: 523, dur: 0.42, vol: v, type: 'square' });
+  },
+  choque(fuerza = 1, distance = 0) {
+    const v = Math.max(0.05, 1 - distance / 120) * Math.min(1.4, 0.35 + fuerza * 0.06);
+    burst({ dur: 0.3, freq: 650, q: 0.9, vol: v });
+    burst({ dur: 0.18, freq: 3200, q: 2, vol: v * 0.5, type: 'bandpass' });
+  },
+  puerta() { burst({ dur: 0.09, freq: 900, q: 1.5, vol: 0.6, type: 'bandpass' }); tone({ f1: 160, f2: 90, dur: 0.1, vol: 0.25, type: 'sine', delay: 0.03 }); },
+  turbo() { burst({ dur: 0.45, freq: 2200, q: 0.4, vol: 0.4, type: 'highpass' }); },
   click() { tone({ f1: 1200, f2: 1100, dur: 0.03, vol: 0.12, type: 'square' }); },
 };

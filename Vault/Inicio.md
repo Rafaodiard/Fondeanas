@@ -1,10 +1,10 @@
 # Salto Final · Inicio
 
-Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]), bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica y salas privadas a las que se entra con un código de 5 letras.
+Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]), autos que se manejan ([[Autos]]), bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica y salas privadas a las que se entra con un código de 5 letras.
 
 - Repo: https://github.com/Rafaodiard/Fondeanas
 - Stack: Node (`server.js` con `ws`) + Three.js 0.170 como ES modules sin bundler. `npm start` levanta todo en el puerto 3000 (`PORT` lo cambia).
-- Vault actualizado con la construcción estilo battle royale (rama `claude/project-thread-s1zvnx`, 2026-11-26), sobre el commit `eecf634` de `main` (que ya trae el cofre y los objetos del piso modelados, y la caída libre, el paracaídas y deslizarse). El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
+- Vault actualizado con los autos manejables (rama `claude/project-thread-pnmtbf`, 2026-11-26), además de la construcción estilo battle royale, el cofre y los objetos del piso modelados, y la caída libre, el paracaídas y deslizarse. El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
 
 ## Cómo está armado
 
@@ -35,6 +35,8 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 | [[construccion3d.js]] | `public/js/construccion3d.js` | Mallas de las construcciones, vista previa, grilla de edición y relleno al levantarse |
 | [[construir.js]] | `public/js/construir.js` | La construcción en el juego: modo construcción, colocar, editar, material automático y su HUD |
 | [[configuracion.js]] | `public/js/configuracion.js` | Panel de configuración: Juego, Video, Sonido y Controles |
+| [[autos.js]] | `public/js/autos.js` | Autos: medidas, asientos, física de manejo, choques y estado de red (compartido) |
+| [[manejar.js]] | `public/js/manejar.js` | Los autos en el juego: manejar, autos de los demás, subir y bajar, gente sentada, HUD y sonidos |
 
 ## Pantallas
 
@@ -45,7 +47,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 
 ## Sistemas del juego
 
-- [[Mapa de la isla]] · [[Estructuras rompibles]] · [[Salas y partidas]] · [[Bus, caída y paracaídas]] · [[Deslizarse]] · [[Tormenta]] · [[Loot y rarezas]] · [[Armas y disparo]] · [[Construcción]] · [[Pico y recursos]] · [[Curación y escudo]] · [[Configuración y controles]]
+- [[Mapa de la isla]] · [[Estructuras rompibles]] · [[Salas y partidas]] · [[Bus, caída y paracaídas]] · [[Deslizarse]] · [[Tormenta]] · [[Loot y rarezas]] · [[Armas y disparo]] · [[Construcción]] · [[Autos]] · [[Pico y recursos]] · [[Curación y escudo]] · [[Configuración y controles]]
 
 ## Arte y herramientas
 
@@ -54,6 +56,8 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 - [[Pipeline del loot]]: scripts de Blender del cofre y los objetos del piso.
 - [[Pipeline de armas]]: scripts de Blender de las armas (modelado, horneado, recargas, export).
 - [[Pipeline del bus]]: script de Blender del bus volador (modelado, fotos y export).
+- [[Pipeline del auto]]: script de Blender del auto (carrocería paramétrica, ruedas, interior, fotos y export).
+- `tools/autos/pruebas.mjs`: pruebas de los autos (ver [[autos.js]]).
 - [[sf_tools.py]]: herramientas base de modelado por script.
 - [[Texturas]]: máscaras de cara y tatuaje hechas con Python.
 - `tools/caida/pruebas.mjs`: pruebas de la caída libre, el paracaídas y deslizarse (ver [[caida.js]]).

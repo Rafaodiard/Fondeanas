@@ -39,3 +39,8 @@ Arma la isla de Salto Final. El mapa es **fijo**: usa `MAP_SEED = 20261124` para
 [[items.js]] (`GRID`, `MATERIALS`) · [[planos.js]] · [[isla.js]] · [[colision.js]] · [[mallas.js]]
 
 Pruebas: [[Pruebas del mapa]].
+
+## Autos (2026-11-26)
+
+- `place('auto', …)` no arma nada: guarda el lugar en `autoSpawns` (`x`, `y`, `z`, `yaw`, `color`). Después de los postes, la `y` de cada uno se ajusta con `groundHeight`. `nearSolid` también evita los lugares de los autos.
+- `dinamicos`: lista de autos ([[autos.js]]) que [[manejar.js]] llena en cada partida. `groundHeight(x, z, y, ignorar)` cuenta su capó, techo y baúl como piso (`sueloAuto`) y `collide(pos, r, h, ignorar)` empuja fuera de su caja (`empujarDeAuto`); `ignorar` es el propio auto cuando el que choca es un auto. Ver [[Autos]].

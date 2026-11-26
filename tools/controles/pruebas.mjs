@@ -35,12 +35,21 @@ await prueba('accionesDe filtra por contexto', () => {
 });
 await prueba('asignar saca la tecla a la acción que choca, no a la de otro contexto', () => {
   const quitadas = C.asignar('saltar', 0, 'KeyE');
-  assert.deepEqual(quitadas, ['Agarrar / abrir']);
+  assert.deepEqual(quitadas, ['Agarrar / abrir / subir al auto']);
   assert.equal(C.accion('interactuar').teclas[0], null);
-  assert.deepEqual(C.accionesDe('KeyE'), ['saltar']);
+  assert.deepEqual(C.accionesDe('KeyE', 'combate'), ['saltar']);
   assert.deepEqual(C.asignar('recargar', 1, 'KeyX').length, 1); // construirPiso está en 'todos'
   C.asignar('girarPrueba', 0, 'KeyR');
   assert.equal(C.accion('recargar').teclas[0], 'KeyR', 'recargar (combate) no pierde R por girar (construcción)');
+});
+await prueba('los controles del auto repiten las teclas de a pie sin chocar', () => {
+  assert.deepEqual(C.accionesDe('KeyW', 'vehiculo'), ['acelerar']);
+  assert.ok(C.accionesDe('KeyW', 'combate').includes('adelante') && !C.accionesDe('KeyW', 'combate').includes('acelerar'));
+  assert.deepEqual(C.accionesDe('Enter', 'vehiculo'), ['chat'], 'el chat se abre también manejando');
+  assert.deepEqual(C.accionesDe('Mouse0', 'vehiculo'), ['bocina']);
+  assert.ok(!C.chocan(C.accion('turbo'), C.accion('correr')));
+  assert.ok(C.chocan(C.accion('turbo'), C.accion('bocina')));
+  assert.ok(C.chocan(C.accion('chat'), C.accion('bocina')));
 });
 await prueba('misma tecla en principal y secundaria no se duplica', () => {
   C.asignar('adelante', 1, 'KeyW');

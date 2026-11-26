@@ -5,7 +5,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 export const ASSETS = {};
 export const ANIMS = {};
-const FILES = ['personaje', 'animaciones_armas', 'animaciones_caida', 'bus', 'paracaidas', 'cofre', 'armas', 'objetos', 'pino', 'arbol', 'roca'];
+const FILES = ['personaje', 'animaciones_armas', 'animaciones_caida', 'bus', 'auto', 'paracaidas', 'cofre', 'armas', 'objetos', 'pino', 'arbol', 'roca'];
 
 export async function loadAssets(onProgress) {
   const loader = new GLTFLoader();

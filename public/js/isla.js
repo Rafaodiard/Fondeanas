@@ -147,7 +147,7 @@ export const PUEBLOS = [
       ['cerca', { L: 36, m: 'madera2' }, 20, 34, 0], ['cerca', { L: 36, m: 'madera2' }, 20, 58, 0],
       ['cerca', { L: 30, m: 'madera2' }, -20, 37, 0],
       ['barriles', {}, -12, -10, 0], ['caja3', {}, 12, -6, 0],
-      ['auto', { m: 'celeste' }, -40, 2, 0],
+      ['auto', { m: 'celeste' }, -52, 4.6, 1], // sobre la calle, lejos del árbol
     ],
   },
   {

@@ -26,6 +26,7 @@ Isla fija de 1200 × 1200 m (la misma en todas las partidas), con diseño propio
 - Cambios de trazado (2026-11-25): Villa Cardo cierra sus dos calles cruzadas en un rectángulo; la calle de atrás de Puerto Bruma vuelve a la costanera por los dos lados; las rutas de la Granja salen de su calle (al Observatorio por el patio y a Médanos por la punta este); la ruta del Refugio baja a la rampa de la Cantera; el camino de Villa Cardo a la montaña llega al cruce del Refugio y la calle sur de la Cantera sale de él; el camino de tierra del oeste ahora une la ruta Altoplaza-Villa Cardo con la ruta al puerto pasando por la puerta de la capilla.
 - Un río que baja de la montaña y desemboca en la ciénaga.
 - 41 lugares chicos con poco loot: estación de servicio, torres de vigía, capilla en ruinas, camping, paradas, cobertizos, casas sueltas, contenedores, antena, molino, autos, tractor, cajas, barriles, fogones y ruinas.
+- Los autos de los pueblos y de los lugares sueltos (14) se manejan: ver [[Autos]].
 
 ## Reglas de construcción del mapa
 

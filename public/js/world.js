@@ -5,6 +5,7 @@ import { GRID, MATERIALS } from './items.js';
 import { PLANOS, Plano, piezasDe, vecinasDe, sinApoyo } from './planos.js';
 import { PUEBLOS, RUTAS, RIO, SUELTOS, TELEFERICO } from './isla.js';
 import { Solidos } from './colision.js';
+import { sueloAuto, empujarDeAuto, COLORES } from './autos.js';
 import { superficie, cajasPieza, DEBAJO } from './construccion.js';
 import { makeStructMesh, empezarObra, avanzarObra, liberar } from './construccion3d.js';
 export { makeStructMesh };
@@ -95,6 +96,8 @@ export class World {
     this.bushes = [];
     this.cacti = [];
     this.signs = [];
+    this.autoSpawns = []; // autos manejables estacionados en las calles {x, y, z, yaw, color}
+    this.dinamicos = []; // cosas que se mueven y chocan (autos, ver autos.js): suelo y empuje
     this.layout();
   }
 
@@ -181,6 +184,8 @@ export class World {
       this.place('puente', { L: b.L, w: b.w + 1, y: 0, dy: b.dy }, b.x, b.z, b.rot, { pad: false, y: b.y }, null);
     }
     this.layoutPostes();
+    // los autos se apoyan en el piso final (después de suavizar las calles y armar los puentes)
+    for (const a of this.autoSpawns) a.y = this.groundHeight(a.x, a.z, this.terrainHeight(a.x, a.z) + 1);
     // Teleférico: torres con dos cables y cabinas colgando.
     const torres = TELEFERICO.map(([x, z]) => {
       this.place('torreTeleferico', {}, x, z, 0, { pad: false }, null);
@@ -374,6 +379,12 @@ export class World {
       this.trees.push(tree);
       return;
     }
+    if (name === 'auto') {
+      // autos manejables (autos.js): solo el lugar donde salen; la malla y el choque los pone manejar.js
+      const [fx, fz] = rot2(0, 1, r); // el frente del plano mira a +Z local
+      this.autoSpawns.push({ x, z, y: this.terrainHeight(x, z), yaw: Math.atan2(-fx, -fz), color: COLORES[opts.m] || COLORES.rojo });
+      return;
+    }
     const fn = PLANOS[name];
     if (!fn) return;
     if (opts.jardin) {
@@ -546,7 +557,12 @@ export class World {
   }
 
   inTown(x, z, pad = 0) { return this.pois.some((t) => Math.hypot(t.x - x, t.z - z) < t.r + pad); }
-  nearSolid(x, z, rad) { let hit = false; this.sol.near(x, z, rad, (s) => { if (!hit && x > s.x0 - rad && x < s.x1 + rad && z > s.z0 - rad && z < s.z1 + rad) hit = true; }); return hit; }
+  nearSolid(x, z, rad) {
+    let hit = false;
+    this.sol.near(x, z, rad, (s) => { if (!hit && x > s.x0 - rad && x < s.x1 + rad && z > s.z0 - rad && z < s.z1 + rad) hit = true; });
+    // los autos estacionados también ocupan lugar (nada nace debajo de ellos)
+    return hit || this.autoSpawns.some((a) => Math.abs(a.x - x) < rad + 2.3 && Math.abs(a.z - z) < rad + 2.3);
+  }
   gridVal(arr, x, z) {
     const i = Math.min(this.N - 1, Math.max(0, this.gi(x))), j = Math.min(this.N - 1, Math.max(0, this.gi(z)));
     return arr[j * this.N + i];
@@ -618,10 +634,16 @@ export class World {
   }
 
   // Piso más alto debajo de (x,z) que se puede pisar desde la altura y (terreno, edificios o construcciones).
-  groundHeight(x, z, y = Infinity) {
+  // ignorar: un auto que no cuenta (el que está calculando su propio piso).
+  groundHeight(x, z, y = Infinity, ignorar = null) {
     let h = this.terrainHeight(x, z);
     const s = this.sol.ground(x, z, y);
     if (s > h) h = s;
+    for (const d of this.dinamicos) {
+      if (d === ignorar) continue;
+      const t = sueloAuto(d, x, z, y);
+      if (t > h) h = t;
+    }
     for (const st of this.structs.values()) {
       if (st.type === 'pared') continue;
       const top = superficie(st, x, z);
@@ -1238,7 +1260,7 @@ export class World {
     for (const s of this.obras) if (!s.mesh || avanzarObra(s.mesh)) this.obras.delete(s);
   }
   // Mueve una cápsula (pos = pies) resolviendo choques con paredes, árboles, rocas y construcciones.
-  collide(pos, radius = 0.45, height = 1.8) {
+  collide(pos, radius = 0.45, height = 1.8, ignorar = null) {
     for (const c of this.circles) {
       if (pos.y > c.top || pos.y + height < c.bottom) continue;
       const dx = pos.x - c.x, dz = pos.z - c.z;
@@ -1248,6 +1270,7 @@ export class World {
     }
     this.sol.push(pos, radius, height);
     for (const s of this.structs.values()) if (s.boxes) for (const b of s.boxes) pushOut(pos, b, radius, height);
+    for (const d of this.dinamicos) if (d !== ignorar) empujarDeAuto(d, pos, radius, height);
   }
 
   // Distancia hasta donde un rayo choca con el terreno (marcha simple), o Infinity.

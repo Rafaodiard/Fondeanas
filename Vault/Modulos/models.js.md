@@ -16,3 +16,7 @@ Archivo: `public/js/models.js`. Arma los objetos 3D del juego. Si el GLB corresp
 - Reexporta de [[rig.js]]: `weaponAction`, `stopWeaponAction`, `weaponShot`.
 
 Usa [[assets.js]] y [[rig.js]]. Lo usan [[main.js]] y [[visor.html]].
+
+## Autos (2026-11-26)
+
+`createAuto(color)`: clona `auto.glb` con `Pintura` teñida, un material propio por auto con el cielo de reflejo del bus (`cieloBus`), `Vidrio` transparente y la chapa de doble cara (se ve por dentro desde las ventanillas). Guarda en `userData` las ruedas (orden de giro `YXZ`: doblar y rodar), el volante, el material de las luces de freno (`frenos`, `frenoBase`) y `quemar()` (queda oscuro y sin vidrios al explotar). Sin el GLB arma un auto de cajas. Lo usan [[manejar.js]] y [[mapa.html]]. Ver [[Pipeline del auto]].

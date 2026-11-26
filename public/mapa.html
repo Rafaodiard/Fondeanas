@@ -28,6 +28,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { World, MODEL } from './js/world.js';
 import { loadAssets, cloneAsset, bakedParts } from './js/assets.js';
 import { createChest, abrirCofre, luzLoot } from './js/loot.js';
+import { createAuto } from './js/models.js';
 
 await loadAssets();
 MODEL.clone = cloneAsset; MODEL.baked = bakedParts; MODEL.cofre = createChest; MODEL.abrirCofre = abrirCofre;
@@ -54,6 +55,12 @@ scene.add(sun, sun.target);
 const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 5000);
 const world = new World(1, 1200);
 world.build(scene);
+// autos estacionados (en el juego los maneja manejar.js; acá solo se muestran donde salen)
+for (const sp of world.autoSpawns) {
+  const m = createAuto(sp.color);
+  m.position.set(sp.x, sp.y, sp.z); m.rotation.y = sp.yaw;
+  scene.add(m);
+}
 const controls = new OrbitControls(camera, renderer.domElement);
 camera.position.set(0, 700, 700);
 controls.target.set(0, 0, 0);

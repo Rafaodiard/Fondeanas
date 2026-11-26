@@ -220,6 +220,75 @@ export function createBus() {
   return g;
 }
 
+// Auto manejable (auto.glb, tools/blender/auto.py): hatchback de cuatro asientos. La pintura se tiñe con el color de
+// cada auto, los vidrios son transparentes (se ve quién va adentro) y las ruedas y el volante se mueven solos.
+// Devuelve un grupo con userData { ruedas: {Rueda_DI...}, volante, frenos (material de las luces de freno), quemar() }.
+export function createAuto(color) {
+  const glb = cloneAsset('auto', null, { Pintura: color });
+  const g = new THREE.Group();
+  const u = g.userData;
+  u.ruedas = {};
+  if (glb) {
+    g.add(glb);
+    const env = cieloBus();
+    const propios = new Map();
+    glb.traverse((o) => {
+      if (!o.isMesh) return;
+      const n = o.material.name;
+      if (!propios.has(n)) {
+        const m = o.material.clone();
+        m.envMap = env;
+        m.envMapIntensity = n === 'Vidrio' ? 1.6 : n === 'Pintura' ? 0.9 : 0.6;
+        if (n === 'Vidrio') { m.transparent = true; m.opacity = 0.42; m.depthWrite = false; m.roughness = 0.04; }
+        // la chapa es una cáscara: por dentro (mirando por las ventanillas) también se ve
+        if (n === 'Pintura' || n === 'TechoNegro' || n === 'Plastico') m.side = THREE.DoubleSide;
+        propios.set(n, m);
+      }
+      o.material = propios.get(n);
+      o.castShadow = n !== 'Vidrio';
+      o.receiveShadow = true;
+    });
+    u.mats = propios;
+    for (const n of ['Rueda_DI', 'Rueda_DD', 'Rueda_TI', 'Rueda_TD']) {
+      const r = glb.getObjectByName(n);
+      if (r) { r.rotation.order = 'YXZ'; u.ruedas[n] = r; }
+    }
+    u.volante = glb.getObjectByName('Volante');
+    u.frenos = propios.get('LuzTrasera');
+    if (u.frenos) u.frenoBase = u.frenos.emissiveIntensity;
+  } else {
+    // respaldo: cajas
+    const paint = std(color), dark = std('#22252b'), glass = std('#9ec9e8', { transparent: true, opacity: 0.45 });
+    g.add(box(2.0, 0.8, 4.4, paint, 0, 0.72, 0));
+    g.add(box(1.7, 0.75, 2.2, glass, 0, 1.5, 0.35));
+    g.add(box(1.75, 0.06, 2.0, dark, 0, 1.9, 0.35));
+    for (const [n, x, z] of [['Rueda_DI', -0.84, -1.42], ['Rueda_DD', 0.84, -1.42], ['Rueda_TI', -0.84, 1.36], ['Rueda_TD', 0.84, 1.36]]) {
+      const w = new THREE.Group();
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.39, 0.39, 0.27, 14), dark);
+      m.rotation.z = Math.PI / 2;
+      w.add(m);
+      w.position.set(x, 0.39, z);
+      w.rotation.order = 'YXZ';
+      g.add(w);
+      u.ruedas[n] = w;
+    }
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+  // auto quemado: todo oscuro y sin vidrios
+  u.quemar = () => {
+    g.traverse((o) => {
+      if (!o.isMesh) return;
+      const m = o.material.clone();
+      if (m.name === 'Vidrio') { o.visible = false; return; }
+      m.color?.multiplyScalar(0.12);
+      if (m.emissive) m.emissiveIntensity = 0;
+      m.roughness = 0.95; m.metalness = 0.2;
+      o.material = m;
+    });
+  };
+  return g;
+}
+
 // Cartel con el nombre del jugador.
 export function createNameTag(name, color) {
   const cv = document.createElement('canvas');
