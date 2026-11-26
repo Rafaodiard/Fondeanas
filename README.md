@@ -119,7 +119,7 @@ El panel tiene cuatro pestañas y todo se guarda en el navegador (`localStorage`
 - **Juego:** sensibilidad del mouse, sensibilidad apuntando y con mira telescópica, invertir el eje vertical, apuntar manteniendo o alternando, correr siempre y números de daño.
 - **Video:** calidad gráfica (baja sin sombras, media y alta), resolución 3D, campo de visión, color de la mira y contador de FPS.
 - **Sonido:** volumen general.
-- **Controles:** cambiar cualquier tecla. Si elegís una que ya usaba otra acción, se la saca a esa y te avisa. Una tecla puede repetirse entre combate y construcción (por ejemplo, la misma tecla para recargar y para algo de construcción) porque no se usan a la vez.
+- **Controles:** cambiar cualquier tecla. Si elegís una que ya usaba otra acción, se la saca a esa y te avisa. Una tecla puede repetirse entre combate y construcción (por ejemplo, R recarga y en modo construcción gira la rampa) porque no se usan a la vez.
 
 Las pruebas del registro de controles y opciones:
 
