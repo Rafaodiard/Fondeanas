@@ -12,7 +12,7 @@ Archivo: `public/js/main.js`. Es el juego en el cliente; lo carga [[index.html]]
 - Física propia del jugador (`updateMe`): gravedad, caminar/correr, salto, nado, caída libre y paracaídas (física en [[caida.js]] con `fisicaAire`), deslizarse (`intentarDeslizar`, `pendiente`, `fisicaDeslizar`); el movimiento lo resuelve `world.moveBody` de [[world.js]] en pasos chicos con piso, techo y paredes.
 - Combate: `tryShoot` (raycasts contra jugadores, estructuras y terreno), `trySwing` (pico), `startReload`, retícula y mira (`updateCrosshair`), efectos (`addTracer`, `addRocket`, `explosionFx`, `sparks`, `addDmgNum`).
 - Estructuras del mapa: `castRay` sabe qué pieza tocó por `userData.triPz` de la malla de choque, el pico y los disparos le mandan el id al servidor, y `pzRota` la saca del mundo y tira escombros de su color (`escombros`). Ver [[Estructuras rompibles]].
-- Construcción: `setBuild`, `buildTarget`, `updateBuild` (fantasma de la pieza). Ver [[Construcción]].
+- Construcción: la maneja [[construir.js]] (`cons`): `hacer` le pasa las acciones de construcción, `contexto()` sale de `cons.contexto()`, `cons.update` corre en cada cuadro, `cons.hud` dentro de `updateSlots`, `cons.autoMaterial` en cada `inv`, y `structAdd`/`structDel` (con `caidas`)/`structHp`/`structEdit` van a [[world.js]]. Prende `renderer.localClippingEnabled` para el relleno de las piezas que se levantan. Ya no hay ayuda de controles en pantalla. Ver [[Construcción]].
 - Otros jugadores (`updateOthers`), loot del piso y cofres (`updateItems` llama a `animarLoot` de [[loot.js]]), bus (`updateBus`), tormenta (`updateStorm`), espectador (`startSpectating`).
 - Entrada: todas las teclas pasan por [[controles.js]] (`pulsar` → `accionesDe` → `hacer`), y las opciones (sensibilidad, FOV, calidad, volumen, color de mira, FPS…) se aplican con `aplicarOpciones` / `aplicarVideo`. Esc abre [[configuracion.js]]. Ver [[Configuración y controles]].
 - Bucle principal: `frame()` (también cuenta los FPS).
@@ -34,6 +34,6 @@ Ver [[Bus, caída y paracaídas]] y [[Deslizarse]].
 
 ## Usa
 
-[[world.js]] · [[caida.js]] · [[assets.js]] · [[models.js]] · [[items.js]] · [[audio.js]] · [[rig.js]] (`setRigEnv`) · [[loot.js]] (`luzLoot`, `animarLoot`, `createChest`, `abrirCofre`) · [[controles.js]] · [[configuracion.js]]
+[[world.js]] · [[caida.js]] · [[assets.js]] · [[models.js]] · [[items.js]] · [[audio.js]] · [[rig.js]] (`setRigEnv`) · [[loot.js]] (`luzLoot`, `animarLoot`, `createChest`, `abrirCofre`) · [[controles.js]] · [[configuracion.js]] · [[construir.js]]
 
 Al arrancar completa `MODEL.clone` y `MODEL.baked` de [[world.js]] con las funciones de [[assets.js]].

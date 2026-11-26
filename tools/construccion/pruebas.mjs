@@ -1,7 +1,9 @@
 // Pruebas de la construcción (public/js/construccion.js y la parte de world.js que la usa), en Node y sin navegador.
 // Uso: node tools/construccion/pruebas.mjs  → tiene que terminar con "todo OK".
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import { World } from '../../public/js/world.js';
+import { makeStructMesh } from '../../public/js/construccion3d.js';
 import { GRID, structKey } from '../../public/js/items.js';
 import {
   superficie, cajasPieza, editValida, resultadoEdicion, rayoEdicion, tieneApoyo, sinApoyo, normalizar, vidaDe, HP_INICIAL, OBRA, T3, ALTO_TECHO,
@@ -161,6 +163,32 @@ prueba('la vida crece mientras se levanta y el daño se descuenta', () => {
   assert.equal(vidaDe(s, OBRA.piedra * 1000), 300);
   s.dano = 50;
   assert.equal(vidaDe(s, OBRA.piedra * 2000), 250);
+});
+
+prueba('lo que se ve coincide con lo que se pisa (rampas, techos y pisos editados, en las 4 direcciones)', () => {
+  const ray = new THREE.Raycaster(), abajo = new THREE.Vector3(0, -1, 0);
+  const casos = [];
+  for (let dir = 0; dir < 4; dir++) {
+    for (const e of [0, 1, 4, 3]) casos.push({ type: 'rampa', dir, e });
+    for (const e of [0, 1, 3, 6, 15]) casos.push({ type: 'techo', dir, e });
+  }
+  for (const e of [0, 9, 7]) casos.push({ type: 'piso', dir: 0, e });
+  for (const c of casos) {
+    const s = { ...c, i: 2, j: 3, y: 10, mat: 'madera' };
+    const g = makeStructMesh(s, true);
+    g.updateMatrixWorld(true);
+    const panel = g.children[0].children[0];
+    for (let k = 0; k < 150; k++) {
+      // lejos de los bordes de las baldosas (ahí el marco tapa la diferencia)
+      const u = (k % 15 + 0.5) / 15 * 4, v = (Math.floor(k / 15) + 0.5) / 10 * 4;
+      if ([u, v].some((a) => Math.abs(a - Math.round(a / T3) * T3) < 0.12 || Math.abs(a - 2) < 0.12)) continue;
+      const x = 8 + u, z = 12 + v, sup = superficie(s, x, z);
+      ray.set(new THREE.Vector3(x, 40, z), abajo);
+      const h = ray.intersectObject(panel)[0];
+      assert.equal(sup === null, !h, `${c.type} dir ${c.dir} e ${c.e} en (${u.toFixed(1)}, ${v.toFixed(1)}): se ve ${h ? 'algo' : 'nada'} y se pisa ${sup === null ? 'nada' : 'algo'}`);
+      if (h) assert.ok(Math.abs(h.point.y - sup) < 0.15, `${c.type} dir ${c.dir} e ${c.e}: se ve a ${h.point.y.toFixed(2)} y se pisa a ${sup.toFixed(2)}`);
+    }
+  }
 });
 
 limpiar();

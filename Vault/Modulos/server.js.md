@@ -30,10 +30,12 @@ Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.
 - `damagePlayer` (el escudo absorbe primero), `killPlayer` (tira todo lo que tenía), `checkWinner`.
 - `addToInventory`, `spawnItem`, `spawnAround` → [[Loot y rarezas]]
 - `handleGame`: un `case` por mensaje de juego (salto, estado, loot, cofres, recarga, disparo, pico, construcción, consumibles, caída).
-- `explode` (lanzacohetes, daño en área; el que dispara recibe la mitad; también daña las piezas del mapa dentro del radio) y `damageStruct` → [[Armas y disparo]], [[Construcción]]
+- `explode` (lanzacohetes, daño en área; el que dispara recibe la mitad; también daña las piezas del mapa dentro del radio) y `damageStruct` (suma daño y compara con `vidaDe`) → [[Armas y disparo]], [[Construcción]]
+- `derrumbar` (saca las construcciones sin apoyo, también después de romperse una pieza del mapa), `structPublic` y los `case 'build'` / `case 'edit'` → [[Construcción]]. `SF_MATS` (variable de entorno) da materiales al empezar, para probar.
 - `distPieza` (distancia a la caja de una pieza) y `damagePieza` (rompe la pieza y las que quedan sin apoyo, avisa con `pzRota` y baja el loot y los cofres que estaban encima) → [[Estructuras rompibles]]
 
 ## Usa
 
 - [[world.js]] (`World`)
 - [[items.js]] (armas, consumibles, munición, materiales, `structKey`, etc.)
+- [[construccion.js]] (reglas de la construcción)

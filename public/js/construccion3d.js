@@ -109,10 +109,10 @@ function materiales(m) {
   const dibujo = { madera: texMadera, piedra: texPiedra, metal: texMetal }[m];
   const tex = lienzo(dibujo, { madera: 11, piedra: 23, metal: 37 }[m]);
   const met = m === 'metal';
-  const panel = new THREE.MeshStandardMaterial({ map: tex, bumpMap: tex, bumpScale: met ? 1.2 : 2, roughness: met ? 0.45 : 0.88, metalness: met ? 0.55 : 0 });
+  const panel = new THREE.MeshStandardMaterial({ map: tex, bumpMap: tex, bumpScale: met ? 1.2 : 2, roughness: met ? 0.5 : 0.88, metalness: met ? 0.2 : 0 });
   const marco = new THREE.MeshStandardMaterial({
     map: tex, color: { madera: '#8a6446', piedra: '#8e8e94', metal: '#6c7884' }[m],
-    roughness: met ? 0.4 : 0.85, metalness: met ? 0.65 : 0,
+    roughness: met ? 0.45 : 0.85, metalness: met ? 0.3 : 0,
   });
   MATS[m] = { panel, marco };
   return MATS[m];
