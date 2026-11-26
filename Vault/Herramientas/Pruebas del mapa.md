@@ -19,4 +19,8 @@ Después corre las **pruebas visuales** de `tools/mapa/visuales.mjs` (`pruebasVi
 10. **Piezas**: ninguna pieza rompible arranca sin apoyo y no hay decoración suelta en el aire.
 11. **Derrumbes**: en un mundo aparte, romper el aro de la vuelta al mundo tiene que tirar todas las cabinas, la pieza rota deja de chocar, y romper una pared de planta baja de una casa no tira ninguna pieza grande.
 
+Al final corre la **prueba de caminos** de `tools/mapa/caminos.mjs` (`pruebaCaminos`):
+
+12. **Caminos**: cada punta de una calle o ruta llega a otra calle (adentro, con medio metro de margen: si no, avisa del hueco) o tiene un remate declarado en [[isla.js]] (plazoleta `{ r }` o `'puerta'` a 3 m como mucho de una estructura). Todas las calles forman una sola red (también cuenta cuando se cruzan por el medio), ninguna plazoleta pisa una estructura y el terreno no asoma más de 10 cm por arriba de ninguna calle (mide sobre los triángulos de `trisCalles`). Con el trazado anterior al arreglo encontraba 37 puntas cortadas y 10 redes sueltas.
+
 Correrla después de tocar [[planos.js]], [[isla.js]], [[mallas.js]] o la física de [[world.js]].

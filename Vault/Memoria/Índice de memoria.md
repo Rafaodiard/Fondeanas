@@ -17,3 +17,4 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 - [[Brazos sin atravesar el cuerpo]]: el pedido, cómo se revisa y la tolerancia.
 - [[Panel de configuración]]: el pedido del panel y quién eligió cada opción.
 - [[Pedido del bus]]: el bus volador modelado por script.
+- [[Caminos prolijos]]: ninguna calle se corta de golpe; remates y la prueba de caminos.

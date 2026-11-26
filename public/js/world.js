@@ -82,7 +82,8 @@ export class World {
     this.structMeshes = [];
     this.placed = []; // estructuras ubicadas {P, r, x, y, z, fp, piezas, ids}
     this.piezas = []; // piezas rompibles de las estructuras del mapa (mismo orden en el servidor y en el cliente)
-    this.ribbons = []; // calles y rutas {pts, w, m}
+    this.ribbons = []; // calles y rutas {pts, w, m, off, def}
+    this.plazas = []; // remates redondos al final de una calle {x, z, r, m, h, rb}
     this.chestSpots = [];
     this.lootSpots = [];
     this.trees = [];
@@ -153,10 +154,12 @@ export class World {
     // 2) calles y rutas
     for (const t of PUEBLOS) for (const c of t.calles) {
       const pts = c.p.map(([x, z]) => [t.x + x, t.z + z]);
-      if (c.m === 'asfalto' && t.tema !== 'ciencia') this.ribbons.push({ pts: resample(pts, 3), w: c.w + 5, m: 'vereda', under: true });
-      this.stampRoad(pts, c.w, c.m, false);
+      const veredas = c.m === 'asfalto' && t.tema !== 'ciencia';
+      if (veredas) this.ribbons.push({ pts: resample(pts, 3), w: c.w + 5, m: 'vereda', under: true });
+      this.stampRoad(pts, c.w, c.m, !!c.suave, { ...c, pueblo: t.id, veredas });
     }
-    for (const r of RUTAS) this.stampRoad(r.p, r.w, r.m, true);
+    for (const r of RUTAS) this.stampRoad(r.p, r.w, r.m, true, r);
+    this.capasCalles();
     // 3) río (y puentes donde lo cruza una ruta)
     this.stampRiver();
     // 4) estructuras
@@ -165,6 +168,7 @@ export class World {
       for (const [name, opts, lx, lz, r, extra] of t.items) this.place(name, opts, t.x + lx, t.z + lz, r, extra || {}, t);
     }
     for (const [name, opts, x, z, r, extra] of SUELTOS) this.place(name, opts, x, z, r, extra || {}, null);
+    this.suavizarCalles();
     // puentes: el tablero va de orilla a orilla siguiendo la ruta (inclinado), 10 cm arriba del terreno en las puntas
     for (const b of this.bridges) {
       const [ax, az] = b.rot === 1 ? [1, 0] : [0, 1];
@@ -226,19 +230,28 @@ export class World {
   }
 
   // Suaviza y aplana el terreno a lo largo de una calle. smooth = ruta (perfil suavizado).
-  stampRoad(pts, w, m, smooth) {
+  // def.ini / def.fin = { r } termina la calle en una plazoleta redonda (rotonda, playón o atrio) en vez de cortarla.
+  // Una calle de pueblo con suave: true se traza y se aplana como una ruta (la rampa de la cantera, que baja escalones).
+  stampRoad(pts, w, m, smooth, def = {}) {
     const path = smooth ? catmull(pts, 3) : resample(pts, 3);
     const prof = path.map(([x, z]) => this.terrainHeight(x, z));
-    if (smooth) for (let pass = 0; pass < 3; pass++) {
-      const cp = prof.slice();
-      for (let i = 0; i < prof.length; i++) {
-        let s = 0, c = 0;
-        for (let k = -6; k <= 6; k++) { const v = cp[i + k]; if (v !== undefined) { s += v; c++; } }
-        prof[i] = s / c;
+    if (smooth) {
+      const raw = prof.slice();
+      for (let pass = 0; pass < 3; pass++) {
+        const cp = prof.slice();
+        for (let i = 0; i < prof.length; i++) {
+          let s = 0, c = 0;
+          for (let k = -6; k <= 6; k++) { const v = cp[i + k]; if (v !== undefined) { s += v; c++; } }
+          prof[i] = s / c;
+        }
       }
+      // las puntas quedan a la altura del lugar al que llegan (la calle del pueblo u otra ruta): sin escalón en el cruce
+      const n = prof.length, K = Math.min(12, Math.floor(n / 2));
+      const d0 = raw[0] - prof[0], d1 = raw[n - 1] - prof[n - 1];
+      for (let i = 0; i < K; i++) { const f = smoothstep(0, 1, 1 - i / K); prof[i] += d0 * f; prof[n - 1 - i] += d1 * f; }
     }
     for (let i = 0; i < prof.length; i++) prof[i] = Math.max(prof[i], 0.9);
-    const hw = w / 2 + 0.8, F = 9;
+    const hw = w / 2 + 2.2, F = 9; // banquina plana: el pliegue del terreno queda afuera de la cinta
     const best = new Map();
     path.forEach(([px, pz], idx) => {
       this.eachVertex(px - hw - F, pz - hw - F, px + hw + F, pz + hw + F, (k, x, z) => {
@@ -254,7 +267,59 @@ export class World {
       const t = 1 - smoothstep(hw, hw + F, b.d);
       this.heights[k] = this.heights[k] * (1 - t) + b.h * t;
     }
-    this.ribbons.push({ pts: path, w, m });
+    const rb = { pts: path, w, m, def };
+    this.ribbons.push(rb);
+    for (const [cual, i] of [['ini', 0], ['fin', path.length - 1]]) {
+      const r = def[cual]?.r;
+      if (r) this.stampPlaza({ x: path[i][0], z: path[i][1], r, m: def[cual].m || m, h: prof[i], rb, vereda: def.veredas });
+    }
+  }
+
+  // Alisa el terreno debajo de las calles: donde se juntan dos calles (o una calle y el aplanado de una estructura)
+  // quedan escalones entre vértices de la grilla que asoman por arriba de la cinta. No toca lo aplanado por
+  // estructuras ni el cauce del río.
+  suavizarCalles(pasadas = 4) {
+    const N = this.N, H = this.heights, rio = RIO.w / 2 + 9;
+    const idx = [];
+    for (let j = 1; j < N - 1; j++) for (let i = 1; i < N - 1; i++) {
+      const k = j * N + i;
+      if (this.roadDist[k] < 1 && !this.locked[k] && this.riverDist[k] > rio) idx.push(k);
+    }
+    for (let p = 0; p < pasadas; p++) {
+      const nv = idx.map((k) => (H[k] * 4 + H[k - 1] + H[k + 1] + H[k - N] + H[k + N] + (H[k - N - 1] + H[k - N + 1] + H[k + N - 1] + H[k + N + 1]) * 0.5) / 10);
+      idx.forEach((k, n) => { H[k] = nv[n]; });
+    }
+  }
+
+  // Plazoleta redonda al final de una calle: aplana el terreno y cuenta como calle (no crecen árboles ni van postes).
+  stampPlaza(pq) {
+    const hw = pq.r + 0.8, F = 6;
+    this.eachVertex(pq.x - hw - F, pq.z - hw - F, pq.x + hw + F, pq.z + hw + F, (k, x, z) => {
+      const d = Math.hypot(x - pq.x, z - pq.z);
+      if (d > hw + F) return;
+      this.roadDist[k] = Math.min(this.roadDist[k], d - pq.r);
+      if (this.locked[k]) return;
+      const t = 1 - smoothstep(hw, hw + F, d);
+      this.heights[k] = this.heights[k] * (1 - t) + pq.h * t;
+    });
+    this.plazas.push(pq);
+  }
+
+  // Altura de dibujo de cada calle sobre el terreno. Una calle que desemboca en otra más ancha (o igual) va debajo,
+  // así la que sigue de largo se ve entera en el cruce. Las plazas anchas (fuente, mercado) van arriba de las calles.
+  capasCalles() {
+    const rbs = this.ribbons.filter((r) => !r.under);
+    const pares = [];
+    for (const A of rbs) for (const p of [A.pts[0], A.pts[A.pts.length - 1]]) for (const B of rbs) {
+      if (B === A || A.w > B.w) continue;
+      const enB = distPoly(p, B.pts) < B.w / 2 - 0.3;
+      const puntaB = Math.min(Math.hypot(p[0] - B.pts[0][0], p[1] - B.pts[0][1]), Math.hypot(p[0] - B.pts[B.pts.length - 1][0], p[1] - B.pts[B.pts.length - 1][1])) < B.w / 2 + 0.5;
+      // en un cruce en T va debajo; si las dos siguen una en la otra, la más angosta va debajo
+      if (enB && (!puntaB || A.w < B.w)) pares.push([A, B]);
+    }
+    for (const r of rbs) r.capa = 0;
+    for (let it = 0; it < 8; it++) for (const [A, B] of pares) if (B.capa <= A.capa) B.capa = A.capa + 1;
+    this.ribbons.forEach((rb, idx) => { rb.off = rb.under ? 0.045 : 0.07 + Math.min(rb.capa, 4) * 0.03 + (idx % 3) * 0.008; });
   }
 
   stampRiver() {
@@ -387,6 +452,7 @@ export class World {
       if (this.gridVal(this.riverDist, x, z) < 10 || this.nearSolid(x, z, 1.6)) return false;
       if (this.bridges.some((b) => Math.hypot(b.x - x, b.z - z) < 22)) return false;
       for (const rb of this.ribbons) for (const [px, pz] of rb.pts) if (Math.hypot(px - x, pz - z) - rb.w / 2 < minRoad) return false;
+      for (const pq of this.plazas) if (Math.hypot(pq.x - x, pq.z - z) - pq.r < minRoad) return false;
       return true;
     };
     const cerca = (x, z) => {
@@ -727,25 +793,66 @@ export class World {
     return ia ? [hi, 1] : [0, lo];
   }
 
-  buildRoads(scene) {
-    const pos = [], col = [];
-    const c = new THREE.Color(), line = new THREE.Color('#f2efe6');
-    this.ribbons.forEach((rb, idx) => {
-      c.set(CALLE_COLOR[rb.m] || '#888');
-      const off = rb.under ? 0.045 : 0.07 + (idx % 7) * 0.01;
-      const pts = rb.pts;
-      // borde de la cinta en el punto i (+t hacia i+1; con t > 0 usa la dirección del segmento)
-      const edge = (i, s, t = 0) => {
-        let px = pts[i][0], pz = pts[i][1], dx, dz;
-        if (t > 0) {
-          const [bx, bz] = pts[Math.min(pts.length - 1, i + 1)];
-          px += (bx - px) * t; pz += (bz - pz) * t; dx = bx - pts[i][0]; dz = bz - pts[i][1];
-        } else {
-          const [ax, az] = pts[Math.max(0, i - 1)], [bx, bz] = pts[Math.min(pts.length - 1, i + 1)];
-          dx = bx - ax; dz = bz - az;
+  // Discos que redondean las calles: plazoletas de remate, puntas y esquinas (tapan los huecos en forma de cuña
+  // que dejan dos cintas que se juntan en ángulo). Cada disco va un poco más abajo que su calle.
+  discosCalles() {
+    if (this._discos) return this._discos;
+    const out = [], rbs = this.ribbons;
+    const d2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    for (const pq of this.plazas) {
+      if (pq.vereda) out.push({ x: pq.x, z: pq.z, r: pq.r + 2.5, off: 0.042, m: 'vereda' });
+      out.push({ x: pq.x, z: pq.z, r: pq.r, off: pq.rb.off - 0.004, m: pq.m });
+    }
+    rbs.forEach((rb, idx) => {
+      const pts = rb.pts, n = pts.length;
+      for (const i of [0, n - 1]) {
+        const p = pts[i];
+        if (this.enPuente(p[0], p[1], 0.5) || this.plazas.some((pq) => pq.rb === rb && d2([pq.x, pq.z], p) < 0.5)) continue;
+        if (rb.under) {
+          // la vereda se redondea sólo donde dobla o se cruza con otra vereda (no a la salida del pueblo)
+          if (!rbs.some((o) => o !== rb && o.under && distPoly(p, o.pts) < o.w / 2)) continue;
+          out.push({ x: p[0], z: p[1], r: rb.w / 2, off: 0.042, m: rb.m });
+          continue;
         }
+        // una plaza ancha que termina sobre una calle más angosta no se redondea (se saldría de la plaza)
+        if (rbs.some((o) => o !== rb && !o.under && o.w < rb.w && distPoly(p, o.pts) < o.w / 2)) continue;
+        // dos calles que siguen una en la otra: la tapa la pone sólo la de más arriba
+        const otra = rbs.some((o, j) => o !== rb && !o.under && (o.off > rb.off || (o.off === rb.off && j < idx)) && Math.min(d2(o.pts[0], p), d2(o.pts[o.pts.length - 1], p)) < Math.min(o.w, rb.w) / 2);
+        if (!otra) out.push({ x: p[0], z: p[1], r: rb.w / 2, off: rb.off - 0.004, m: rb.m });
+      }
+      // esquinas: donde la cinta dobla más de 20° el ancho se angosta; un disco lo completa
+      for (let i = 1; i < n - 1; i++) {
+        const [ax, az] = pts[i - 1], [bx, bz] = pts[i], [cx, cz] = pts[i + 1];
+        const u = Math.atan2(bz - az, bx - ax), v = Math.atan2(cz - bz, cx - bx);
+        let da = Math.abs(v - u); if (da > Math.PI) da = 2 * Math.PI - da;
+        if (da > 0.35 && !this.enPuente(bx, bz, 0.5)) out.push({ x: bx, z: bz, r: rb.w / 2, off: rb.under ? 0.042 : rb.off - 0.006, m: rb.m });
+      }
+    });
+    return (this._discos = out);
+  }
+
+  // Triángulos de las calles (sin Three.js, para poder probarlos): pos = [x,y,z,...] y mat = material de cada triángulo.
+  trisCalles() {
+    if (this._tris) return this._tris;
+    const pos = [], mat = [];
+    const tri = (m, ...ps) => { for (const p of ps) pos.push(...p); mat.push(m); };
+    this.ribbons.forEach((rb) => {
+      const off = rb.off;
+      const pts = rb.pts;
+      // dirección de la cinta en el punto i (promedio de los dos tramos)
+      const dir = (i) => {
+        const [ax, az] = pts[Math.max(0, i - 1)], [bx, bz] = pts[Math.min(pts.length - 1, i + 1)];
+        const L = Math.hypot(bx - ax, bz - az) || 1;
+        return [(bx - ax) / L, (bz - az) / L];
+      };
+      // borde de la cinta a la altura t del tramo i..i+1, corrido s a un costado
+      const edge = (i, s, t = 0) => {
+        const [ax, az] = pts[i], [bx, bz] = pts[Math.min(pts.length - 1, i + 1)];
+        const da = dir(i), db = dir(Math.min(pts.length - 1, i + 1));
+        let dx = da[0] + (db[0] - da[0]) * t, dz = da[1] + (db[1] - da[1]) * t;
         const L = Math.hypot(dx, dz) || 1;
-        const x = px + (-dz / L) * s, z = pz + (dx / L) * s;
+        dx /= L; dz /= L;
+        const x = ax + (bx - ax) * t - dz * s, z = az + (bz - az) * t + dx * s;
         return [x, this.terrainHeight(x, z) + off, z];
       };
       for (let i = 0; i < pts.length - 1; i++) {
@@ -753,18 +860,52 @@ export class World {
         const tr = this.tramoFueraDePuente(pts, i);
         if (!tr) continue;
         const [t0, t1] = tr;
-        const ea = (s) => (t0 > 0 ? edge(i, s, t0) : edge(i, s)), eb = (s) => (t1 < 1 ? edge(i, s, t1) : edge(i + 1, s));
-        const a = ea(w), b = ea(-w), d = eb(-w), e = eb(w);
-        pos.push(...a, ...b, ...d, ...a, ...d, ...e);
-        for (let k = 0; k < 6; k++) col.push(c.r, c.g, c.b);
-        if (rb.m === 'asfalto' && rb.w >= 6 && i % 3 === 0) {
+        const ea = (s) => edge(i, s, t0), eb = (s) => edge(i, s, t1);
+        // en celdas de 1,5 m a lo largo y 2 m a lo ancho como mucho: la cinta sigue el terreno (la grilla es de 4 m)
+        // y no asoma el pasto por el medio
+        const segL = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]) * (t1 - t0);
+        const steps = Math.max(1, Math.ceil(segL / 1.5)), lanes = Math.max(1, Math.ceil(rb.w / 2));
+        for (let st = 0; st < steps; st++) {
+          const ta = t0 + ((t1 - t0) * st) / steps, tb = t0 + ((t1 - t0) * (st + 1)) / steps;
+          for (let l = 0; l < lanes; l++) {
+            const s0 = w - (2 * w * l) / lanes, s1 = w - (2 * w * (l + 1)) / lanes;
+            const a = edge(i, s0, ta), b = edge(i, s1, ta), d = edge(i, s1, tb), e = edge(i, s0, tb);
+            tri(rb.m, a, b, d); tri(rb.m, a, d, e);
+          }
+        }
+        // la línea del medio no se pinta en los primeros y últimos metros (en los cruces se juntarían varias)
+        if (rb.m === 'asfalto' && rb.w >= 6 && i % 3 === 0 && i >= 4 && i < pts.length - 5) {
           const a2 = ea(0.12), b2 = ea(-0.12), d2 = eb(-0.12), e2 = eb(0.12);
           for (const p of [a2, b2, d2, e2]) p[1] += 0.01;
-          pos.push(...a2, ...b2, ...d2, ...a2, ...d2, ...e2);
-          for (let k = 0; k < 6; k++) col.push(line.r, line.g, line.b);
+          tri('linea', a2, b2, d2); tri('linea', a2, d2, e2);
         }
       }
     });
+    // discos (en anillos, para que sigan el terreno)
+    for (const q of this.discosCalles()) {
+      const seg = Math.max(14, Math.min(48, Math.ceil((q.r * Math.PI * 2) / 1.5))), rings = Math.max(1, Math.ceil(q.r / 1.5));
+      const at = (k, j) => {
+        if (k === 0) return [q.x, this.terrainHeight(q.x, q.z) + q.off, q.z];
+        const a = (j / seg) * Math.PI * 2, rr = (q.r * k) / rings, x = q.x + Math.cos(a) * rr, z = q.z + Math.sin(a) * rr;
+        return [x, this.terrainHeight(x, z) + q.off, z];
+      };
+      for (let k = 0; k < rings; k++) for (let j = 0; j < seg; j++) {
+        const p0 = at(k, j), p1 = at(k, j + 1), p2 = at(k + 1, j + 1), p3 = at(k + 1, j);
+        if (k === 0) tri(q.m, p0, p2, p3);
+        else { tri(q.m, p0, p1, p2); tri(q.m, p0, p2, p3); }
+      }
+    }
+    return (this._tris = { pos, mat });
+  }
+
+  buildRoads(scene) {
+    const { pos, mat } = this.trisCalles();
+    const col = [], cache = {};
+    const c = new THREE.Color();
+    for (const m of mat) {
+      if (!cache[m]) { c.set(m === 'linea' ? '#f2efe6' : CALLE_COLOR[m] || '#888'); cache[m] = [c.r, c.g, c.b]; }
+      for (let k = 0; k < 3; k++) col.push(...cache[m]);
+    }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
@@ -1146,6 +1287,10 @@ export class World {
       ctx.lineWidth = Math.max(1, (rb.w / this.size) * px * 1.6);
       ctx.beginPath(); rb.pts.forEach(([x, z], k) => (k ? ctx.lineTo(toM(x), toM(z)) : ctx.moveTo(toM(x), toM(z)))); ctx.stroke();
     }
+    for (const pq of this.plazas) {
+      ctx.fillStyle = pq.m === 'asfalto' ? '#5a5d63' : pq.m === 'vereda' ? '#d9d2c2' : '#b0905f';
+      ctx.beginPath(); ctx.arc(toM(pq.x), toM(pq.z), Math.max(1, (pq.r / this.size) * px * 1.3), 0, Math.PI * 2); ctx.fill();
+    }
     for (const p of this.placed) {
       if (['farol', 'cerca', 'auto', 'caja3', 'barriles', 'fogon', 'campo', 'tractor', 'puesto', 'carpa', 'pasarela', 'muelle', 'malecon', 'puente', 'montanaRusa', 'rueda', 'poste', 'cables', 'indicador', 'torreTeleferico', 'banco', 'tacho', 'hidrante', 'buzon', 'cartel', 'cantero', 'seto', 'jardin'].includes(p.name)) continue;
       const f = p.fp;
@@ -1213,6 +1358,17 @@ function smoothstep(a, b, x) {
 }
 
 // Reparte puntos cada `step` metros a lo largo de una polilínea.
+// Distancia de un punto [x, z] a una polilínea.
+export function distPoly([x, z], pts) {
+  let best = Infinity;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [ax, az] = pts[i], [bx, bz] = pts[i + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2));
+    best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t));
+  }
+  return best;
+}
+
 function resample(pts, step) {
   const out = [pts[0]];
   for (let i = 0; i < pts.length - 1; i++) {
