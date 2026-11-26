@@ -11,7 +11,7 @@ Archivo: `public/js/loot.js`. Todo lo que se ve del loot en el cliente: objetos 
 - `modeloObjeto(item, color)` (2026-11-26): el modelo de un objeto que no es arma (nodo `objetos_<nombre>` de `objetos.glb` con sus materiales, o la forma simple si no cargó). Lo usan `createItemMesh` y [[iconos.js]] para la foto de la barra de items.
 - `createChest()`: cofre con aura, brillo en el piso y motas doradas. La tapa es el nodo `cofre_tapa`; el fondo usa el material `BrilloCofre` clonado por cofre.
 - `abrirCofre(g, animar)`: con `animar` arranca la animación (tapa con rebote, destello, ráfaga de chispas, brillo que se apaga); sin animar queda abierto de una.
-- `animarLoot(items, cofres, t, camera)`: un cuadro. Objetos: flotan, giran, el haz mira a la cámara, chispas solo a menos de 45 m, nada a más de 160 m. Un objeto nuevo a menos de 3,5 m de un cofre abierto hace menos de 1,5 s sale volando del cofre en arco (0,6 s). Cofres: aura que late mientras están cerrados y la animación de apertura.
+- `animarLoot(items, cofres, t, camera, world?)`: un cuadro. Objetos: flotan, giran, el haz mira a la cámara, chispas solo a menos de 45 m, nada a más de 160 m. Un objeto nuevo a menos de 3,5 m de un cofre abierto hace menos de 1,5 s sale volando del cofre en arco (0,6 s). Con `world` (2026-11-26, lo pasa [[main.js]]) el arco es más bajo si hay un techo cerca (`techoLoot` de [[lugarLoot.js]]; hasta 1,4 m) y nunca baja del piso por el que pasa (`pisoLoot`): si el destino está más abajo, cae recién al pasar el borde. Sin `world` ([[loot.html]]) el arco es siempre de 1,4 m. Cofres: aura que late mientras están cerrados y la animación de apertura.
 
 ## Quién la usa
 

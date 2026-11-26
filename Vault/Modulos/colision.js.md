@@ -2,7 +2,7 @@
 
 Volver a [[Inicio]] · lo usa [[world.js]]
 
-Archivo: `public/js/colision.js`. Colisiones del mapa: cajas, rampas y cilindros guardados en una grilla espacial de 8 m. Lo usan el cliente (movimiento del jugador) y el servidor (dónde cae el loot).
+Archivo: `public/js/colision.js`. Colisiones del mapa: cajas, rampas y cilindros guardados en una grilla espacial de 8 m. Lo usan el cliente (movimiento del jugador) y el servidor (dónde cae el loot, vía [[lugarLoot.js]]).
 
 - `STEP = 0.55`: escalón que se sube caminando (más alto hay que saltar).
 - `class Solidos`: `add`, `addBox(b, kind)`, `addCyl(x, z, r, y0, y1, kind)`, `near(x, z, rad, fn)` (recorre los sólidos cercanos sin repetir), `remove(s)` (saca un sólido de la grilla cuando se rompe su pieza y lo marca `dead`; ver [[Estructuras rompibles]]).

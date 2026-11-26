@@ -13,6 +13,7 @@ import {
 } from './public/js/items.js';
 import { TIPOS, normalizar, tieneApoyo, sinApoyo, vidaDe, editValida, OBRA, ALCANCE_EDICION, cajaPieza, superficie, DEBAJO } from './public/js/construccion.js';
 import { AUTO, nuevoAuto, aplicarRed, estadoRed, autoPublico, asientoLibre, rapidez } from './public/js/autos.js';
+import { repartirLoot, acomodarLoot, LOOT_RADIO, LOOT_ALTO } from './public/js/lugarLoot.js';
 import { totalValido, dificultadValida, cuantosBots } from './public/js/opcionesBots.js';
 import { nuevoBot, nombresBots, prepararBots, actualizarBots, alRecibirDanio, alMatar } from './servidor/bots.js';
 
@@ -151,16 +152,31 @@ function spawnItem(room, item, x, y, z) {
   return it;
 }
 
+// Reparte objetos alrededor de (x,y,z) (cofre, jugador que suelta algo o que murió) sin pasar paredes: ver lugarLoot.js.
 function spawnAround(room, list, x, y, z) {
-  const out = list.map((item, k) => {
-    const a = (k / list.length) * Math.PI * 2 + Math.random();
-    const r = 1 + Math.random() * 0.8;
-    const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
-    return spawnItem(room, item, px, Math.max(y, room.world.groundHeight(px, pz, y + 1)), pz);
-  });
+  const lugares = repartirLoot(room.world, list.length, x, y, z);
+  const out = list.map((item, k) => spawnItem(room, item, lugares[k].x, lugares[k].y, lugares[k].z));
   if (out.length) broadcast(room, { t: 'itemsAdd', items: out });
   return out;
 }
+
+// Algo cambió en las cajas (se construyó, editó o rompió una pieza): el loot que quedó adentro sale para su lado
+// y el que quedó en el aire cae. caja = { x0, y0, z0, x1, y1, z1 }.
+function acomodarItems(room, cajas) {
+  if (!cajas.length) return;
+  const m = LOOT_RADIO + 0.3;
+  const cerca = (it, a) => it.x > a.x0 - m && it.x < a.x1 + m && it.z > a.z0 - m && it.z < a.z1 + m && it.y > a.y0 - LOOT_ALTO - 0.3 && it.y < a.y1 + 1.5;
+  const movidos = [];
+  for (const it of room.items.values()) {
+    if (!cajas.some((a) => cerca(it, a))) continue;
+    const p = acomodarLoot(room.world, it);
+    if (Math.hypot(p.x - it.x, p.y - it.y, p.z - it.z) < 0.02) continue;
+    it.x = p.x; it.y = p.y; it.z = p.z;
+    movidos.push(it);
+  }
+  if (movidos.length) { broadcast(room, { t: 'itemsDel', ids: movidos.map((it) => it.id) }); broadcast(room, { t: 'itemsAdd', items: movidos }); }
+}
+const cajaDeAabb = (a) => ({ x0: a[0], y0: a[1], z0: a[2], x1: a[3], y1: a[4], z1: a[5] });
 
 function startMatch(room) {
   room.phase = 'bus';
@@ -612,6 +628,7 @@ function handleGame(room, player, msg) {
       player.mats[mat] -= BUILD_COST;
       broadcast(room, { t: 'structAdd', s: structPublic(s) });
       send(player.ws, invMsg(player));
+      acomodarItems(room, [cajaPieza(s)]); // el loot que quedó adentro de la pieza nueva sale para su lado
       break;
     }
     case 'edit': {
@@ -625,6 +642,7 @@ function handleGame(room, player, msg) {
       const dir = s.type === 'rampa' && Number.isInteger(msg.dir) && msg.dir >= 0 && msg.dir <= 3 ? msg.dir : s.dir;
       room.world.editStruct(s.key, msg.e, dir);
       broadcast(room, { t: 'structEdit', key: s.key, e: s.e, dir: s.dir });
+      acomodarItems(room, [cajaPieza(s)]); // al cerrar un hueco el loot que estaba ahí sale para su lado
       break;
     }
     case 'useStart': {
@@ -841,18 +859,13 @@ function damagePieza(room, id, dmg, avisar = true) {
   // las rutas de los bots que pasaban por ahí se vuelven a calcular
   if (room.nav) for (const r of rotas) room.nav.invalidar(room.world.piezas[r].aabb);
   // construcciones de jugadores que se apoyaban en lo que se rompió
-  const caidas = derrumbar(room);
+  const cajasCaidas = [];
+  const caidas = derrumbar(room, cajasCaidas);
   if (caidas.length) broadcast(room, { t: 'structDel', key: null, caidas });
-  // lo que quedó en el aire cae
+  // lo que quedó en el aire cae (y lo que estaba sobre construcciones que se cayeron)
   const dentro = (p, a) => p[0] > a[0] - 0.3 && p[0] < a[3] + 0.3 && p[2] > a[2] - 0.3 && p[2] < a[5] + 0.3 && p[1] > a[1] - 0.3 && p[1] < a[4] + 1.5;
   const zonas = rotas.map((r) => room.world.piezas[r].aabb);
-  const movidos = [];
-  for (const it of room.items.values()) {
-    if (!zonas.some((a) => dentro([it.x, it.y, it.z], a))) continue;
-    const g = room.world.groundHeight(it.x, it.z, it.y + 0.3);
-    if (g < it.y - 0.05) { it.y = +g.toFixed(2); movidos.push(it); }
-  }
-  if (movidos.length) { broadcast(room, { t: 'itemsDel', ids: movidos.map((it) => it.id) }); broadcast(room, { t: 'itemsAdd', items: movidos }); }
+  acomodarItems(room, [...zonas.map(cajaDeAabb), ...cajasCaidas]);
   room.chests.forEach((c, idx) => {
     if (!zonas.some((a) => dentro([c.x, c.y, c.z], a))) return;
     const g = room.world.groundHeight(c.x, c.z, c.y + 0.3);
@@ -973,15 +986,22 @@ function damageStruct(room, s, dmg) {
   const hp = vidaDe(s, Date.now());
   if (hp <= 0) {
     room.world.removeStruct(s.key);
-    broadcast(room, { t: 'structDel', key: s.key, caidas: derrumbar(room) });
+    const cajas = [cajaPieza(s)];
+    broadcast(room, { t: 'structDel', key: s.key, caidas: derrumbar(room, cajas) });
+    acomodarItems(room, cajas);
   } else broadcast(room, { t: 'structHp', key: s.key, hp: Math.ceil(hp), dano: Math.round(s.dano) });
 }
 
 // Saca las construcciones que quedaron sin apoyo (como en el género: lo que no llega al piso se cae). Devuelve sus claves.
-function derrumbar(room) {
+// cajas: si viene, se le agregan las cajas de lo que se cayó (para acomodar el loot que tenía arriba).
+function derrumbar(room, cajas = null) {
   if (!room.world.structs.size) return [];
   const caidas = sinApoyo(room.world);
-  for (const k of caidas) room.world.removeStruct(k);
+  for (const k of caidas) {
+    const s = room.world.structs.get(k);
+    if (cajas && s) cajas.push(cajaPieza(s));
+    room.world.removeStruct(k);
+  }
   return caidas;
 }
 
