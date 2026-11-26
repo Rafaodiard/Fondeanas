@@ -1,6 +1,6 @@
 // Construcción de los jugadores: piezas, ediciones, choques, superficies y apoyo.
 // Sin Three.js: lo usan el cliente (movimiento, vista previa, edición) y el servidor (validar, vida, derrumbes).
-import { GRID, MATERIALS } from './items.js';
+import { GRID, MATERIALS, DIRS, structKey } from './items.js';
 
 export const TIPOS = ['pared', 'piso', 'rampa', 'techo'];
 export const NOMBRES = { pared: 'Pared', piso: 'Piso', rampa: 'Rampa', techo: 'Techo' };
@@ -183,22 +183,159 @@ function indexar(structs) {
   return m;
 }
 
-// ¿Se puede poner la pieza nueva s? Tiene que tocar el piso, el mapa u otra construcción.
-export function tieneApoyo(world, s) {
-  if (apoyadaEnMapa(world, s)) return true;
-  const porCelda = indexar(world.structs.values());
-  s.caja = cajaPieza(s);
-  return vecinas(porCelda, s).length > 0;
+// ---------- Grilla de encastre (como en el género) ----------
+// Todas las piezas viven en una grilla de celdas de GRID × GRID × GRID: las paredes en los lados de una celda,
+// los pisos en su cara de abajo, y la rampa o el techo (uno de los dos) adentro, apoyados en esa cara.
+// Dos piezas están enganchadas cuando comparten un borde entero de la grilla: el borde de arriba de una pared
+// con el de un piso, el borde alto de una rampa con el de un piso, dos paredes de costado, etc. Así no puede
+// quedar un piso en el medio de una pared: cada pieza arranca donde termina otra.
+
+// Esquinas [i, j] del lado d (0=-Z, 1=+X, 2=+Z, 3=-X) de la celda (i, j).
+function lado(i, j, d) {
+  return d === 0 ? [[i, j], [i + 1, j]] : d === 1 ? [[i + 1, j], [i + 1, j + 1]] : d === 2 ? [[i, j + 1], [i + 1, j + 1]] : [[i, j], [i, j + 1]];
+}
+const punto = (i, y, j) => `${i},${Math.round(y * 100) / 100},${j}`;
+const segmento = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+
+// Bordes de la grilla que ocupa la pieza (claves de texto; dos piezas con una clave igual se enganchan).
+// Las ediciones no cambian los bordes: una pared con puerta sigue sosteniendo lo que tiene arriba.
+export function bordes(s) {
+  const h = ([a, b], y) => segmento(punto(a[0], y, a[1]), punto(b[0], y, b[1]));
+  const v = (p, y0, y1) => segmento(punto(p[0], y0, p[1]), punto(p[0], y1, p[1]));
+  if (s.type === 'pared') {
+    const n = s.dir === 2 || s.dir === 1 ? normalizar({ ...s }) : s;
+    const pts = lado(n.i, n.j, n.dir === 0 ? 0 : 3);
+    return [h(pts, n.y), h(pts, n.y + GRID), v(pts[0], n.y, n.y + GRID), v(pts[1], n.y, n.y + GRID)];
+  }
+  if (s.type === 'rampa') {
+    const alto = lado(s.i, s.j, s.dir), bajo = lado(s.i, s.j, (s.dir + 2) % 4);
+    const out = [h(alto, s.y + GRID), h(bajo, s.y)];
+    // costados en diagonal: cada esquina de abajo con la de arriba del mismo costado
+    for (const b of bajo) {
+      const a = alto.find((p) => (s.dir % 2 === 0 ? p[0] === b[0] : p[1] === b[1]));
+      out.push(segmento(punto(b[0], s.y, b[1]), punto(a[0], s.y + GRID, a[1])));
+    }
+    return out;
+  }
+  return [0, 1, 2, 3].map((d) => h(lado(s.i, s.j, d), s.y)); // piso y techo: los 4 bordes de la base
 }
 
-// Claves de las construcciones que quedaron sin apoyo (no llegan al piso ni al mapa por otras piezas).
+// ¿Comparten un borde de la grilla?
+export function enganchadas(a, b) {
+  const ba = new Set(bordes(a));
+  return bordes(b).some((k) => ba.has(k));
+}
+
+// ¿Están en la misma grilla de altura? (la diferencia de nivel es un múltiplo exacto de GRID)
+const modulo = (a, n) => ((a % n) + n) % n;
+export function mismaGrilla(a, b) {
+  const d = modulo(a.y - b.y, GRID);
+  return d < 0.01 || d > GRID - 0.01;
+}
+
+// La rampa y el techo ocupan el mismo lugar adentro de la celda: no puede haber los dos.
+export function ocupado(world, s) {
+  if (world.structs.has(s.key || structKey(s))) return true;
+  if (s.type !== 'rampa' && s.type !== 'techo') return false;
+  return world.structs.has(structKey({ ...s, type: s.type === 'rampa' ? 'techo' : 'rampa' }));
+}
+
+// ¿La pieza nueva s se apoya en el piso o en el mapa, o comparte un borde con otra construcción?
+export function tieneApoyo(world, s) {
+  if (apoyadaEnMapa(world, s)) return true;
+  s.caja = cajaPieza(s);
+  return vecinas(indexar(world.structs.values()), s).some((o) => enganchadas(s, o));
+}
+
+// Por qué no se puede poner la pieza s, o null si encaja. Lo usan la vista previa (verde o roja) y el servidor.
+export const MOTIVOS = {
+  ocupado: 'Ya hay una pieza ahí',
+  grilla: 'No encaja con la grilla de al lado',
+  apoyo: 'Sin apoyo: tiene que salir del borde de otra pieza o del piso',
+};
+export function motivoNoEncaja(world, s) {
+  if (ocupado(world, s)) return 'ocupado';
+  s.caja = cajaPieza(s);
+  const cerca = vecinas(indexar(world.structs.values()), s);
+  // lo que toca tiene que estar en la misma grilla (si no, quedaría un piso a media pared)
+  if (cerca.some((o) => !mismaGrilla(s, o))) return 'grilla';
+  if (apoyadaEnMapa(world, s) || cerca.some((o) => enganchadas(s, o))) return null;
+  return 'apoyo';
+}
+export const encaja = (world, s) => motivoNoEncaja(world, s) === null;
+
+// Nivel de la grilla para una pieza nueva cerca de la celda (i, j) a la altura y (los pies).
+// Si hay construcciones cerca, el de su grilla: la celda que contiene y (con `tol` de margen, para que parado
+// sobre un piso cuente ese piso). Si no hay, y redondeado para abajo a medio metro (el piso del terreno).
+export function nivelGrilla(world, i, j, y, tol = 0.6) {
+  let ref = null, mejor = Infinity;
+  for (const s of world.structs.values()) {
+    if (Math.abs(s.i - i) > 2 || Math.abs(s.j - j) > 2) continue;
+    const dy = Math.abs(s.y - y);
+    if (dy > GRID * 2) continue;
+    const d = Math.hypot(s.i - i, s.j - j) * GRID + dy;
+    if (d < mejor) { mejor = d; ref = s; }
+  }
+  if (!ref) return Math.floor(y * 2) / 2;
+  return ref.y + GRID * Math.floor((y - ref.y + tol) / GRID);
+}
+
+// ---------- A dónde va la pieza que se está por poner ----------
+// yo = { pos: {x,y,z}, yaw, pitch }; tipo = pieza; giro = vueltas extra de la rampa (R).
+// Como en el género: la pared va en el lado de la celda que se mira, el piso abajo de los pies, adelante o
+// arriba de la cabeza según cuánto se mire para abajo o para arriba, y lo mismo la rampa y el techo.
+export function direccionDe(yaw) {
+  return Math.round(((-yaw / (Math.PI / 2)) % 4 + 4) % 4) % 4; // 0=-Z,1=+X,2=+Z,3=-X
+}
+export function nivelDelJugador(world, pos, d) {
+  const ci = Math.floor(pos.x / GRID), cj = Math.floor(pos.z / GRID);
+  // parado sobre una pieza: su nivel, para que todo encaje
+  for (const s of world.structs.values()) {
+    if (s.type === 'pared' || s.i !== ci || s.j !== cj) continue;
+    if (pos.y < s.y - 0.3 || pos.y > s.y + (s.type === 'rampa' ? GRID : 1.7) + 0.6) continue;
+    if (s.type === 'rampa') {
+      if (s.dir === d) return { ci, cj, level: s.y, sube: true }; // la rampa sube hacia donde miro: lo de adelante va arriba
+      return { ci, cj, level: pos.y > s.y + GRID * 0.5 ? s.y + GRID : s.y, sube: false };
+    }
+    return { ci, cj, level: s.y, sube: false };
+  }
+  return { ci, cj, level: nivelGrilla(world, ci, cj, pos.y), sube: false };
+}
+export function objetivoPieza(world, yo, tipo, giro = 0) {
+  const d = direccionDe(yo.yaw);
+  const { ci, cj, level, sube } = nivelDelJugador(world, yo.pos, d);
+  const [dx, dz] = DIRS[d];
+  const p = yo.pitch, arriba = sube ? GRID : 0;
+  let t;
+  if (tipo === 'pared') t = { i: ci, j: cj, y: level + (p > 0.8 ? GRID : sube && p > 0.1 ? GRID : 0), dir: d };
+  else if (tipo === 'piso') {
+    if (p > 0.45) t = { i: ci, j: cj, y: level + GRID, dir: d };
+    else if (p < -0.6) t = { i: ci, j: cj, y: sube ? level + GRID : level, dir: d };
+    else t = { i: ci + dx, j: cj + dz, y: level + arriba, dir: d };
+  } else if (tipo === 'rampa') {
+    const dir = (d + giro) % 4;
+    if (p < -0.55 && !sube) t = { i: ci, j: cj, y: level, dir };
+    else t = { i: ci + dx, j: cj + dz, y: level + arriba, dir };
+  } else if (p > 0.3) t = { i: ci, j: cj, y: level + GRID, dir: d };
+  else t = { i: ci + dx, j: cj + dz, y: level + arriba, dir: d };
+  const s = normalizar({ type: tipo, ...t, mat: yo.mat, e: 0 });
+  s.key = structKey(s);
+  return s;
+}
+
+// Claves de las construcciones que quedaron sin apoyo: las que no llegan al piso ni al mapa
+// pasando de borde en borde por otras piezas.
 export function sinApoyo(world) {
   const lista = [...world.structs.values()];
-  const porCelda = indexar(lista);
+  const porBorde = new Map();
+  for (const s of lista) {
+    s.bordes = bordes(s);
+    for (const k of s.bordes) { if (!porBorde.has(k)) porBorde.set(k, []); porBorde.get(k).push(s); }
+  }
   const ok = new Set(), cola = [];
   for (const s of lista) { s.caja = cajaPieza(s); if (apoyadaEnMapa(world, s)) { ok.add(s); cola.push(s); } }
   while (cola.length) {
-    for (const v of vecinas(porCelda, cola.pop())) if (!ok.has(v)) { ok.add(v); cola.push(v); }
+    for (const k of cola.pop().bordes) for (const v of porBorde.get(k)) if (!ok.has(v)) { ok.add(v); cola.push(v); }
   }
   return lista.filter((s) => !ok.has(s)).map((s) => s.key);
 }

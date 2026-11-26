@@ -26,3 +26,4 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 
 - [[Jugar con bots]]: el pedido de jugar con bots y lo que se decidió (nombres, fin de partida, límite de 24).
 - [[Fotos de armas en la barra]]: el pedido de ver las armas en la barra de items y lo que se decidió (fotos sacadas de los modelos 3D).
+- [[Encastre de la construcción]]: el pedido de que cada pieza vaya donde termina otra (grilla de encastre) y de construir más fluido, y lo que se decidió.
