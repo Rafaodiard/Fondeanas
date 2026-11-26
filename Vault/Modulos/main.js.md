@@ -41,3 +41,11 @@ Al arrancar completa `MODEL.clone` y `MODEL.baked` de [[world.js]] con las funci
 ## Autos (2026-11-26)
 
 Los autos van en [[manejar.js]] (`crearManejo`). [[main.js]] le pasa los mensajes `auto*`, `bocina` y lo llama en cada cuadro (`autos.update`); el estado `auto` del jugador (sentado) cuenta como en partida (`PLAYING`) y manda `state` igual que a pie. Lo que se agregó acá: contexto `vehiculo` en `contexto()`, `case` de `bajarAuto` / `cambiarAsiento` / `bocina` en `hacer()`, el auto en `findInteract` (*E Manejar* o *Subir al auto*), los autos en `castRay` (disparos y pico: hits `{ auto }`), `updateOthers` sienta a los demás con `autos.sentarOtro`, la cámara del auto en `updateCamera` (atrás, más lejos y con más ángulo de visión cuanto más rápido), el mensaje `empujon` (atropellado), la causa de muerte `auto`, los autos en el minimapa y el HUD del auto. Ver [[Autos]].
+
+## Bots (2026-11-26)
+
+- `enter(type, conBots)`: al crear una sala guarda en `alCrear` los bots de Configuración; al llegar `welcome` manda `bots` y, con *Jugar con bots* (`#btnBots`), también `start`.
+- `cambiarBots` (los `<select>` de la sala `#botsTotal` y `#botsDif`): guarda las opciones con `fijarOpcion` y manda `bots`. `resumenMenuBots` escribe debajo del botón del menú el total y la dificultad.
+- `showLobby`: lista solo a las personas, agrega "🤖 + N bots (dificultad)", muestra los selectores solo al anfitrión y el botón dice "Empezar con N bots".
+- `onMatchEnd`: con `botsVivos` muestra "Quedaban N bots en pie".
+- Los bots llegan en `room.players` (con `bot: true`) y se dibujan y animan como cualquier otro jugador (`others`). Ver [[Bots]].

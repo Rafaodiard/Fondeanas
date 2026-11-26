@@ -12,14 +12,20 @@ import {
 } from './public/js/items.js';
 import { TIPOS, normalizar, tieneApoyo, sinApoyo, vidaDe, editValida, OBRA, ALCANCE_EDICION, cajaPieza } from './public/js/construccion.js';
 import { AUTO, nuevoAuto, aplicarRed, estadoRed, autoPublico, asientoLibre, rapidez } from './public/js/autos.js';
+import { totalValido, dificultadValida, cuantosBots } from './public/js/opcionesBots.js';
+import { nuevoBot, nombresBots, prepararBots, actualizarBots, alRecibirDanio, alMatar } from './servidor/bots.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
 const ISLAND_SIZE = 1200;
 const BUS_DURATION = 22;
 const BUS_HEIGHT = 260;
-const MAX_PLAYERS = 16;
+const MAX_PLAYERS = 16; // personas (los bots completan aparte, hasta BOT_MAX_TOTAL entre todos)
 const TICK_MS = 100;
+const BOT_MS = 50;      // los bots se mueven a 20 Hz
+// Sólo para mirar o probar a los bots: SF_BOTS_HASTA_EL_FINAL=1 npm start sigue la partida aunque ya no quede
+// ninguna persona viva (si no, termina a los pocos segundos de morir la última).
+const BOTS_HASTA_EL_FINAL = !!process.env.SF_BOTS_HASTA_EL_FINAL;
 const PICKUP_RANGE = 3.2;
 // Sólo para probar la construcción: SF_MATS=500 npm start arranca cada partida con 500 de cada material.
 const MATS_INICIALES = Math.max(0, Math.min(MAX_MATS, Number(process.env.SF_MATS) || 0));
@@ -68,21 +74,25 @@ function createRoom() {
     code: makeCode(), seed: Math.floor(Math.random() * 1e9), phase: 'lobby', players: new Map(), hostId: null,
     bus: null, storm: null, winner: null, world: null, items: new Map(), chests: [], nextItem: 1,
     trees: [], rocks: [], autos: [],
+    bots: { total: 0, dif: 'normal' }, // los bots completan la sala hasta `total` jugadores (0 = sin bots)
+    partida: 0,
   };
   rooms.set(room.code, room);
   return room;
 }
 
-const send = (ws, msg) => { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); };
+// los bots no tienen conexión (ws null): no se les manda nada
+const send = (ws, msg) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); };
 function broadcast(room, msg, exceptId) {
   const data = JSON.stringify(msg);
-  for (const p of room.players.values()) if (p.id !== exceptId && p.ws.readyState === 1) p.ws.send(data);
+  for (const p of room.players.values()) if (p.id !== exceptId && p.ws && p.ws.readyState === 1) p.ws.send(data);
 }
-const publicPlayer = (p) => ({ id: p.id, name: p.name, color: p.color, alive: p.alive, kills: p.kills, state: p.state });
+const publicPlayer = (p) => ({ id: p.id, name: p.name, color: p.color, alive: p.alive, kills: p.kills, state: p.state, ...(p.bot ? { bot: true } : {}) });
+const personas = (room) => [...room.players.values()].filter((p) => !p.bot);
 
 function roomInfo(room) {
   return {
-    code: room.code, seed: room.seed, phase: room.phase, hostId: room.hostId, islandSize: ISLAND_SIZE,
+    code: room.code, seed: room.seed, phase: room.phase, hostId: room.hostId, islandSize: ISLAND_SIZE, bots: room.bots,
     players: [...room.players.values()].map(publicPlayer), bus: room.bus, storm: room.storm, serverTime: Date.now(),
   };
 }
@@ -179,9 +189,29 @@ function startMatch(room) {
     ],
     start: room.bus.start,
   };
+  room.partida++;
+  agregarBots(room);
   for (const p of room.players.values()) resetPlayer(p, room);
+  prepararBots(room);
   broadcast(room, { t: 'matchStart', room: roomInfo(room), snap: matchSnapshot(room) });
   for (const p of room.players.values()) send(p.ws, invMsg(p));
+}
+
+// Bots que completan la sala hasta el total elegido (entran al empezar la partida y se van al volver a la sala).
+function agregarBots(room) {
+  sacarBots(room);
+  const n = cuantosBots(room.bots.total, room.players.size);
+  if (!n) return;
+  const usados = new Set([...room.players.values()].map((p) => p.color));
+  const libres = [...COLORS.filter((c) => !usados.has(c)), ...COLORS];
+  const nombres = nombresBots(n, new Set([...room.players.values()].map((p) => p.name)));
+  for (let k = 0; k < n; k++) {
+    const p = { ...nuevoBot(room.bots.dif), id: nextId++, name: nombres[k], color: libres[k % libres.length], kills: 0 };
+    room.players.set(p.id, p);
+  }
+}
+function sacarBots(room) {
+  for (const [id, p] of room.players) if (p.bot) room.players.delete(id);
 }
 
 function resetPlayer(p, room) {
@@ -214,6 +244,7 @@ function damagePlayer(room, target, dmg, attacker, cause) {
   target.hp -= dmg - toShield;
   if (target.hp <= 0) { killPlayer(room, target, attacker, cause); return true; }
   send(target.ws, { ...invMsg(target), from: attacker ? attacker.id : null });
+  if (target.bot) alRecibirDanio(room, target, attacker, Date.now());
   return false;
 }
 
@@ -223,7 +254,7 @@ function killPlayer(room, victim, killer, cause) {
   if (!victim.alive) return;
   if (victim.auto) bajarDelAuto(room, victim);
   victim.alive = false; victim.hp = 0; victim.shield = 0; victim.state = 'dead';
-  if (killer && killer !== victim) killer.kills++;
+  if (killer && killer !== victim) { killer.kills++; if (killer.bot) alMatar(room, killer, Date.now()); }
   // Tira todo lo que tenía.
   const drops = victim.slots.filter(Boolean);
   for (const [a, n] of Object.entries(victim.ammo)) if (n > 0) drops.push({ kind: 'ammo', a, count: n });
@@ -237,17 +268,30 @@ function killPlayer(room, victim, killer, cause) {
 function checkWinner(room) {
   if (room.phase !== 'playing' && room.phase !== 'bus') return;
   const alive = [...room.players.values()].filter((p) => p.alive);
-  if ((room.players.size > 1 && alive.length <= 1) || alive.length === 0) {
-    room.phase = 'ended';
-    room.winner = alive[0] ? alive[0].id : null;
-    broadcast(room, { t: 'matchEnd', winner: room.winner, players: [...room.players.values()].map(publicPlayer) });
+  if ((room.players.size > 1 && alive.length <= 1) || alive.length === 0) return endMatch(room, alive[0] ? alive[0].id : null);
+  // ya no queda ninguna persona viva (solo bots): la partida termina al rato, para que se vea el cartel de eliminado
+  if (!BOTS_HASTA_EL_FINAL && !alive.some((p) => !p.bot)) {
+    const n = room.partida;
     setTimeout(() => {
-      if (!rooms.has(room.code)) return;
-      room.phase = 'lobby';
-      for (const p of room.players.values()) { p.state = 'lobby'; p.alive = true; p.hp = 100; }
-      broadcast(room, { t: 'room', room: roomInfo(room) });
-    }, 9000);
+      if (rooms.has(room.code) && room.partida === n && (room.phase === 'playing' || room.phase === 'bus')) {
+        endMatch(room, null, [...room.players.values()].filter((p) => p.alive).length);
+      }
+    }, 4500);
   }
+}
+function endMatch(room, winner, botsVivos = 0) {
+  room.phase = 'ended';
+  room.winner = winner;
+  broadcast(room, { t: 'matchEnd', winner, players: [...room.players.values()].map(publicPlayer), ...(botsVivos ? { botsVivos } : {}) });
+  const n = room.partida;
+  setTimeout(() => {
+    if (!rooms.has(room.code) || room.partida !== n) return;
+    room.phase = 'lobby';
+    sacarBots(room);
+    room.nav = null;
+    for (const p of room.players.values()) { p.state = 'lobby'; p.alive = true; p.hp = 100; }
+    broadcast(room, { t: 'room', room: roomInfo(room) });
+  }, 9000);
 }
 
 function tick() {
@@ -277,6 +321,22 @@ function tick() {
   }
 }
 setInterval(tick, TICK_MS);
+
+// ---------- Bots ----------
+function busPos(room, now) {
+  const b = room.bus, k = Math.max(0, Math.min(1.4, (now - b.start) / b.duration));
+  return { x: b.from[0] + (b.to[0] - b.from[0]) * k, y: b.from[1] + (b.to[1] - b.from[1]) * k, z: b.from[2] + (b.to[2] - b.from[2]) * k };
+}
+let ultimoBots = Date.now();
+setInterval(() => {
+  const now = Date.now();
+  const dt = Math.min(0.1, (now - ultimoBots) / 1000);
+  ultimoBots = now;
+  for (const room of rooms.values()) {
+    if ((room.phase !== 'bus' && room.phase !== 'playing') || !room.nav) continue;
+    actualizarBots(room, { now, dt, handleGame, broadcast, stormAt, busPos });
+  }
+}, BOT_MS);
 
 // ---------- Acciones de juego ----------
 function addToInventory(p, item) {
@@ -329,6 +389,9 @@ function handleGame(room, player, msg) {
       if (!player.alive || player.state === 'bus') break;
       const p = msg.p;
       if (!Array.isArray(p) || p.length !== 3 || !p.every(Number.isFinite)) break;
+      // velocidad aproximada (la usan los bots para saber si el blanco se mueve)
+      if (player.tState) player.velEst = Math.min(30, Math.hypot(p[0] - player.pos[0], p[2] - player.pos[2]) / Math.max(0.03, (now - player.tState) / 1000));
+      player.tState = now;
       player.pos = p;
       if (player.auto) player.state = 'auto';
       else if (['falling', 'glider', 'ground'].includes(msg.s)) player.state = msg.s;
@@ -732,6 +795,8 @@ function damagePieza(room, id, dmg) {
   for (const c of room.world.piezasSinApoyo(id)) if (room.world.romperPieza(c)) rotas.push(c);
   room.pzRotas.push(...rotas);
   broadcast(room, { t: 'pzRota', ids: rotas });
+  // las rutas de los bots que pasaban por ahí se vuelven a calcular
+  if (room.nav) for (const r of rotas) room.nav.invalidar(room.world.piezas[r].aabb);
   // construcciones de jugadores que se apoyaban en lo que se rompió
   const caidas = derrumbar(room);
   if (caidas.length) broadcast(room, { t: 'structDel', key: null, caidas });
@@ -791,7 +856,7 @@ wss.on('connection', (ws) => {
       else {
         room = rooms.get(String(msg.code || '').toUpperCase().trim());
         if (!room) return send(ws, { t: 'error', message: 'No existe una sala con ese código.' });
-        if (room.players.size >= MAX_PLAYERS) { room = null; return send(ws, { t: 'error', message: 'La sala está llena.' }); }
+        if (personas(room).length >= MAX_PLAYERS) { room = null; return send(ws, { t: 'error', message: 'La sala está llena.' }); }
       }
       const name = String(msg.name || 'Jugador').replace(/[<>]/g, '').slice(0, 16) || 'Jugador';
       const used = new Set([...room.players.values()].map((p) => p.color));
@@ -812,6 +877,15 @@ wss.on('connection', (ws) => {
       if (player.id === room.hostId && room.phase === 'lobby') startMatch(room);
       return;
     }
+    if (msg.t === 'bots') {
+      // el anfitrión elige hasta cuántos jugadores completan los bots y su dificultad
+      if (player.id !== room.hostId || room.phase !== 'lobby') return;
+      const total = Number(msg.total), dif = String(msg.dif || room.bots.dif);
+      if (!totalValido(total) || !dificultadValida(dif)) return;
+      room.bots = { total, dif };
+      broadcast(room, { t: 'room', room: roomInfo(room) });
+      return;
+    }
     if (msg.t === 'chat') {
       const text = String(msg.text || '').slice(0, 120);
       if (text) broadcast(room, { t: 'chat', id: player.id, name: player.name, text });
@@ -825,8 +899,10 @@ wss.on('connection', (ws) => {
     if (player.auto) bajarDelAuto(room, player);
     for (const a of room.autos) if (a.ctrl === player.id) { a.ctrl = null; a.vx = a.vy = a.vz = 0; broadcast(room, { t: 'auto', a: a.id, ...estadoRed(a) }); }
     room.players.delete(player.id);
-    if (room.players.size === 0) { rooms.delete(room.code); return; }
-    if (room.hostId === player.id) room.hostId = room.players.keys().next().value;
+    // sin personas la sala se cierra (aunque queden bots jugando)
+    const quedan = personas(room);
+    if (quedan.length === 0) { rooms.delete(room.code); return; }
+    if (room.hostId === player.id) room.hostId = quedan[0].id;
     broadcast(room, { t: 'left', id: player.id });
     broadcast(room, { t: 'room', room: roomInfo(room) });
     if (player.alive && room.phase !== 'lobby') checkWinner(room);

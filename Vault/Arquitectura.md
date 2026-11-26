@@ -11,6 +11,7 @@ Según el comentario de cabecera de [[server.js]]: **el cliente decide su movimi
 - Los autos siguen la misma idea: el que maneja simula su auto con [[autos.js]] y manda su estado; el servidor decide quién va en cada asiento, quién simula cada auto (`ctrl`: el conductor, o el último que lo manejó mientras frena solo), el daño, los atropellos y las explosiones. Ver [[Autos]].
 - El daño por caída también lo calcula el cliente y lo manda con `fall` (el servidor lo limita a 100).
 - El servidor maneja inventario, munición, cofres, recursos, estructuras, tormenta y muertes, y avisa a todos.
+- Los bots también los maneja el servidor (`servidor/`: [[bots.js]] y [[navegacion.js]]): se mueven con la misma física que el cliente y sus acciones pasan por el mismo `handleGame`. Ver [[Bots]].
 - Ver [[Protocolo de red]] para la lista de mensajes.
 
 ## Mismo mundo en todos lados
@@ -35,7 +36,9 @@ public/models/*.glb ──► assets.js (loadAssets, cloneAsset, bakedParts)
 
 ## Dependencias entre módulos (imports)
 
-- [[server.js]] → [[world.js]], [[items.js]], [[autos.js]], `ws`
+- [[server.js]] → [[world.js]], [[items.js]], [[autos.js]], [[opcionesBots.js]], [[bots.js]], `ws`
+- [[bots.js]] → [[navegacion.js]], [[items.js]], [[construccion.js]], [[caida.js]], [[opcionesBots.js]]
+- [[navegacion.js]] → [[colision.js]]
 - [[main.js]] → [[world.js]], [[assets.js]], [[models.js]], [[items.js]], [[audio.js]], [[rig.js]], [[caida.js]], [[manejar.js]]
 - [[manejar.js]] → [[autos.js]], [[models.js]], [[controles.js]], [[rig.js]]
 - [[caida.js]] → `three` (solo vectores; no toca la escena)

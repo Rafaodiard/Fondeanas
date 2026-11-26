@@ -15,6 +15,8 @@
 // Códigos: los de KeyboardEvent.code ('KeyW', 'Space', 'ShiftLeft'…), 'Mouse0'…'Mouse4' para los botones
 // del mouse y 'RuedaArriba' / 'RuedaAbajo' para la rueda. Escape queda reservado para el menú.
 
+import { BOT_TOTALES, BOT_DIFICULTADES } from './opcionesBots.js';
+
 const CLAVE_CONTROLES = 'sf-controles';
 const CLAVE_OPCIONES = 'sf-opciones';
 export const RESERVADAS = ['Escape'];
@@ -237,6 +239,9 @@ O({ id: 'invertirY', nombre: 'Invertir el eje vertical', grupo: 'Juego', tipo: '
 O({ id: 'apuntarAlternar', nombre: 'Apuntar', grupo: 'Juego', tipo: 'lista', valores: [[false, 'Mantener apretado'], [true, 'Alternar']], def: false });
 O({ id: 'correrSiempre', nombre: 'Correr siempre', ayuda: 'Con esto activado, la tecla de correr hace caminar', grupo: 'Juego', tipo: 'si-no', def: false });
 O({ id: 'numerosDanio', nombre: 'Números de daño', grupo: 'Juego', tipo: 'si-no', def: true });
+// Bots: lo que se pone al crear una sala (el anfitrión lo puede cambiar en la sala) y lo que usa "Jugar con bots".
+O({ id: 'botsTotal', nombre: 'Bots: completar la sala hasta', ayuda: 'Al crear una sala, los bots completan hasta este total de jugadores', grupo: 'Juego', tipo: 'lista', valores: BOT_TOTALES.map((n) => [n, n ? `${n} jugadores` : 'Sin bots']), def: 0 });
+O({ id: 'botsDificultad', nombre: 'Dificultad de los bots', grupo: 'Juego', tipo: 'lista', valores: Object.entries(BOT_DIFICULTADES), def: 'normal' });
 
 O({ id: 'calidad', nombre: 'Calidad gráfica', grupo: 'Video', tipo: 'lista', valores: [['baja', 'Baja'], ['media', 'Media'], ['alta', 'Alta']], def: 'alta' });
 O({ id: 'resolucion', nombre: 'Resolución 3D', grupo: 'Video', tipo: 'rango', min: 0.5, max: 1, paso: 0.05, def: 1, fmt: pct });

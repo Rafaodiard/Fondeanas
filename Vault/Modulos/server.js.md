@@ -18,7 +18,8 @@ Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.
 | `ISLAND_SIZE` | 1200 |
 | `BUS_DURATION` | 22 s |
 | `BUS_HEIGHT` | 260 |
-| `MAX_PLAYERS` | 16 |
+| `MAX_PLAYERS` | 16 personas (los bots completan aparte, hasta 24 en total) |
+| `BOT_MS` | 50 (los bots se mueven a 20 Hz) |
 | `TICK_MS` | 100 |
 | `PICKUP_RANGE` | 3.2 |
 
@@ -43,3 +44,11 @@ Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.
 ## Autos (2026-11-26)
 
 `room.autos` (de [[autos.js]] `nuevoAuto`, uno por `world.autoSpawns`) va en `matchSnapshot`. `player.auto = { a, k }` es el auto y el asiento; con eso el estado del jugador queda en `auto`. Mensajes `subir`, `bajar`, `asiento`, `auto`, `bocina`, `atropello` y `choque` ([[Protocolo de red]]). `avisarAsientos` manda `autoSeats`; `bajarDelAuto` libera el asiento (también al morir o desconectarse; si el que se desconecta simulaba un auto, el auto queda quieto). `danarAuto`: balas, pico (da metal), cohetes y choques; a 0 de vida explota (`autoBoom`): saca a los de adentro y lastima hasta 7 m (`70 × (1 − d/7) + 10`), con la causa `auto`. Ver [[Autos]].
+
+## Bots (2026-11-26)
+
+- `room.bots = { total, dif }` (lo cambia el anfitrión con el mensaje `bots`, va en `roomInfo`) y `room.partida` (cuenta las partidas para que los `setTimeout` viejos no toquen una nueva).
+- `agregarBots` / `sacarBots`: entran al empezar la partida (antes de `resetPlayer`) y se van al volver a la sala. `prepararBots` y `actualizarBots` (un `setInterval` de `BOT_MS`) están en [[bots.js]]; `busPos` calcula dónde está el bus (igual que el cliente).
+- `send` y `broadcast` saltean a los que no tienen conexión (los bots). `publicPlayer` agrega `bot: true`. `personas(room)`: solo las personas (para el límite de 16, cerrar la sala cuando se van todas y elegir anfitrión).
+- `damagePlayer` avisa a los bots que los lastimaron (`alRecibirDanio`) y `killPlayer` al bot que eliminó a alguien (`alMatar`). En `state` se estima la velocidad de cada persona (`velEst`) para la puntería de los bots. `damagePieza` tira las grillas de navegación que tocaba la pieza rota.
+- `checkWinner` / `endMatch`: si no queda ninguna persona viva, la partida termina a los 4,5 s con `botsVivos` (salvo con `SF_BOTS_HASTA_EL_FINAL=1`). Ver [[Bots]].
