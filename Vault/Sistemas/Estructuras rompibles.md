@@ -2,7 +2,7 @@
 
 Volver a [[Inicio]] · código en [[planos.js]], [[world.js]], [[mallas.js]], [[server.js]] y [[main.js]] · pruebas en [[Pruebas del mapa]]
 
-Todas las estructuras del mapa se rompen con el pico, a tiros y con explosiones, pieza por pieza. Lo que queda colgando cuando se rompe lo que lo sostiene se cae. Pedido en [[Errores del mapa]].
+Todas las estructuras del mapa se rompen con el pico, a tiros, con explosiones y chocándolas con un auto rápido (ver [[Autos]]), pieza por pieza. Lo que queda colgando cuando se rompe lo que lo sostiene se cae. Pedido en [[Errores del mapa]].
 
 ## Piezas
 

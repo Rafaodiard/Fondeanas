@@ -374,7 +374,7 @@ export class World {
     if (name === 'arbol' || name === 'pino' || name === 'alamo') {
       const h = this.terrainHeight(x, z), sc = opts.s || 1;
       const tree = { x, z, y: h, s: sc, r: (x * 7.1 + z * 3.3) % 6.28, pine: name === 'pino', sy: name === 'alamo' ? 1.9 : 1, sxz: name === 'alamo' ? 0.62 : 1, alive: true, town: true };
-      tree.circle = { x, z, r: 0.45 * sc, bottom: h - 1, top: h + 7 * sc * tree.sy };
+      tree.circle = { x, z, r: 0.45 * sc, bottom: h - 1, top: h + 7 * sc * tree.sy, res: 'tree', idx: this.trees.length };
       this.circles.push(tree.circle);
       this.trees.push(tree);
       return;
@@ -587,7 +587,7 @@ export class World {
       const forest = this.noise(x / 110 + 50, z / 110 + 50);
       if (forest < -0.05 && kind > 0.1) { if (this.bushes.length < 900 && kind < 0.5) this.bushes.push({ x, z, y: h, s: 0.6 + rand() * 0.8, r }); continue; }
       const tree = { x, z, y: h, s, r, pine: bio.snow > 0.2 || h > 38 || (kind < 0.35 && bio.sw < 0.2), alive: true };
-      tree.circle = { x, z, r: 0.45 * s, bottom: h - 1, top: h + 7 * s };
+      tree.circle = { x, z, r: 0.45 * s, bottom: h - 1, top: h + 7 * s, res: 'tree', idx: this.trees.length };
       this.circles.push(tree.circle);
       this.trees.push(tree);
     }
@@ -613,7 +613,7 @@ export class World {
       const bio = this.biome(x, z, h);
       if (rand() > 0.35 + bio.snow * 0.4 + bio.quarry * 0.6) continue;
       const rock = { x, z, y: h, s, r, alive: true };
-      rock.circle = { x, z, r: s * 1.1, bottom: h - s, top: h + s * 0.75 };
+      rock.circle = { x, z, r: s * 1.1, bottom: h - s, top: h + s * 0.75, res: 'rock', idx: this.rocks.length };
       this.circles.push(rock.circle);
       this.rocks.push(rock);
     }
@@ -1260,16 +1260,31 @@ export class World {
     for (const s of this.obras) if (!s.mesh || avanzarObra(s.mesh)) this.obras.delete(s);
   }
   // Mueve una cápsula (pos = pies) resolviendo choques con paredes, árboles, rocas y construcciones.
-  collide(pos, radius = 0.45, height = 1.8, ignorar = null) {
+  // choque(o, nx, nz): para los autos (autos.js). Antes de que algo rompible empuje se lo llama con lo que es
+  // ({ pz } pieza del mapa, { key } construcción, { res, idx } árbol o roca) y la dirección del empujón;
+  // si devuelve true, eso no empuja (el auto lo rompe y sigue de largo).
+  collide(pos, radius = 0.45, height = 1.8, ignorar = null, choque = null) {
     for (const c of this.circles) {
       if (pos.y > c.top || pos.y + height < c.bottom) continue;
       const dx = pos.x - c.x, dz = pos.z - c.z;
       if (Math.abs(dx) > 6 || Math.abs(dz) > 6) continue;
       const d = Math.hypot(dx, dz), min = c.r + radius;
-      if (d < min && d > 1e-4) { pos.x = c.x + (dx / d) * min; pos.z = c.z + (dz / d) * min; }
+      if (d < min && d > 1e-4) {
+        if (choque && c.res && choque({ res: c.res, idx: c.idx }, dx / d, dz / d)) continue;
+        pos.x = c.x + (dx / d) * min; pos.z = c.z + (dz / d) * min;
+      }
     }
-    this.sol.push(pos, radius, height);
-    for (const s of this.structs.values()) if (s.boxes) for (const b of s.boxes) pushOut(pos, b, radius, height);
+    this.sol.push(pos, radius, height, choque && ((s, nx, nz) => s.pz >= 0 && choque({ pz: s.pz }, nx, nz)));
+    for (const s of this.structs.values()) {
+      if (!s.boxes) continue;
+      for (const b of s.boxes) {
+        if (!choque) { pushOut(pos, b, radius, height); continue; }
+        const x = pos.x, z = pos.z;
+        pushOut(pos, b, radius, height);
+        const dx = pos.x - x, dz = pos.z - z, d = Math.hypot(dx, dz);
+        if (d > 1e-9 && choque({ key: s.key }, dx / d, dz / d)) { pos.x = x; pos.z = z; }
+      }
+    }
     for (const d of this.dinamicos) if (d !== ignorar) empujarDeAuto(d, pos, radius, height);
   }
 

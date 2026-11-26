@@ -18,6 +18,27 @@ export const AUTO = {
   ATROPELLO: 7,                            // velocidad desde la que pisar a alguien hace daño
 };
 export const DISTANCIA_EJES = AUTO.EJE_D + AUTO.EJE_T;
+
+// Embestidas: el auto rompe o no lo que choca según la velocidad con la que le pega (la parte de la velocidad que va
+// contra la cosa, no la total: rozar una pared de costado no la rompe). Tabla por material, para tunear:
+//   desde  m/s contra la cosa desde los que el golpe la daña (más despacio el auto solo rebota, como antes)
+//   porMs  daño a la cosa por cada m/s por encima de `desde`; si llega a su vida, la rompe y el auto sigue de largo
+//   frena  m/s que pierde el auto por cada 100 de vida que rompe al atravesar algo
+//   dano   daño al auto por cada 100 de vida que rompe
+// Con vida llena: madera (150) se rompe desde 12,5 m/s (45 km/h), piedra (300) desde 24,7 m/s (89 km/h, casi a fondo),
+// metal (450) solo con turbo (34,5 m/s); un árbol común (150) desde 15,4 m/s; las rocas frenan siempre al auto
+// (la más chica, 222, recién se rompe con turbo a fondo). Lo que ya está dañado se rompe más fácil.
+// Lo fijo del mapa (postes, torres del teleférico, carteles...) y lo que no es una pieza frena siempre.
+export const EMBESTIDA = {
+  madera: { desde: 5, porMs: 20, frena: 3.2, dano: 8 },
+  piedra: { desde: 8, porMs: 18, frena: 3.6, dano: 12 },
+  metal: { desde: 12, porMs: 20, frena: 4, dano: 16 },
+  arbol: { desde: 6, porMs: 16, frena: 3, dano: 8 },   // el daño se divide por el grosor del árbol (escala s)
+  roca: { desde: 10, porMs: 9, frena: 5, dano: 14 },
+  SALE_MIN: 0.25,   // al atravesar algo el auto conserva al menos esta parte de la velocidad contra la cosa
+  ESPERA: 0.35,     // segundos antes de volver a dañar lo mismo (si se queda empujándolo no lo daña en cada paso)
+  ATRAVIESA: 0.8,   // segundos que el auto sigue de largo por algo que rompió mientras llega la confirmación del servidor
+};
 const G = 25; // la misma gravedad que el jugador (main.js)
 
 // Asientos: 0 = conductor (izquierda), 1 = acompañante, 2 y 3 = atrás. y = altura del almohadón.
@@ -165,18 +186,88 @@ export function lugarBajada(world, a, k) {
   return { x: a.x, y: a.y + AUTO.ALTO + 0.05, z: a.z }; // encerrado: sale por el techo
 }
 
+// ---------- Embestidas ----------
+/** Qué material es lo que chocó el auto ({ pz } | { key } | { res, idx }), o null si no se rompe con el auto. */
+export function materialChoque(world, o) {
+  if (!o) return null;
+  if (Number.isInteger(o.pz)) {
+    const p = world.piezas[o.pz];
+    return p && !p.fija && !p.rota && EMBESTIDA[p.clase] ? { mat: p.clase, esc: 1 } : null;
+  }
+  if (typeof o.key === 'string') {
+    const s = world.structs.get(o.key);
+    return s && EMBESTIDA[s.mat] ? { mat: s.mat, esc: 1 } : null;
+  }
+  if ((o.res === 'tree' || o.res === 'rock') && Number.isInteger(o.idx)) {
+    const r = (o.res === 'tree' ? world.trees : world.rocks)[o.idx];
+    if (!r || r.alive === false) return null;
+    return o.res === 'tree' ? { mat: 'arbol', esc: Math.max(0.6, r.s || 1) } : { mat: 'roca', esc: 1 };
+  }
+  return null;
+}
+/** Clave de una cosa chocada (para no dañarla dos veces seguidas). */
+export const claveChoque = (o) => (Number.isInteger(o.pz) ? `z${o.pz}` : o.key ? `s${o.key}` : `${o.res}${o.idx}`);
+
+/** Golpe del auto contra algo de material mat con vida hp, a v m/s contra la cosa (esc: grosor, para árboles).
+ *  Devuelve { dano (a la cosa), rompe, sale (m/s contra la cosa que le quedan al auto), danoAuto }. Lo usan el
+ *  cliente (para seguir de largo sin esperar) y el servidor (que decide con la vida de verdad). */
+export function impacto(mat, hp, v, esc = 1) {
+  const t = EMBESTIDA[mat];
+  const nada = { dano: 0, rompe: false, sale: v, danoAuto: 0 };
+  if (!t || !(v > t.desde) || !(hp > 0)) return nada;
+  const dano = ((v - t.desde) * t.porMs) / esc;
+  if (dano < hp) return { ...nada, dano };
+  const pesa = (hp * esc) / 100; // lo que costó romperla
+  return { dano, rompe: true, sale: Math.max(v * EMBESTIDA.SALE_MIN, v - t.frena * pesa), danoAuto: t.dano * pesa };
+}
+
+// Llamado por world.collide antes de que algo rompible empuje un círculo del auto. Decide si el golpe lo daña o lo
+// rompe; si lo rompe, el auto pierde velocidad y sigue de largo (true = no empuja). Anota el golpe en a.embestidas
+// (el cliente se lo manda al servidor).
+function embestir(world, a, emb, o, nx, nz) {
+  const id = claveChoque(o);
+  const pasa = a.atraviesa.get(id);
+  if (pasa !== undefined) { if (pasa > a.reloj) return true; a.atraviesa.delete(id); }
+  const vn = -(a.vx * nx + a.vz * nz); // velocidad contra la cosa (nx, nz apunta de la cosa al auto)
+  if (vn <= 0.5 || a.rota) return false;
+  if ((a.golpeados.get(id) ?? -1) > a.reloj) return false;
+  const m = materialChoque(world, o);
+  const hp = m && emb.vida(o);
+  if (!(hp > 0)) return false;
+  const r = impacto(m.mat, hp, vn, m.esc);
+  if (!(r.dano > 0)) return false;
+  a.golpeados.set(id, a.reloj + EMBESTIDA.ESPERA);
+  a.embestidas.push({ o, v: Math.round(vn * 100) / 100, rompe: r.rompe, mat: m.mat });
+  if (!r.rompe) return false;
+  a.atraviesa.set(id, a.reloj + EMBESTIDA.ATRAVIESA);
+  const dv = vn - r.sale;
+  a.vx += nx * dv; a.vz += nz * dv;
+  return true;
+}
+
 // ---------- Física ----------
 // ent: { acel, freno, izq, der, mano, turbo } (booleanos). Los demás autos chocan por world.dinamicos.
+// emb: si viene ({ vida(o) → vida que se conoce de la cosa }), el auto rompe lo que choca según la velocidad
+// (ver EMBESTIDA) y deja los golpes en a.embestidas. Sin emb choca contra todo como si fuera irrompible.
 // Devuelve el golpe más fuerte contra algo (m/s de velocidad perdida) para el sonido y el daño.
-export function fisicaAuto(world, a, ent, dt) {
+export function fisicaAuto(world, a, ent, dt, emb = null) {
   let golpe = 0;
   const n = Math.max(1, Math.ceil(dt / (1 / 90)));
   const h = dt / n;
-  for (let i = 0; i < n; i++) golpe = Math.max(golpe, paso(world, a, ent, h));
+  let choque = null;
+  if (emb) {
+    if (!a.atraviesa) { a.atraviesa = new Map(); a.golpeados = new Map(); a.embestidas = []; a.reloj = 0; }
+    choque = (o, nx, nz) => embestir(world, a, emb, o, nx, nz);
+    if (a.golpeados.size > 40) for (const [k, t] of a.golpeados) if (t <= a.reloj) a.golpeados.delete(k);
+  }
+  for (let i = 0; i < n; i++) {
+    if (emb) a.reloj += h;
+    golpe = Math.max(golpe, paso(world, a, ent, h, choque));
+  }
   return golpe;
 }
 
-function paso(world, a, ent, dt) {
+function paso(world, a, ent, dt, choque) {
   const [fx, fz] = adelante(a), [rx, rz] = derecha(a);
   let vF = a.vx * fx + a.vz * fz;
   let vL = a.vx * rx + a.vz * rz;
@@ -228,7 +319,7 @@ function paso(world, a, ent, dt) {
     for (const lz of AUTO.CIRCULOS) {
       const [cx, cz] = aMundo(a, 0, lz);
       const p = { x: cx, y: a.y, z: cz };
-      world.collide(p, AUTO.RADIO, 1.5, a);
+      world.collide(p, AUTO.RADIO, 1.5, a, choque);
       const dx = p.x - cx, dz = p.z - cz;
       if (dx * dx + dz * dz < 1e-10) continue;
       a.x += dx; a.z += dz;
