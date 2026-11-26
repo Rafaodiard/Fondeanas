@@ -7,10 +7,10 @@ import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { World } from './public/js/world.js';
 import {
-  WEAPONS, CONSUMABLES, AMMO, MATERIALS, BUILD_COST, MAX_MATS, PICKAXE, SLOTS, GRID, DIRS,
+  WEAPONS, CONSUMABLES, AMMO, MATERIALS, BUILD_COST, MAX_MATS, PICKAXE, PUNTO_DEBIL, SLOTS, GRID, DIRS,
   randomWeapon, randomConsumable, randomAmmo, weaponDamage, weaponReload, structKey,
 } from './public/js/items.js';
-import { TIPOS, normalizar, tieneApoyo, sinApoyo, vidaDe, editValida, OBRA, ALCANCE_EDICION, cajaPieza } from './public/js/construccion.js';
+import { TIPOS, normalizar, tieneApoyo, sinApoyo, vidaDe, editValida, OBRA, ALCANCE_EDICION, cajaPieza, superficie, DEBAJO } from './public/js/construccion.js';
 import { AUTO, nuevoAuto, aplicarRed, estadoRed, autoPublico, asientoLibre, rapidez } from './public/js/autos.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -96,6 +96,7 @@ function matchSnapshot(room) {
     rocks: room.rocks.map((hp, i) => (hp <= 0 ? i : -1)).filter((i) => i >= 0),
     structs: [...room.world.structs.values()].map(structPublic),
     piezas: room.pzRotas, // piezas del mapa ya rotas (en orden)
+    pzHp: room.pzHp.flatMap((hp, id) => { const pz = room.world.piezas[id]; return !pz.fija && !pz.rota && hp < pz.hp ? [[id, Math.ceil(hp)]] : []; }), // dañadas
     cofresMovidos: room.chests.flatMap((c, i) => (c.movido ? [[i, c.y]] : [])),
     autos: room.autos.map(autoPublico),
   };
@@ -105,7 +106,7 @@ function structPublic(s) {
   const t = Date.now();
   return {
     key: s.key, type: s.type, i: s.i, j: s.j, y: s.y, dir: s.dir, mat: s.mat, e: s.e || 0, owner: s.owner,
-    hp: Math.ceil(vidaDe(s, t)), max: MATERIALS[s.mat].hp, obra: OBRA[s.mat], crece: +Math.max(0, OBRA[s.mat] - (t - s.born) / 1000).toFixed(2),
+    hp: Math.ceil(vidaDe(s, t)), max: MATERIALS[s.mat].hp, dano: Math.round(s.dano || 0), obra: OBRA[s.mat], crece: +Math.max(0, OBRA[s.mat] - (t - s.born) / 1000).toFixed(2),
   };
 }
 
@@ -186,7 +187,7 @@ function startMatch(room) {
 
 function resetPlayer(p, room) {
   p.hp = 100; p.shield = 0; p.alive = true; p.kills = 0; p.state = 'bus';
-  p.pos = [...room.bus.from]; p.lastShot = 0; p.lastSwing = 0; p.use = null; p.auto = null;
+  p.pos = [...room.bus.from]; p.lastShot = 0; p.lastSwing = 0; p.debil = null; p.use = null; p.auto = null;
   p.slots = Array(SLOTS).fill(null);
   p.ammo = { ligera: 0, media: 0, pesada: 0, cartuchos: 0, cohetes: 0 };
   p.mats = { madera: MATS_INICIALES, piedra: MATS_INICIALES, metal: MATS_INICIALES };
@@ -458,7 +459,11 @@ function handleGame(room, player, msg) {
         }
       } else if (msg.key) {
         const s = room.world.structs.get(msg.key);
-        if (s) damageStruct(room, s, PICKAXE.struct);
+        if (!s) break;
+        const o = { key: s.key }, at = puntoGolpe(room, player, o, msg.at);
+        const crit = esCritico(player, o, at, now);
+        damageStruct(room, s, PICKAXE.struct * (crit ? PUNTO_DEBIL.mult : 1));
+        avisarDebil(room, player, o, at, msg.n, crit, now);
       } else if (Number.isInteger(msg.auto)) {
         // los autos se pican como el metal
         const a = room.autos[msg.auto];
@@ -471,7 +476,10 @@ function handleGame(room, player, msg) {
       } else if (Number.isInteger(msg.pz)) {
         const pz = room.world.piezas[msg.pz];
         if (!pz || pz.fija || pz.rota || distPieza(room, msg.pz, player.pos) > PICKAXE.range + 2) break;
-        const rompio = damagePieza(room, msg.pz, PICKAXE.struct);
+        const o = { pz: msg.pz }, at = puntoGolpe(room, player, o, msg.at);
+        const crit = esCritico(player, o, at, now);
+        const rompio = damagePieza(room, msg.pz, PICKAXE.struct * (crit ? PUNTO_DEBIL.mult : 1));
+        avisarDebil(room, player, o, at, msg.n, crit, now);
         const [gainMat, base] = PICKAXE.gain[pz.clase];
         const amount = rompio ? base * 2 : base;
         player.mats[gainMat] = Math.min(MAX_MATS, player.mats[gainMat] + amount);
@@ -485,13 +493,16 @@ function handleGame(room, player, msg) {
           const info = (msg.res === 'tree' ? room.world.trees : room.world.rocks)[msg.idx];
           if (!info || list[msg.idx] <= 0) break;
           if (Math.hypot(info.x - player.pos[0], info.z - player.pos[2]) > PICKAXE.range + info.s * 2 + 2) break;
-          list[msg.idx] -= 50;
+          const o = { res: msg.res, idx: msg.idx }, at = puntoGolpe(room, player, o, msg.at);
+          const crit = esCritico(player, o, at, now);
+          list[msg.idx] -= PICKAXE.struct * (crit ? PUNTO_DEBIL.mult : 1);
           [gainMat, amount] = PICKAXE.gain[msg.res];
           if (list[msg.idx] <= 0) {
             room.world.destroyResource(msg.res, msg.idx);
             broadcast(room, { t: 'resGone', res: msg.res, idx: msg.idx });
             amount *= 2;
           } else broadcast(room, { t: 'resHit', res: msg.res, idx: msg.idx }, player.id);
+          avisarDebil(room, player, o, at, msg.n, crit, now);
         }
         player.mats[gainMat] = Math.min(MAX_MATS, player.mats[gainMat] + amount);
         send(player.ws, { ...invMsg(player), gained: [gainMat, amount] });
@@ -672,7 +683,10 @@ function explode(room, attacker, at, def, base) {
       : Math.hypot(Math.max(s.x0 - at[0], 0, at[0] - s.x1), Math.max(s.y0 - at[1], 0, at[1] - s.y1), Math.max(s.z0 - at[2], 0, at[2] - s.z1));
     if (d < def.splash && d < (golpes.get(s.pz) ?? Infinity)) golpes.set(s.pz, d);
   });
-  for (const [id, d] of golpes) damagePieza(room, id, def.struct * (1 - (d / def.splash) * 0.5));
+  const sanas = [];
+  for (const [id, d] of golpes) if (!damagePieza(room, id, def.struct * (1 - (d / def.splash) * 0.5), false)) sanas.push(id);
+  const vivas = sanas.filter((id) => !room.world.piezas[id].rota && !room.world.piezas[id].fija);
+  if (vivas.length) broadcast(room, { t: 'pzHp', ids: vivas, hp: vivas.map((id) => Math.ceil(room.pzHp[id])) });
   for (const a of room.autos) {
     const d = dist3([a.x, a.y + 0.8, a.z], at);
     if (d < def.splash + 2.3) danarAuto(room, a, def.struct * (1 - Math.max(0, d - 2.3) / def.splash * 0.5), attacker);
@@ -722,11 +736,15 @@ function distPieza(room, id, p) {
 
 // Daño a una pieza del mapa. Si se rompe, se caen también las piezas de su estructura que quedan sin apoyo,
 // y lo que estaba arriba (loot, cofres) baja hasta el piso nuevo. Devuelve true si se rompió.
-function damagePieza(room, id, dmg) {
+function damagePieza(room, id, dmg, avisar = true) {
   const pz = room.world.piezas[id];
   if (!pz || pz.fija || pz.rota || !(dmg > 0)) return false;
   room.pzHp[id] -= dmg;
-  if (room.pzHp[id] > 0) return false;
+  if (room.pzHp[id] > 0) {
+    // la vida nueva a todos: con eso cada uno dibuja las grietas (y el que pega, la barra)
+    if (avisar) broadcast(room, { t: 'pzHp', ids: [id], hp: [Math.ceil(room.pzHp[id])] });
+    return false;
+  }
   const rotas = [id];
   room.world.romperPieza(id);
   for (const c of room.world.piezasSinApoyo(id)) if (room.world.romperPieza(c)) rotas.push(c);
@@ -755,6 +773,110 @@ function damagePieza(room, id, dmg) {
 
 const RARITIESmul = (it) => 1 + it.rarity * 0.05;
 
+// ---------- Punto débil del pico (golpe crítico) ----------
+// El servidor elige dónde aparece (cerca del golpe, sobre la misma cosa) y decide si un golpe fue crítico:
+// el punto del golpe que manda el cliente tiene que estar a PUNTO_DEBIL.radio del punto débil que eligió.
+const idDe = (o) => (o.pz !== undefined ? `z${o.pz}` : o.key ? `s${o.key}` : `${o.res}${o.idx}`);
+const finito = (a) => Array.isArray(a) && a.length === 3 && a.every(Number.isFinite);
+function distSolido(s, p) {
+  if (s.cyl) return Math.max(0, Math.hypot(p[0] - s.x, p[2] - s.z) - s.r, s.y0 - p[1], p[1] - s.y1);
+  return Math.hypot(Math.max(s.x0 - p[0], 0, p[0] - s.x1), Math.max(s.y0 - p[1], 0, p[1] - s.y1), Math.max(s.z0 - p[2], 0, p[2] - s.z1));
+}
+// ¿El punto p está sobre la cosa o (con margen m)?
+function sobre(room, o, p, m) {
+  const W = room.world;
+  if (o.pz !== undefined) return W.piezas[o.pz].solids.some((s) => !s.dead && distSolido(s, p) <= m);
+  if (o.key) {
+    const s = W.structs.get(o.key);
+    if (!s) return false;
+    if (s.type === 'pared') return (s.boxes || []).some((b) => distSolido({ x0: b.minX, x1: b.maxX, y0: b.minY, y1: b.maxY, z0: b.minZ, z1: b.maxZ }, p) <= m);
+    const y = superficie(s, p[0], p[2]);
+    return y !== null && p[1] >= y - DEBAJO[s.type] - m && p[1] <= y + m;
+  }
+  const info = (o.res === 'tree' ? W.trees : W.rocks)[o.idx];
+  if (!info) return false;
+  if (o.res === 'tree') return Math.hypot(p[0] - info.x, p[2] - info.z) <= 0.45 * info.s + 0.8 + m && p[1] > info.y - 0.5 && p[1] < info.y + 9 * info.s;
+  return Math.hypot(p[0] - info.x, p[1] - info.y, p[2] - info.z) <= info.s * 1.7 + 0.6 + m;
+}
+// Punto del golpe que manda el cliente, si es creíble (cerca del jugador y sobre la cosa); si no, null.
+function puntoGolpe(room, player, o, at) {
+  if (!finito(at) || dist3(at, player.pos) > PICKAXE.range + 3.2) return null;
+  return sobre(room, o, at, 0.5) ? at : null;
+}
+function esCritico(player, o, at, now) {
+  const d = player.debil;
+  if (!at || !d || d.id !== idDe(o) || now > d.hasta) return false;
+  return dist3(at, d.p) <= PUNTO_DEBIL.radio;
+}
+// Elige un punto débil nuevo cerca de at (o null si no encuentra uno que quede sobre la cosa).
+function nuevoDebil(room, o, at, nCliente) {
+  const W = room.world, [d0, d1] = PUNTO_DEBIL.dist;
+  if (o.res) {
+    const info = (o.res === 'tree' ? W.trees : W.rocks)[o.idx];
+    if (!info) return null;
+    for (let k = 0; k < 12; k++) {
+      const r = d0 + Math.random() * (d1 - d0), ang = Math.random() * Math.PI * 2;
+      if (o.res === 'tree') {
+        // alrededor del tronco, a la altura de la mano
+        const R = Math.min(Math.max(0.2, Math.hypot(at[0] - info.x, at[2] - info.z)), 0.45 * info.s + 0.25);
+        const a = Math.atan2(at[2] - info.z, at[0] - info.x) + Math.max(-0.9, Math.min(0.9, (Math.cos(ang) * r) / R));
+        const y = Math.max(info.y + 0.5, Math.min(info.y + 2.4, at[1] + Math.sin(ang) * r));
+        return { p: [info.x + Math.cos(a) * R, y, info.z + Math.sin(a) * R], n: [Math.cos(a), 0, Math.sin(a)] };
+      }
+      // roca: se gira el punto del golpe alrededor del centro
+      const v = [at[0] - info.x, at[1] - info.y, at[2] - info.z], R = Math.hypot(...v) || 1;
+      const n = v.map((c) => c / R), t1 = Math.abs(n[1]) > 0.9 ? [1, 0, 0] : norm([-n[2], 0, n[0]]), t2 = cruz(n, t1);
+      const q = norm(n.map((c, i) => c * R + (t1[i] * Math.cos(ang) + t2[i] * Math.sin(ang)) * r));
+      const p = [info.x + q[0] * R, info.y + q[1] * R, info.z + q[2] * R];
+      if (p[1] > W.terrainHeight(p[0], p[2]) + 0.25) return { p, n: q };
+    }
+    return null;
+  }
+  // pieza del mapa o construcción: se mueve sobre el plano de la cara golpeada
+  let n = finito(nCliente) ? norm(nCliente) : null;
+  if (!n) return null;
+  const t1 = Math.abs(n[1]) > 0.9 ? [1, 0, 0] : norm([-n[2], 0, n[0]]), t2 = cruz(n, t1);
+  for (let k = 0; k < 16; k++) {
+    const r = (k < 12 ? d0 + Math.random() * (d1 - d0) : 0.35 + Math.random() * 0.2), ang = Math.random() * Math.PI * 2;
+    const p = at.map((c, i) => c + (t1[i] * Math.cos(ang) + t2[i] * Math.sin(ang)) * r);
+    const fuera = p.map((c, i) => c + n[i] * 0.22);
+    if (sobre(room, o, p, 0.06) && !sobre(room, o, fuera, 0) && p[1] > W.terrainHeight(p[0], p[2]) + 0.3) return { p, n };
+  }
+  return null;
+}
+function norm(v) { const l = Math.hypot(...v); return l > 1e-6 ? v.map((c) => c / l) : null; }
+function cruz(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+const r3 = (v) => v.map((c) => +c.toFixed(3));
+
+// Después de un golpe de pico: el punto débil aparece con el primer golpe, se queda mientras se le siga pegando
+// a lo mismo y se mueve cuando se le pega (crítico). Al que pega le llega dónde quedó y la vida (árboles y rocas).
+function avisarDebil(room, player, o, at, nCliente, crit, now) {
+  const id = idDe(o);
+  let vida = null, max = 0;
+  if (o.pz !== undefined) vida = room.world.piezas[o.pz].rota ? 0 : room.pzHp[o.pz];
+  else if (o.key) { const s = room.world.structs.get(o.key); vida = s ? vidaDe(s, now) : 0; }
+  else {
+    vida = Math.max(0, (o.res === 'tree' ? room.trees : room.rocks)[o.idx]);
+    max = o.res === 'tree' ? 150 : Math.round(150 + room.world.rocks[o.idx].s * 120);
+  }
+  const msg = { t: 'debil', o, crit, hp: Math.ceil(vida), max };
+  const d = player.debil;
+  if (!(vida > 0) || !at) {
+    if (!(vida > 0) && d?.id === id) player.debil = null;
+    msg.p = !(vida > 0) || !d || d.id !== id ? null : d.p;
+    if (msg.p) msg.n = d.n;
+  } else if (crit || !d || d.id !== id || now > d.hasta) {
+    const nuevo = nuevoDebil(room, o, at, nCliente);
+    player.debil = nuevo ? { id, p: nuevo.p, n: nuevo.n, hasta: now + PUNTO_DEBIL.dura * 1000 } : null;
+    msg.p = nuevo ? r3(nuevo.p) : null;
+    if (nuevo) msg.n = r3(nuevo.n);
+  } else {
+    d.hasta = now + PUNTO_DEBIL.dura * 1000; // le siguió pegando a lo mismo: el punto se queda
+    msg.p = r3(d.p); msg.n = r3(d.n);
+  }
+  send(player.ws, msg);
+}
+
 function damageStruct(room, s, dmg) {
   if (!room.world.structs.has(s.key) || !(dmg > 0)) return;
   s.dano = (s.dano || 0) + dmg;
@@ -762,7 +884,7 @@ function damageStruct(room, s, dmg) {
   if (hp <= 0) {
     room.world.removeStruct(s.key);
     broadcast(room, { t: 'structDel', key: s.key, caidas: derrumbar(room) });
-  } else broadcast(room, { t: 'structHp', key: s.key, hp: Math.ceil(hp) });
+  } else broadcast(room, { t: 'structHp', key: s.key, hp: Math.ceil(hp), dano: Math.round(s.dano) });
 }
 
 // Saca las construcciones que quedaron sin apoyo (como en el género: lo que no llega al piso se cae). Devuelve sus claves.

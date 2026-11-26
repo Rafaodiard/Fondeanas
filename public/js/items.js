@@ -44,6 +44,10 @@ export const MAX_MATS = 999;
 export const GRID = 4;
 // gain: material que da cada golpe según lo que se pica (árboles, rocas y piezas del mapa por su material; x2 al romper)
 export const PICKAXE = { damage: 20, struct: 50, cooldown: 0.5, range: 3.2, gain: { tree: ['madera', 8], rock: ['piedra', 8], house: ['metal', 6], madera: ['madera', 6], piedra: ['piedra', 6], metal: ['metal', 5] } };
+// Punto débil del pico (golpe crítico): aparece en lo que picás, cerca del golpe. Pegarle ahí hace mult veces el daño
+// y lo mueve a otro lado. radio: tolerancia del servidor (m); visual: radio del círculo; dura: segundos sin pegarle
+// hasta que se borra; dist: a cuántos metros del golpe aparece el siguiente.
+export const PUNTO_DEBIL = { mult: 2, radio: 0.55, visual: 0.3, dura: 6, dist: [0.55, 1.15] };
 export const SLOTS = 5; // sin contar el pico
 
 // Peso de cada rareza al tirar loot (piso / cofre).

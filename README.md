@@ -60,6 +60,7 @@ Para recorrer la isla sin jugar, con el servidor levantado abrí http://localhos
 - **Armas:** pistola, subfusil, rifle de asalto, escopeta, francotirador con mira y lanzacohetes con daño en área. Cada una usa su tipo de munición. Cada arma tiene su propio retroceso al disparar (sube, patea y se corre hacia atrás) y sus recargas animadas, revisadas para que el arma no atraviese el cuerpo.
 - **Inventario** con 5 slots y el pico fijo.
 - **Pico:** saca madera de los árboles y piedra de las rocas, y rompe cualquier estructura del mapa dando el material de la pieza (madera, piedra o metal, el doble en el golpe que la rompe). Los árboles, las rocas y las estructuras se rompen.
+- **Daño visible y golpes críticos:** las paredes, pisos, techos y demás piezas del mapa, y las construcciones, se van agrietando y oscureciendo a medida que pierden vida (lo ven todos en la sala). Debajo de la mira aparece la barra de vida de lo que golpeás o mirás con el pico, con la parte recién perdida en blanco. Al picar una estructura, un árbol o una roca aparece un **punto débil** (círculo celeste) cerca del golpe: pegarle ahí es un crítico que hace el doble de daño (100 en vez de 50), con número celeste, destello y sonido propio, y el punto se mueve a otro lado. Si le pegás a otro lado el punto se queda; si dejás de picar 6 s, se va.
 - **Construcción** (ver abajo): pared, piso, rampa y techo en una grilla de 4 m, en madera, piedra o metal, que se pueden editar.
 - **Escudo y curación:** vendas, botiquín, frasco azul y bidón azul.
 - Al morir, el jugador tira todo lo que tenía. También hay daño por caída, tormenta por fases, números de daño, minimapa, killfeed, chat, modo espectador y sonidos sintetizados.
@@ -70,7 +71,7 @@ Como en los battle royale del género:
 
 - **Cuatro piezas:** pared, piso, rampa y techo (una pirámide baja). Cada una cuesta 10 del material. Arriba del inventario está la barra con las cuatro piezas y la tecla de cada una, y el material que estás usando con cuánto te queda.
 - **Vista previa:** la pieza aparece como un holograma azul donde va a ir (rojo si no se puede: ya hay una, no alcanza el material o no tiene apoyo). Se ubica sola según hacia dónde mirás: la pared en el borde de tu celda, el piso adelante (mirando arriba, sobre tu cabeza; mirando abajo, bajo los pies), la rampa adelante subiendo hacia donde mirás (R la gira) y el techo adelante o sobre tu cabeza. Parado en una rampa, la pieza de adelante va un nivel más arriba, así se sube construyendo rampas seguidas. Manteniendo el clic se construye seguido.
-- **Se levantan de a poco:** la pieza aparece en holograma y se va llenando de abajo hacia arriba; arranca con el 30 % de su vida y llega al máximo cuando termina (madera 150 en 2,5 s, piedra 300 en 5 s, metal 450 en 7,5 s). Apuntando a una construcción se ve su vida debajo de la mira.
+- **Se levantan de a poco:** la pieza aparece en holograma y se va llenando de abajo hacia arriba; arranca con el 30 % de su vida y llega al máximo cuando termina (madera 150 en 2,5 s, piedra 300 en 5 s, metal 450 en 7,5 s). Apuntando a una construcción se ve su vida debajo de la mira, y las dañadas se ven agrietadas.
 - **Apoyo y derrumbes:** una pieza nueva tiene que tocar el piso, una estructura del mapa u otra construcción. Si se rompe lo que sostiene algo (una pieza tuya o una pieza del mapa), todo lo que deja de llegar al piso se cae.
 - **Edición** (F mirando una construcción tuya): aparece la grilla de la pieza y se marcan baldosas con clic (manteniendo apretado se marcan varias). F otra vez confirma; clic derecho la deja como nueva.
   - Pared (3×3): lo marcado se saca. Así se hacen puertas, ventanas, arcos o media pared, y se puede pasar y disparar por el hueco.
@@ -153,7 +154,9 @@ node tools/controles/pruebas.mjs
 - `public/js/autos.js`: los autos, compartido por el cliente y el servidor: medidas, asientos, física de manejo (motor, frenos, dirección, derrape, turbo, ruedas contra el piso), choques, dónde pega un disparo, dónde se baja cada uno y el estado que viaja por la red.
 - `public/js/manejar.js`: los autos en el juego: mallas, manejar el propio, ver los de los demás, subir, bajar y cambiar de asiento, gente sentada, atropellos, HUD, minimapa y sonidos.
 - `tools/autos/pruebas.mjs`: pruebas de los autos (lugares de salida libres, manejar desde cada uno sin meterse en nada, choque contra una casa, agua, dos autos, techo, balas, bajarse y red): `node tools/autos/pruebas.mjs`.
-- `public/js/items.js`: armas, rarezas, munición, consumibles y materiales (lo usan el cliente y el servidor).
+- `public/js/items.js`: armas, rarezas, munición, consumibles y materiales, y el punto débil del pico (`PUNTO_DEBIL`) (lo usan el cliente y el servidor).
+- `public/js/golpes.js`: daño visible en el cliente: grietas encima de las piezas dañadas (shader procedural), barra de vida de lo que golpeás o mirás y el punto débil del pico (círculo, crítico, número, aro y sonido). El servidor elige el punto débil y decide si un golpe fue crítico.
+- `tools/golpes/pruebas.mjs`: pruebas del punto débil y la vida de lo dañado contra el servidor de verdad (por WebSocket): `node tools/golpes/pruebas.mjs`.
 - `public/js/audio.js`: efectos de sonido sintetizados.
 - `public/models/*.glb`: modelos 3D hechos en Blender (personaje, bus volador, auto, paracaídas, armas y pico, pino, árbol, roca, cofre y objetos del piso). El color de la ropa y de las rarezas se tiñe en el juego.
 - `public/js/loot.js`: objetos del piso y cofres en el juego, con sus efectos (anillo, haz y chispas por rareza, aura del cofre, apertura animada y loot que sale volando). `public/loot.html`: vitrina del loot (`/loot.html`).
@@ -167,7 +170,7 @@ node tools/controles/pruebas.mjs
 - `public/js/main.js`: el juego en sí (cámara en tercera persona, física, disparo, HUD, minimapa, red).
 - `public/js/construccion.js`: reglas de la construcción, compartidas por el cliente y el servidor: ediciones válidas, superficie que se pisa y cajas que chocan de cada pieza editada, apoyo, derrumbes, vida que crece y qué baldosa se mira al editar.
 - `public/js/construccion3d.js`: mallas de las construcciones (texturas de tablas, bloques de piedra y chapa con remaches, marcos que rodean también los huecos editados), holograma de la vista previa, grilla de edición y el relleno de la pieza mientras se levanta.
-- `public/js/construir.js`: la construcción en el juego: modo construcción, dónde va cada pieza, colocar seguido, edición, material automático y la barra de piezas del HUD. Registra sus controles en `controles.js`.
+- `public/js/construir.js`: la construcción en el juego: modo construcción, dónde va cada pieza, colocar seguido, edición, material automático y la barra de piezas del HUD (la vida de lo que se mira la muestra `golpes.js`). Registra sus controles en `controles.js`.
 - `tools/construccion/pruebas.mjs`: pruebas de la construcción.
 - `public/js/controles.js`: registro central de acciones y teclas (con contexto: siempre, combate, construcción o vehículo) y de las opciones del juego, guardados en `localStorage`. Cualquier control u opción nueva se agrega acá con `registrarAccion` / `registrarOpcion`.
 - `public/js/configuracion.js`: el panel de configuración (pestañas Juego, Video, Sonido y Controles).
@@ -175,6 +178,8 @@ node tools/controles/pruebas.mjs
 
 ## Capturas
 
+![Golpe crítico en el punto débil: 100 de daño, chispas celestes y la barra de vida de la pared](docs/golpes_critico.jpg)
+![Paredes con distinto daño: las grietas se abren a medida que pierden vida](docs/golpes_grietas.jpg)
 ![Bus volador desde el juego](docs/bus.png)
 ![Bus volador renderizado en Blender](docs/bus_blender.jpg)
 ![Combate](docs/combate.png)
