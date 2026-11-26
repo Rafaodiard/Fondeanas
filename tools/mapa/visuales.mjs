@@ -282,17 +282,20 @@ function titilanMundo(world, fail) {
     if (entre <= 10) fail(`caras encimadas entre ${A.pl.name} y ${B.pl.name} (${s > 0 ? '+' : '-'}${EJE[e]} en ${pl.toFixed(2)}): ${desc(A.ref)} / ${desc(B.ref)}`);
   }
   // contra el terreno y contra las calles: caras de arriba casi a la misma altura (o la calle por encima del piso de adentro)
-  const off = (rb, idx) => (rb.under ? 0.045 : 0.07 + (idx % 7) * 0.01);
   const calles = [];
-  world.ribbons.forEach((rb, idx) => {
+  world.ribbons.forEach((rb) => {
     for (let i = 0; i < rb.pts.length - 1; i++) {
       const [ax, az] = rb.pts[i], [bx, bz] = rb.pts[i + 1], L = Math.hypot(bx - ax, bz - az) || 1, nx = -(bz - az) / L, nz = (bx - ax) / L;
       for (let t = 0; t < 1; t += 0.34) for (let w = -rb.w / 2 + 0.25; w <= rb.w / 2 - 0.25; w += 0.5) {
         const x = ax + (bx - ax) * t + nx * w, z = az + (bz - az) * t + nz * w;
-        if (!world.enPuente(x, z)) calles.push([x, z, world.terrainHeight(x, z) + off(rb, idx), rb.m]); // sobre los puentes no se dibuja
+        if (!world.enPuente(x, z)) calles.push([x, z, world.terrainHeight(x, z) + rb.off, rb.m]); // sobre los puentes no se dibuja
       }
     }
   });
+  // plazoletas, puntas y esquinas redondeadas
+  for (const q of world.discosCalles()) for (let x = q.x - q.r + 0.25; x < q.x + q.r; x += 0.5) for (let z = q.z - q.r + 0.25; z < q.z + q.r; z += 0.5) {
+    if (Math.hypot(x - q.x, z - q.z) < q.r - 0.1) calles.push([x, z, world.terrainHeight(x, z) + q.off, q.m]);
+  }
   const idx = new Map(), C = 4;
   for (const c of calles) { const k = Math.floor(c[0] / C) * 100003 + Math.floor(c[1] / C); let a = idx.get(k); if (!a) idx.set(k, (a = [])); a.push(c); }
   let terreno = 0, calle = 0;

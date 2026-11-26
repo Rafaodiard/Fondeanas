@@ -30,6 +30,10 @@ Una isla fija de 1200 × 1200 m, la misma en todas las partidas, con todas las e
 
 Entre los pueblos hay rutas con postes de luz, caminos de tierra, un río con puentes, indicadores de caminos y más de 40 lugares chicos con un poco de loot (estación de servicio, torres de vigía, capilla en ruinas, camping, cobertizos, ruinas...). El agua tiene olas, cambia de color con la profundidad y hace espuma en la orilla.
 
+**Caminos prolijos.** Todas las calles y rutas forman una sola red: ninguna se corta de golpe. Cada punta llega a otra calle (en los cruces la que sigue de largo queda arriba, y las puntas y las esquinas se redondean, sin huecos en forma de cuña) o termina en un remate: una rotonda, un playón, un estacionamiento o la puerta de una estructura. El terreno debajo de las calles se alisa para que el pasto no asome en los cruces.
+
+![Villa Cardo: rotonda al final de la calle, esquinas redondeadas y el camino de tierra que sale hacia la montaña](docs/mapa_caminos.jpg)
+
 **Todo se rompe.** Cada estructura del mapa está armada en piezas (tramos de pared, baldosas de piso, aguas del techo, escaleras, muebles, tramos de muelle y de puente) que se rompen con el pico, a tiros y con explosiones. Cada pieza es de madera, piedra o metal y su vida depende del material y del tamaño. Cuando se rompe lo que sostiene algo, lo que queda en el aire se cae, y el loot y los cofres que estaban encima bajan al piso nuevo. Los cimientos, el malecón, los postes de luz, los carteles y las torres del teleférico no se rompen.
 
 Sin errores de colisión: las puertas quedan al ras del piso, no se atraviesan techos ni pisos aunque se caiga rápido, todas las escaleras se suben (con baranda sólida), las ventanas tienen vidrio que frena al jugador pero deja pasar las balas, los puentes siguen la pendiente de las dos orillas y todo el loot se alcanza caminando. Lo revisan las pruebas automáticas:
@@ -38,7 +42,7 @@ Sin errores de colisión: las puertas quedan al ras del piso, no se atraviesan t
 node tools/mapa/pruebas.mjs
 ```
 
-Además de las colisiones, las pruebas revisan lo que se ve: caras al revés, partes que se atraviesan sin chocar, pisos falsos, caras que titilan (dos superficies en el mismo plano), estructuras metidas en otras, en el terreno o en las calles, piezas sin apoyo y que los derrumbes tiren lo que tienen que tirar. Con `TODAS=1` lista todas las caras que titilan en vez de las primeras.
+Además de las colisiones, las pruebas revisan lo que se ve: caras al revés, partes que se atraviesan sin chocar, pisos falsos, caras que titilan (dos superficies en el mismo plano), estructuras metidas en otras, en el terreno o en las calles, piezas sin apoyo y que los derrumbes tiren lo que tienen que tirar. También revisan los caminos (`tools/mapa/caminos.mjs`): que ninguna calle se corte de golpe ni quede con un hueco antes de otra, que toda la red esté unida, que las plazoletas no pisen estructuras y que el terreno no asome por arriba de las calles. Con `TODAS=1` lista todas las caras que titilan en vez de las primeras.
 
 Para recorrer la isla sin jugar, con el servidor levantado abrí http://localhost:3000/mapa.html (arrastrá para girar, rueda para acercar, WASD para moverte).
 
@@ -96,12 +100,12 @@ node tools/controles/pruebas.mjs
 
 - `server.js`: servidor HTTP + WebSocket. Maneja salas por código, el recorrido del bus, la tormenta, la vida, el daño, las piezas del mapa que se rompen y quién gana.
 - `public/js/world.js`: arma la isla (terreno, pueblos, rutas, río, árboles, rocas, cofres y agua) igual en el servidor y en todos los clientes, y mueve al jugador contra el mapa en pasos chicos (piso, techo y paredes).
-- `public/js/isla.js`: diseño de la isla: pueblos con sus calles y estructuras, rutas, río, teleférico y lugares chicos entre pueblos.
+- `public/js/isla.js`: diseño de la isla: pueblos con sus calles y estructuras, rutas (con el remate de cada punta que no llega a otra calle), río, teleférico y lugares chicos entre pueblos.
 - `public/js/planos.js`: planos de todas las estructuras (casas, edificios, faro, grúa, granero, cúpula, etc.). De la misma lista de piezas salen lo que se ve, lo que choca y las piezas que se rompen.
 - `public/js/colision.js`: sólidos del mapa (cajas, rampas y cilindros) en una grilla espacial.
 - `public/js/mallas.js`: junta las estructuras en pocas mallas y les dibuja texturas procedurales (ladrillo, tablas, tejas, chapa, adobe...).
 - `public/mapa.html`: visor del mapa (`/mapa.html`).
-- `tools/mapa/pruebas.mjs`: pruebas automáticas del mapa (colisiones, loot alcanzable y las pruebas visuales de `tools/mapa/visuales.mjs`).
+- `tools/mapa/pruebas.mjs`: pruebas automáticas del mapa (colisiones, loot alcanzable, las pruebas visuales de `tools/mapa/visuales.mjs` y la de caminos de `tools/mapa/caminos.mjs`).
 - `public/js/items.js`: armas, rarezas, munición, consumibles y materiales (lo usan el cliente y el servidor).
 - `public/js/audio.js`: efectos de sonido sintetizados.
 - `public/models/*.glb`: modelos 3D hechos en Blender (personaje, bus volador, planeador, armas y pico, pino, árbol, roca, cofre y objetos del piso). El color de la ropa y de las rarezas se tiñe en el juego.

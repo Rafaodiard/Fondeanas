@@ -215,5 +215,6 @@ function alcance(name, opts = {}, entrada = 0) {
   console.log('lugares de loot y cofres del mapa revisados:', w.lootSpots.length + w.chestSpots.length);
 }
 await import('./visuales.mjs').then((m) => m.pruebasVisuales({ alcances, world, fail }));
+await import('./caminos.mjs').then((m) => m.pruebaCaminos({ world, fail }));
 console.log(fails ? `${fails} fallas` : 'todo OK');
 process.exit(fails ? 1 : 0);

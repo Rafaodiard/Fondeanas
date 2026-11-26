@@ -52,12 +52,14 @@ export const PUEBLOS = [
   {
     id: 'villa', name: 'Villa Cardo', x: -365, z: -20, r: 72, h: 10, tema: 'barrio',
     calles: [
-      { p: [[-74, 0], [74, 0]], w: 7, m: 'asfalto' },
+      { p: [[-66, 0], [74, 0]], w: 7, m: 'asfalto', ini: { r: 7.5 } }, // al oeste termina en una rotonda (calle sin salida)
       { p: [[-26, -62], [-26, 62]], w: 6, m: 'asfalto' },
       { p: [[26, -62], [26, 62]], w: 6, m: 'asfalto' },
+      { p: [[-26, -62], [26, -62]], w: 6, m: 'asfalto' }, // las dos calles cruzadas se cierran en un rectángulo
+      { p: [[-26, 62], [26, 62]], w: 6, m: 'asfalto' },
     ],
     items: [
-      ['cartel', { text: 'Villa Cardo' }, 70, 7, 1], ['cartel', { text: 'Villa Cardo' }, -30, 64, 0],
+      ['cartel', { text: 'Villa Cardo' }, 70, 7, 1], ['cartel', { text: 'Villa Cardo' }, 23, 72, 0],
       ['arbol', {}, -30, -28, 0], ['arbol', {}, 30, 28, 0], ['arbol', { s: 1.1 }, -62, 30, 0], ['arbol', {}, 62, -30, 0], ['pino', {}, 0, 30, 0], ['arbol', { s: 0.9 }, -50, -28, 0], ['arbol', { s: 0.9 }, 50, 28, 0],
       ['hidrante', {}, -20, 4.5, 0], ['hidrante', {}, 20, -4.5, 0], ['tacho', {}, -36, 4.5, 0], ['tacho', { m: 'azul' }, 36, -4.5, 0],
       ['banco', {}, -55, 55, 1],
@@ -80,7 +82,7 @@ export const PUEBLOS = [
       ['cobertizo', { pared: 'blanco', techo: 'chapa_roja', abierto: true }, -64, -14, 0],
       ['cobertizo', { pared: 'celeste', techo: 'chapa', abierto: true }, 64, 14, 2],
       ['local', { pared: 'blanco', toldo: 'lona_roja', letrero: 'verde', cofre: true }, 0, -45, 0],
-      ['cerca', { L: 10 }, -45, -4.5, 0], ['cerca', { L: 10 }, 5, -4.5, 0], ['cerca', { L: 10 }, -55, 4.5, 0], ['cerca', { L: 10 }, 45, 4.5, 0],
+      ['cerca', { L: 10 }, -45, -4.5, 0], ['cerca', { L: 10 }, 5, -4.5, 0], ['cerca', { L: 8 }, -53, 4.5, 0], ['cerca', { L: 10 }, 45, 4.5, 0],
       ['farol', {}, -30, -4, 0], ['farol', {}, 30, 4, 2], ['farol', {}, -22, 30, 1], ['farol', {}, 22, -30, 3],
       ['auto', { m: 'verde' }, -50, -4.2, 1], ['auto', { m: 'azul' }, 28.5, 30, 0], ['auto', { m: 'blanco_puro' }, 10, 4.2, 3],
       ['fogon', {}, -55, 45, 0],
@@ -91,10 +93,10 @@ export const PUEBLOS = [
     calles: [
       { p: [[0, -80], [0, 4]], w: 8, m: 'asfalto' },
       { p: [[-75, 4], [75, 4]], w: 8, m: 'asfalto' },
-      { p: [[-75, -26], [75, -26]], w: 6, m: 'asfalto' },
+      { p: [[-75, 4], [-75, -26], [75, -26], [75, 4]], w: 6, m: 'asfalto' }, // la calle de atrás vuelve a la costanera por los dos lados
     ],
     items: [
-      ['cartel', { text: 'Puerto Bruma', fondo: 'azul' }, 7, -72, 2], ['cartel', { text: 'Puerto Bruma', fondo: 'azul' }, 72, -6, 1],
+      ['cartel', { text: 'Puerto Bruma', fondo: 'azul' }, 7, -72, 2], ['cartel', { text: 'Puerto Bruma', fondo: 'azul' }, 82, -8, 1],
       ['banco', {}, -10, 10, 2], ['banco', {}, 55, 10, 2], ['tacho', { m: 'azul' }, -26, 9.5, 0], ['hidrante', {}, 10, -2.5, 0],
       ['arbol', { s: 0.8 }, -66, -44, 0], ['arbol', { s: 0.8 }, 66, -44, 0], ['pino', {}, 10, -50, 0],
       ['malecon', { L: 130 }, -10, 18, 0],
@@ -125,7 +127,7 @@ export const PUEBLOS = [
     id: 'granja', name: 'Granja Los Álamos', x: 295, z: -165, r: 78, h: 15, tema: 'granja',
     calles: [
       { p: [[-78, 6], [78, 6]], w: 5, m: 'tierra' },
-      { p: [[-6, 6], [-6, -8]], w: 5, m: 'tierra' },
+      { p: [[-6, 6], [-6, -9.6]], w: 5, m: 'tierra', fin: 'puerta' }, // hasta la puerta del granero
     ],
     items: [
       ['cartel', { text: 'Granja Los Álamos', w: 6 }, -72, 12, 3],
@@ -151,7 +153,7 @@ export const PUEBLOS = [
   {
     id: 'medanos', name: 'Médanos', x: 375, z: 130, r: 72, h: 7, tema: 'desierto',
     calles: [
-      { p: [[-74, 0], [74, 0]], w: 6, m: 'tierra' },
+      { p: [[-74, 0], [58, 0]], w: 6, m: 'tierra', fin: { r: 7 } }, // al este termina en un playón
       { p: [[0, -60], [0, 70]], w: 5, m: 'tierra' },
       { p: [[-10, 0], [10, 0]], w: 22, m: 'arena' },
     ],
@@ -180,7 +182,7 @@ export const PUEBLOS = [
     id: 'parque', name: 'Parque Remolino', x: 175, z: 330, r: 78, h: 9, tema: 'parque',
     calles: [
       { p: [[0, -80], [0, 70]], w: 7, m: 'vereda' },
-      { p: [[-70, 8], [70, 8]], w: 6, m: 'vereda' },
+      { p: [[-58, 8], [70, 8]], w: 6, m: 'vereda', ini: { r: 6 } }, // al oeste termina en una plazoleta con banco
     ],
     items: [
       ['cartel', { text: 'Parque Remolino', fondo: 'rojo' }, -9, -72, 2],
@@ -200,6 +202,7 @@ export const PUEBLOS = [
       ['local', { pared: 'amarillo', toldo: 'lona_azul', letrero: 'rojo' }, 52, -42, 0],
       ['farol', {}, -5, -30, 1], ['farol', {}, 5, -10, 3], ['farol', {}, -5, 15, 1], ['farol', {}, 25, 12, 2], ['farol', {}, -25, 12, 2],
       ['caja3', {}, 60, 0, 0],
+      ['banco', {}, -58, 16, 2],
     ],
   },
   {
@@ -226,8 +229,8 @@ export const PUEBLOS = [
   {
     id: 'cantera', name: 'Cantera Roja', x: -95, z: -205, etiqueta: [15, 55], r: 80, h: 27, tema: 'cantera', pozo: { r: 38, prof: 14 },
     calles: [
-      { p: [[0, -82], [0, -52], [-12, -32], [-16, -14], [-6, 0]], w: 6, m: 'tierra' },
-      { p: [[-80, 50], [80, 50]], w: 5, m: 'tierra' },
+      { p: [[0, -52], [-12, -32], [-16, -14], [-2, -2]], w: 6, m: 'tierra', fin: { r: 5 }, suave: true }, // rampa al fondo del pozo: termina en el playón de carga
+      { p: [[-77.5, 50], [56, 50]], w: 5, m: 'tierra', fin: { r: 8 } }, // del camino de Villa Cardo a un playón de maniobras
     ],
     items: [
       ['cartel', { text: 'Cantera Roja', fondo: 'rojo' }, 7, 72, 0], ['cartel', { text: 'Cantera Roja', fondo: 'rojo' }, 7, -76, 2],
@@ -245,7 +248,7 @@ export const PUEBLOS = [
   },
   {
     id: 'refugio', name: 'Refugio Nevado', x: -238, z: -212, etiqueta: [-15, -58], r: 56, h: 'auto', hOff: 1, borde: 70, tema: 'nieve',
-    calles: [{ p: [[58, 10], [0, 12], [-56, 12]], w: 5, m: 'nieve' }],
+    calles: [{ p: [[58, 10], [0, 12], [-56, 12]], w: 5, m: 'nieve', fin: { r: 7 } }],
     items: [
       ['cartel', { text: 'Refugio Nevado', fondo: 'azul' }, 54, 17, 1], ['pino', { s: 1.2 }, -10, 35, 0], ['pino', {}, 15, 38, 0], ['pino', { s: 1.3 }, -40, 30, 0], ['pino', {}, 42, 32, 0], ['banco', {}, 5, 30, 0],
       ['lodge', { cofre: true }, 0, -10, 0],
@@ -259,7 +262,10 @@ export const PUEBLOS = [
   },
   {
     id: 'observatorio', name: 'Observatorio Cumbre', x: 150, z: -385, r: 62, h: 52, tema: 'ciencia',
-    calles: [{ p: [[62, 30], [0, 22], [-62, 30]], w: 5, m: 'asfalto' }, { p: [[0, 22], [0, 6]], w: 5, m: 'asfalto' }],
+    calles: [
+      { p: [[62, 30], [0, 22], [-52, 29]], w: 5, m: 'asfalto', fin: { r: 7 } }, // al oeste, estacionamiento
+      { p: [[0, 22], [0, 2]], w: 5, m: 'asfalto', fin: 'puerta' }, // hasta la puerta de la cúpula
+    ],
     items: [
       ['cartel', { text: 'Observatorio Cumbre', fondo: 'azul', w: 6 }, 56, 36, 1], ['banco', {}, 0, 34, 2],
       ['cupula', { cofre: true }, 0, -8, 0],
@@ -274,22 +280,24 @@ export const PUEBLOS = [
 ];
 
 // Rutas entre pueblos (puntos del mundo). w = ancho, m = material.
+// Cada punta de una ruta o de una calle tiene que llegar a otra calle o terminar en un remate (ini/fin):
+// { r } = plazoleta redonda, 'puerta' = llega hasta la puerta de una estructura. Lo revisa tools/mapa/caminos.mjs.
 export const RUTAS = [
   { p: [[-80, 20], [-130, 10], [-165, 0], [-210, 0], [-260, -14], [-292, -20]], w: 8, m: 'asfalto' },
   { p: [[0, 100], [-8, 180], [-25, 260], [-38, 330]], w: 8, m: 'asfalto' },
   { p: [[80, 20], [150, 50], [230, 100], [300, 130]], w: 8, m: 'asfalto' },
-  { p: [[10, -60], [90, -100], [170, -140], [218, -159]], w: 8, m: 'asfalto' },
-  { p: [[-8, -60], [-40, -100], [-80, -120], [-95, -125]], w: 7, m: 'asfalto' },
+  { p: [[0, -60], [90, -100], [170, -140], [218, -159]], w: 8, m: 'asfalto' },
+  { p: [[0, -60], [-40, -100], [-80, -120], [-95, -135], [-95, -155]], w: 7, m: 'asfalto' },
   { p: [[375, 200], [330, 260], [270, 300], [245, 338]], w: 7, m: 'asfalto' },
-  { p: [[175, 410], [120, 430], [60, 420], [35, 414]], w: 7, m: 'asfalto' },
-  { p: [[310, -243], [260, -300], [212, -355]], w: 5, m: 'tierra' },
-  { p: [[-180, -202], [-165, -200], [-150, -188], [-140, -170]], w: 5, m: 'tierra' },
-  { p: [[-350, 52], [-345, 140], [-338, 213]], w: 5, m: 'tierra' },
-  { p: [[-115, 412], [-190, 380], [-262, 320]], w: 5, m: 'tierra' },
-  { p: [[340, -87], [355, 0], [372, 58]], w: 6, m: 'asfalto' },
-  { p: [[-375, -92], [-330, -140], [-260, -140], [-225, -140], [-175, -150], [-168, -180]], w: 5, m: 'tierra' },
-  { p: [[-170, 140], [-110, 190], [-60, 230], [-30, 260]], w: 4, m: 'tierra' },
-  { p: [[90, 230], [130, 230], [178, 252]], w: 4, m: 'tierra' },
+  { p: [[175, 400], [120, 430], [60, 420], [35, 414]], w: 7, m: 'asfalto' },
+  { p: [[278, -159], [280, -200], [268, -250], [240, -305], [212, -355]], w: 5, m: 'tierra' }, // sale de la calle de la granja
+  { p: [[-180, -202], [-160, -215], [-130, -238], [-108, -252], [-95, -257]], w: 5, m: 'tierra' }, // del Refugio a la rampa de la cantera
+  { p: [[-350, 42], [-345, 140], [-338, 213]], w: 5, m: 'tierra', fin: { r: 6 } }, // termina a la orilla de la ciénaga
+  { p: [[-115, 412], [-190, 380], [-262, 320]], w: 5, m: 'tierra', fin: { r: 6 } },
+  { p: [[373, -159], [380, -110], [365, -40], [362, 10], [375, 70]], w: 6, m: 'asfalto' },
+  { p: [[-375, -82], [-330, -140], [-260, -140], [-225, -140], [-175, -150], [-178, -185], [-180, -202]], w: 5, m: 'tierra' },
+  { p: [[-142, 7], [-140, 40], [-146, 75], [-150, 110], [-142, 150], [-110, 190], [-60, 230], [-25, 260]], w: 4, m: 'tierra' }, // pasa por la capilla
+  { p: [[90, 230], [130, 230], [175, 250]], w: 4, m: 'tierra', ini: { r: 6 } }, // empieza en el camping
 ];
 
 // Teleférico: del Refugio Nevado a la cumbre de la montaña (torres en orden, de abajo hacia arriba).
