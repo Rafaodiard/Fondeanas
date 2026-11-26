@@ -119,7 +119,7 @@ export function crearLobby({ renderer, canvas }) {
     const corrida = ancho ? -Math.min(1.9, (camera.aspect - 1) * 1.25) : 0;
     camera.fov = ancho ? 30 : 40;
     camera.position.set(corrida, ancho ? 1.7 : 2.0, ancho ? 7.6 : 8.4);
-    camera.lookAt(corrida, ancho ? 0.95 : 0.2, 0);
+    camera.lookAt(corrida, ancho ? 0.95 : -0.35, 0);
     camera.updateProjectionMatrix();
 
     if (pj) {
