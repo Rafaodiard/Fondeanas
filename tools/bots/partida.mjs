@@ -6,9 +6,14 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import WebSocket from 'ws';
+import { BOT_TOTALES, BOT_DIFICULTADES, totalValido, dificultadValida } from '../../public/js/opcionesBots.js';
 
 const raiz = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const total = Number(process.argv[2]) || 12, dif = process.argv[3] || 'normal', maxSeg = Number(process.argv[4]) || 420;
+if (!totalValido(total) || total === 0 || !dificultadValida(dif)) {
+  console.error(`total tiene que ser uno de ${BOT_TOTALES.filter(Boolean).join(', ')} y la dificultad una de ${Object.keys(BOT_DIFICULTADES).join(', ')}`);
+  process.exit(1);
+}
 const PORT = 3000 + Math.floor(Math.random() * 900) + 50;
 const srv = spawn(process.execPath, ['server.js'], { cwd: raiz, env: { ...process.env, PORT, SF_BOTS_HASTA_EL_FINAL: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
 // SF_BOTS_DEBUG=1 muestra qué hace cada bot cada 10 s
