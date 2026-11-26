@@ -9,6 +9,7 @@ import {
 } from './items.js';
 import { sfx, setVolumen } from './audio.js';
 import { setRigEnv } from './rig.js';
+import { prepararIconos, iconoDe, iconoPico } from './iconos.js';
 import {
   estadoCaida, fisicaAire, abrirParacaidas, puedeCerrar, cerrarParacaidas, PARACAIDAS, DESLIZ,
   puedeDeslizar, empezarDeslizar, terminarDeslizar, fisicaDeslizar, paramsRed, leerParams,
@@ -32,7 +33,7 @@ const ui = {
   center: $('center-msg'), alive: $('alive'), kills: $('kills'), storm: $('stormInfo'), minimap: $('minimap'),
   killfeed: $('killfeed'), hpfill: $('hpfill'), hptext: $('hptext'), shieldfill: $('shieldfill'), shieldtext: $('shieldtext'),
   hit: $('hitmarker'), damage: $('damage'), chatlog: $('chatlog'), chatInput: $('chatInput'), click: $('clickToPlay'),
-  slots: $('slots'), prompt: $('prompt'), usebar: $('usebar'), usefill: $('usefill'), usetext: $('usetext'),
+  slots: $('slots'), itemMano: $('itemMano'), prompt: $('prompt'), usebar: $('usebar'), usefill: $('usefill'), usetext: $('usetext'),
   pickupFeed: $('pickupFeed'), buildbar: $('buildbar'), buildhint: $('buildhint'), structhp: $('structhp'), scope: $('scope'), dmgnums: $('dmgnums'), crosshair: $('crosshair'),
   autohud: $('autohud'), autovel: $('autovel'), autovida: $('autovida'), autoturbo: $('autoturbo'), autohint: $('autohint'),
   btnBots: $('btnBots'), botsResumenMenu: $('botsResumenMenu'), botsElegir: $('botsElegir'), botsTotal: $('botsTotal'), botsDif: $('botsDif'), botsResumen: $('botsResumen'),
@@ -58,6 +59,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 setRigEnv(renderer);
 luzLoot(renderer);
+prepararIconos(renderer); // fotos de las armas y objetos para la barra de items (iconos.js)
 renderer.localClippingEnabled = true; // las construcciones se llenan de abajo hacia arriba mientras se levantan
 
 const scene = new THREE.Scene();
@@ -548,23 +550,34 @@ function heldItem() { return me.sel >= 0 ? me.slots[me.sel] : null; }
 
 function updateSlots() {
   const cells = [];
-  cells.push(`<div class="slot ${me.sel === -1 && !me.build ? 'active' : ''}"><span class="k">${escapeHtml(teclaDe('pico'))}</span><span class="n">⛏ Pico</span></div>`);
+  const foto = (url) => (url ? `<img class="ic" src="${url}" alt="" draggable="false">` : '');
+  // con foto, el nombre no entra en el lugar: queda de título y se muestra el de lo que tenés en la mano (itemMano)
+  const conFoto = (url) => (url ? ' foto' : '');
+  cells.push(`<div class="slot${conFoto(iconoPico())} ${me.sel === -1 && !me.build ? 'active' : ''}" title="Pico"><span class="k">${escapeHtml(teclaDe('pico'))}</span>${foto(iconoPico())}<span class="n">${iconoPico() ? '' : '⛏ '}Pico</span></div>`);
   for (let i = 0; i < SLOTS; i++) {
     const it = me.slots[i];
-    let inner = '';
+    let inner = '', clase = '', titulo = '';
     if (it) {
+      clase = conFoto(iconoDe(it));
+      titulo = ` title="${escapeHtml(itemLabel(it))}"`;
       const col = itemColor(it);
       if (it.kind === 'weapon') {
         const def = WEAPONS[it.w];
         const ammo = me.reloadSlot === i && me.reloading > 0 ? '…' : `${it.mag}/${me.ammo[def.ammo] || 0}`;
-        inner = `<span class="rar" style="background:linear-gradient(transparent,${col})"></span><span class="a">${ammo}</span><span class="n">${def.name}</span>`;
+        inner = `<span class="rar" style="--c:${col}"></span>${foto(iconoDe(it))}<span class="a">${ammo}</span><span class="n">${def.name}</span>`;
       } else {
-        inner = `<span class="rar" style="background:linear-gradient(transparent,${col})"></span><span class="a">×${it.count}</span><span class="n">${CONSUMABLES[it.c].name}</span>`;
+        inner = `<span class="rar" style="--c:${col}"></span>${foto(iconoDe(it))}<span class="a">×${it.count}</span><span class="n">${CONSUMABLES[it.c].name}</span>`;
       }
     }
-    cells.push(`<div class="slot ${me.sel === i && !me.build ? 'active' : ''}"><span class="k">${escapeHtml(teclaDe('ranura' + (i + 1)))}</span>${inner}</div>`);
+    cells.push(`<div class="slot${clase} ${me.sel === i && !me.build ? 'active' : ''}"${titulo}><span class="k">${escapeHtml(teclaDe('ranura' + (i + 1)))}</span>${inner}</div>`);
   }
   ui.slots.innerHTML = cells.join('');
+  // nombre de lo que tenés en la mano, al costado de la barra (con la rareza si es un arma)
+  const mano = heldItem();
+  ui.itemMano.classList.toggle('hidden', !!me.build);
+  if (!mano) ui.itemMano.innerHTML = 'Pico';
+  else if (mano.kind === 'weapon') ui.itemMano.innerHTML = `${escapeHtml(WEAPONS[mano.w].name)}<small style="--c:${RARITIES[mano.rarity].color}">${escapeHtml(RARITIES[mano.rarity].name)}</small>`;
+  else ui.itemMano.innerHTML = escapeHtml(CONSUMABLES[mano.c].name);
   document.querySelectorAll('.mat').forEach((el) => {
     const m = el.dataset.m;
     el.querySelector('i').style.background = MATERIALS[m].color;

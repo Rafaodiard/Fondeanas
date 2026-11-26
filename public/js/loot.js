@@ -136,6 +136,14 @@ function materialesObjeto(obj) {
   return obj;
 }
 
+// Modelo de un objeto que no es arma (munición, material, curación o escudo): el de objetos.glb o, si no cargó, uno simple.
+// También lo usa iconos.js para la foto de la barra de items.
+export function modeloObjeto(item, color) {
+  const nombre = NOMBRE_OBJETO(item);
+  const glb = nombre && cloneAsset('objetos', `objetos_${nombre}`, { Tinte: color });
+  return glb ? materialesObjeto(glb) : objetoProcedural(item, color);
+}
+
 function objetoProcedural(item, color) {
   // por si objetos.glb no cargó: formas simples
   const g = new THREE.Group();
@@ -174,9 +182,7 @@ export function createItemMesh(item, color) {
     marco.add(w);
     spin.add(marco);
   } else {
-    const nombre = NOMBRE_OBJETO(item);
-    const glb = nombre && cloneAsset('objetos', `objetos_${nombre}`, { Tinte: color });
-    spin.add(glb ? materialesObjeto(glb) : objetoProcedural(item, color));
+    spin.add(modeloObjeto(item, color));
     spin.scale.setScalar(1.15);
   }
   // brillo en el piso: anillo + halo

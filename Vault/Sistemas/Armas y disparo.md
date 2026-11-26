@@ -36,3 +36,7 @@ Cada arma tiene además multiplicador de cabeza, cooldown, alcance, dispersión 
 ## Apuntar
 
 Clic derecho, solo con armas (`canAim`). Con el francotirador se ve la mira telescópica (`#scope` en [[index.html]]).
+
+## Íconos en la barra (2026-11-26)
+
+Cada arma de la barra de items se ve con su foto, sacada del mismo modelo de `armas.glb` con la franja de su rareza ([[iconos.js]]). Al costado de la barra se lee el nombre y la rareza del arma que tenés en la mano.
