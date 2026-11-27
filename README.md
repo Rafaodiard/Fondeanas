@@ -117,7 +117,7 @@ Para recorrer la isla sin jugar, con el servidor levantado abrí http://localhos
 - **Caída libre con control.** Yendo adelante con la mirada al horizonte se **planea**: cae lento (24 m/s) y llega lejos (unos 200 m desde el bus). Mirando abajo se va en **picada**: cae rápido (72 m/s) pero casi no avanza. En el medio se mezcla de a poco, y al doblar el cuerpo se ladea hacia la curva.
 - **Paracaídas.** Se abre y se cierra con la tecla de saltar mientras estés a más de **80 m** del piso (o del agua). Si bajás de esa altura se abre solo y ya no se puede cerrar. Abierto avanza más rápido con adelante (21 m/s), frena con atrás (y cae más despacio) y se mueve de costado con A/D; tirar de un freno baja ese lado de la vela y el cuerpo se inclina. Sale arrugado y se infla al abrirse, y al tocar el piso el personaje amortigua con las rodillas.
 - **Deslizarse.** Corriendo, **Ctrl** te tira al piso con un impulso: en el plano recorre unos 16 m, en bajada acelera y sigue, en subida frena. Se puede doblar un poco, saltar en medio sin perder velocidad y disparar mientras te deslizás.
-- **Autos.** 14 autos estacionados en las calles de los pueblos y en las rutas (hatchback modelado en Blender, cada uno de su color). Se suben hasta cuatro: conductor, acompañante y dos atrás. Aceleran fuerte, frenan, doblan menos cuanto más rápido van, derrapan con el freno de mano y tienen **turbo** (3 s, se recarga solo). Suben y bajan con el terreno, saltan en los lomos, chocan contra casas, árboles, construcciones y otros autos, y no entran al agua honda. Un choque fuerte los abolla; a las 800 de vida explotan. Atropellar a alguien rápido le hace daño y lo empuja. Se les puede disparar y pegar con el pico (dan metal), y uno se puede parar arriba. Al bajarse se sale por la propia puerta (o por donde haya lugar) con parte del envión, y el auto sigue solo hasta frenar. Adentro: cámara de persecución, velocímetro, vida del auto, turbo, sonido de motor, derrape y bocina, y el conductor con las manos en el volante, que gira con la dirección.
+- **Autos.** 14 autos estacionados en las calles de los pueblos y en las rutas (hatchback modelado en Blender, cada uno de su color). Se suben hasta cuatro: conductor, acompañante y dos atrás. Aceleran fuerte, frenan, doblan menos cuanto más rápido van, derrapan con el freno de mano y tienen **turbo** (3 s, se recarga solo). Suben y bajan con el terreno, saltan en los lomos, chocan contra casas, árboles, construcciones y otros autos, y no entran al agua honda. **Según la velocidad rompen o no lo que chocan**: despacio rebotan sin dañar nada; más rápido dañan lo que chocan (se ven las grietas) y, si el golpe alcanza, lo rompen y siguen de largo, más lentos y un poco dañados según lo que rompieron. Con vida llena: madera desde 45 km/h, árboles desde 55 km/h (los gruesos aguantan más), piedra casi a fondo (89 km/h), metal solo con turbo; las rocas, los postes y lo fijo del mapa los frenan siempre. Lo que ya está dañado se rompe más fácil. Lo decide el servidor y lo ven todos; los números están en la tabla `EMBESTIDA` de `public/js/autos.js`. Un choque fuerte los abolla; a las 800 de vida explotan. Atropellar a alguien rápido le hace daño y lo empuja. Se les puede disparar y pegar con el pico (dan metal), y uno se puede parar arriba. Al bajarse se sale por la propia puerta (o por donde haya lugar) con parte del envión, y el auto sigue solo hasta frenar. Adentro: cámara de persecución, velocímetro, vida del auto, turbo, sonido de motor, derrape y bocina, y el conductor con las manos en el volante, que gira con la dirección.
 - **Loot** en el piso y en **cofres**, con cinco rarezas (común, poco común, rara, épica y legendaria) que suben el daño y bajan el tiempo de recarga.
   - Cofre modelado en Blender (tablas, herrajes dorados, cerradura, manijas, tapa con bisagra e interior que brilla). Cerrado tiene un aura dorada que late y motas que suben; al abrirlo la tapa salta con rebote, sale una ráfaga de chispas y el loot sale volando del cofre hasta el piso. Cada cofre mira hacia el lado con más lugar libre (no queda con la cerradura contra la pared).
   - Objetos del piso modelados uno por uno: vendas, botiquín, frasco y bidón de escudo (vidrio con líquido que brilla), una caja por tipo de munición (con la franja del color de la munición y balas arriba), cohete, y pilas de madera, piedra y metal. Flotan y giran despacio sobre un anillo del color del objeto; las armas suman un haz de luz más alto y chispas más numerosas cuanto más rara es el arma.
@@ -133,17 +133,20 @@ Para recorrer la isla sin jugar, con el servidor levantado abrí http://localhos
 - **Daño visible y golpes críticos:** las paredes, pisos, techos y demás piezas del mapa, y las construcciones, se van agrietando y oscureciendo a medida que pierden vida (lo ven todos en la sala). Debajo de la mira aparece la barra de vida de lo que golpeás o mirás con el pico, con la parte recién perdida en blanco. Al picar una estructura, un árbol o una roca aparece un **punto débil** (círculo celeste) cerca del golpe: pegarle ahí es un crítico que hace el doble de daño (100 en vez de 50), con número celeste, destello y sonido propio, y el punto se mueve a otro lado. Si le pegás a otro lado el punto se queda; si dejás de picar 6 s, se va.
 - **Construcción** (ver abajo): pared, piso, rampa y techo en una grilla de 4 m, en madera, piedra o metal, que se pueden editar.
 - **Escudo y curación:** vendas, botiquín, frasco azul y bidón azul.
-- Al morir, el jugador tira todo lo que tenía. También hay daño por caída, tormenta por fases, números de daño, minimapa, killfeed, chat, modo espectador y sonidos sintetizados.
+- **Mapa, brújula y marcas:** arriba a la derecha hay un minimapa que te sigue (con el norte arriba; se aleja en el bus y en la caída) con la tormenta, la próxima zona, el recorrido del bus, los autos y tus marcas; si estás afuera de la zona, una línea te muestra por dónde ir. Arriba al centro, una brújula con hacia dónde mirás y a cuántos metros está cada marca. Con **M** se abre el mapa grande de la isla (relieve, agua, río, calles, casas, grilla A–J / 1–10 y los pueblos): rueda para acercar, arrastrar para moverlo y **clic para marcar** un lugar (otro clic la mueve, clic sobre ella o clic derecho la saca). También se marca sin abrir el mapa con el **clic de la rueda** (o T) mirando a un lugar. Cada jugador tiene una marca de su color que se ve en el mapa, en el minimapa, en la brújula y en el mundo como un haz de luz con la distancia. La ve toda la sala (se puede desactivar en Configuración).
+- Al morir, el jugador tira todo lo que tenía. También hay daño por caída, tormenta por fases, números de daño, killfeed, chat, modo espectador y sonidos sintetizados.
 
 ## Construcción
 
 Como en los battle royale del género:
 
 - **Cuatro piezas:** pared, piso, rampa y techo (una pirámide baja). Cada una cuesta 10 del material. Arriba del inventario está la barra con las cuatro piezas y la tecla de cada una, y el material que estás usando con cuánto te queda.
-- **Vista previa:** la pieza aparece como un holograma azul donde va a ir (rojo si no se puede: ya hay una, no alcanza el material o no tiene apoyo). Se ubica sola según hacia dónde mirás: la pared en el borde de tu celda, el piso adelante (mirando arriba, sobre tu cabeza; mirando abajo, bajo los pies), la rampa adelante subiendo hacia donde mirás (R la gira) y el techo adelante o sobre tu cabeza. Parado en una rampa, la pieza de adelante va un nivel más arriba, así se sube construyendo rampas seguidas. Manteniendo el clic se construye seguido.
+- **Grilla de encastre:** todas las piezas van en una grilla de celdas de 4 × 4 × 4 m, y cada una tiene que arrancar donde termina otra, como en el juego original. Las paredes van en los lados de una celda, los pisos en su cara de abajo, y la rampa o el techo (uno de los dos) adentro. Un piso solo se puede poner en el suelo, en el borde de arriba (o de abajo) de una pared, en el borde alto o bajo de una rampa o pegado al borde de otro piso; nunca a media pared. El techo va arriba de un piso o de paredes; las paredes, una arriba de otra o de costado. Dos piezas se sostienen cuando comparten un borde entero de la grilla (tocarse en una punta no alcanza), y todo lo que se arma cerca de una construcción queda en su misma grilla de altura. El servidor revisa las mismas reglas, así que un cliente tramposo no puede meter piezas corridas.
+- **Vista previa:** la pieza aparece como un holograma azul donde va a ir, y en rojo si no se puede, con el motivo en la ayuda de construcción (no encaja con la grilla de al lado, no tiene apoyo o no alcanza el material). Se ubica sola según hacia dónde mirás: la pared en el borde de tu celda, el piso adelante (mirando arriba, sobre tu cabeza; mirando abajo, bajo los pies), la rampa adelante subiendo hacia donde mirás (R la gira) y el techo adelante o sobre tu cabeza. Parado en una rampa, la pieza de adelante va un nivel más arriba, así se sube construyendo rampas seguidas. Manteniendo el clic se construye seguido.
 - **Se levantan de a poco:** la pieza aparece en holograma y se va llenando de abajo hacia arriba; arranca con el 30 % de su vida y llega al máximo cuando termina (madera 150 en 2,5 s, piedra 300 en 5 s, metal 450 en 7,5 s). Apuntando a una construcción se ve su vida debajo de la mira, y las dañadas se ven agrietadas.
-- **Apoyo y derrumbes:** una pieza nueva tiene que tocar el piso, una estructura del mapa u otra construcción. Si se rompe lo que sostiene algo (una pieza tuya o una pieza del mapa), todo lo que deja de llegar al piso se cae.
-- **Edición** (F mirando una construcción tuya): aparece la grilla de la pieza y se marcan baldosas con clic (manteniendo apretado se marcan varias). F otra vez confirma; clic derecho la deja como nueva.
+- **Apoyo y derrumbes:** una pieza nueva tiene que apoyarse en el suelo o en una estructura del mapa, o compartir un borde con otra construcción. Si se rompe lo que sostiene algo (una pieza tuya o una pieza del mapa), todo lo que deja de llegar al piso pasando de borde en borde se cae.
+- **Para construir rápido** (opciones en la pestaña Juego de la configuración): *Confirmar la edición al soltar la tecla* (prendida de fábrica: mantenés F, marcás y al soltar se confirma; un toque corto deja la edición abierta como antes), *Construir seguido manteniendo el clic* (prendida) y *Volver a la pared al entrar a construir* (apagada: Q vuelve a la última pieza). Si una rampa o un piso aparece donde estás parado, te sube arriba en vez de dejarte adentro.
+- **Edición** (F mirando una construcción tuya): aparece la grilla de la pieza y se marcan baldosas con clic (manteniendo apretado se marcan varias). F otra vez (o soltar F, si la mantuviste) confirma; clic derecho la deja como nueva. Una pieza editada sigue sosteniendo lo que tiene arriba.
   - Pared (3×3): lo marcado se saca. Así se hacen puertas, ventanas, arcos o media pared, y se puede pasar y disparar por el hueco.
   - Piso (2×2): lo marcado se saca y se cae por el hueco.
   - Rampa (3×3, vista desde arriba): se arrastra en la dirección en que tiene que subir, y si marcás solo una o dos columnas queda una rampa angosta.
@@ -151,10 +154,12 @@ Como en los battle royale del género:
 - **Material automático:** si se te termina el material elegido, pasa solo al siguiente que alcance para una pieza. Con clic derecho en modo construcción se cambia a mano.
 - Las piezas nuevas no se pueden poner cayendo ni planeando. Los pisos, rampas y techos de construcción hacen de techo: saltando abajo no se atraviesan.
 
-Las pruebas de la construcción (choques con las piezas editadas, que lo que se ve coincida con lo que se pisa, apoyo, derrumbes y vida):
+Las pruebas de la construcción (choques con las piezas editadas, que lo que se ve coincida con lo que se pisa, la grilla de encastre, apoyo, derrumbes y vida) y las del servidor rechazando piezas mal puestas por red:
 
 ```bash
 node tools/construccion/pruebas.mjs
+node tools/construccion/red.mjs
+CAPTURAS=capturas node tools/construccion/capturas.mjs   # fotos del encastre en el juego (Playwright)
 ```
 
 Para probar a construir sin juntar materiales: `SF_MATS=500 npm start` arranca cada partida con 500 de cada material.
@@ -179,8 +184,10 @@ Estas son las teclas de fábrica. **Todas se pueden cambiar** desde **⚙ Config
 | F | Editar la construcción que mirás / confirmar la edición |
 | G | Tirar el objeto que tenés en la mano |
 | B | Bailar |
+| M | Abrir y cerrar el mapa (con el mapa abierto: clic marca, clic derecho saca la marca, rueda acerca, arrastrar mueve) |
+| Clic de la rueda o T | Marcar el lugar al que apuntás (otra vez en el mismo lugar la saca) |
 | Enter | Chat |
-| Esc | Soltar el mouse / abrir la configuración |
+| Esc | Soltar el mouse / abrir la configuración (con el mapa abierto, lo cierra) |
 
 En el auto:
 
@@ -200,7 +207,7 @@ En pantalla no hay una lista de controles: en el auto aparece una ayuda corta co
 
 El panel tiene cuatro pestañas y todo se guarda en el navegador (`localStorage`), así que queda para la próxima vez:
 
-- **Juego:** sensibilidad del mouse, sensibilidad apuntando y con mira telescópica, invertir el eje vertical, apuntar manteniendo o alternando, correr siempre, números de daño, y los bots de las salas que crees (hasta cuántos jugadores completan y su dificultad).
+- **Juego:** sensibilidad del mouse, sensibilidad apuntando y con mira telescópica, invertir el eje vertical, apuntar manteniendo o alternando, correr siempre, números de daño, las opciones de construcción (confirmar la edición al soltar, construir seguido, volver a la pared al entrar a construir), compartir tus marcas con la sala, zoom del minimapa (cerca, medio o lejos), y los bots de las salas que crees (hasta cuántos jugadores completan y su dificultad).
 - **Video:** calidad gráfica (baja sin sombras, media y alta), resolución 3D, campo de visión, color de la mira y contador de FPS.
 - **Sonido:** volumen general.
 - **Controles:** cambiar cualquier tecla. Si elegís una que ya usaba otra acción, se la saca a esa y te avisa. Una tecla puede repetirse entre combate y construcción (por ejemplo, R recarga y en modo construcción gira la rampa) porque no se usan a la vez. Lo mismo con los controles del auto (grupo *Vehículos*): solo valen sentado en un auto, así que repiten las de a pie.
@@ -226,9 +233,9 @@ node tools/controles/pruebas.mjs
 - `public/js/mallas.js`: junta las estructuras en pocas mallas y les dibuja texturas procedurales (ladrillo, tablas, tejas, chapa, adobe...).
 - `public/mapa.html`: visor del mapa (`/mapa.html`).
 - `tools/mapa/pruebas.mjs`: pruebas automáticas del mapa (colisiones, loot alcanzable, las pruebas visuales de `tools/mapa/visuales.mjs` y la de caminos de `tools/mapa/caminos.mjs`).
-- `public/js/autos.js`: los autos, compartido por el cliente y el servidor: medidas, asientos, física de manejo (motor, frenos, dirección, derrape, turbo, ruedas contra el piso), choques, dónde pega un disparo, dónde se baja cada uno y el estado que viaja por la red.
+- `public/js/autos.js`: los autos, compartido por el cliente y el servidor: medidas, asientos, física de manejo (motor, frenos, dirección, derrape, turbo, ruedas contra el piso), choques, qué rompen según la velocidad (tabla `EMBESTIDA` e `impacto`), dónde pega un disparo, dónde se baja cada uno y el estado que viaja por la red.
 - `public/js/manejar.js`: los autos en el juego: mallas, manejar el propio, ver los de los demás, subir, bajar y cambiar de asiento, gente sentada, atropellos, HUD, minimapa y sonidos.
-- `tools/autos/pruebas.mjs`: pruebas de los autos (lugares de salida libres, manejar desde cada uno sin meterse en nada, choque contra una casa, agua, dos autos, techo, balas, bajarse y red): `node tools/autos/pruebas.mjs`.
+- `tools/autos/pruebas.mjs`: pruebas de los autos (lugares de salida libres, manejar desde cada uno sin meterse en nada, choque contra una casa, agua, dos autos, techo, balas, bajarse y red): `node tools/autos/pruebas.mjs`. `tools/autos/embestidas.mjs` (a qué velocidad se rompe cada material y la física de atravesar o rebotar) y `tools/autos/servidor.mjs` (las embestidas contra el servidor: velocidad que no se puede mentir, cosas lejos, el que no maneja, árboles y rocas): `node tools/autos/embestidas.mjs` y `node tools/autos/servidor.mjs`.
 - `public/js/items.js`: armas, rarezas, munición, consumibles y materiales, y el punto débil del pico (`PUNTO_DEBIL`) (lo usan el cliente y el servidor).
 - `public/js/golpes.js`: daño visible en el cliente: grietas encima de las piezas dañadas (shader procedural), barra de vida de lo que golpeás o mirás y el punto débil del pico (círculo, crítico, número, aro y sonido). El servidor elige el punto débil y decide si un golpe fue crítico.
 - `tools/golpes/pruebas.mjs`: pruebas del punto débil y la vida de lo dañado contra el servidor de verdad (por WebSocket): `node tools/golpes/pruebas.mjs`.
@@ -243,11 +250,12 @@ node tools/controles/pruebas.mjs
 - `tools/blender/`: scripts de Blender que generan el personaje (`heroe_*.py`; `heroe_caida.py` hace los clips de caída, paracaídas, aterrizaje y deslizarse sobre el esqueleto que trae `heroe_importar.py` del GLB del juego), el paracaídas (`paracaidas.py`), las armas (`armas_*.py`), el bus volador (`bus.py`) y sus animaciones, el auto (`auto.py`), y el cofre y los objetos del piso (`loot_modelos.py`, `loot_export.py`). `heroe_reemplazar_clips.mjs` cambia solo algunos clips del personaje sin tocar el resto del GLB. `recargas_control.py`, `armas_choque.py` y `brazos_choque.py` revisan las animaciones sin renderizar (brazos, saltos entre cuadros, cuánto se mete el arma en el cuerpo y cuánto se meten los brazos y las manos en el cuerpo con las mismas mezclas del juego, mirando derecho, abajo y arriba). `tools/texturas/`: máscaras de la cara y el tatuaje.
 - `Vault/`: vault de Obsidian que documenta el proyecto (empezar por `Vault/Inicio.md`) y grafo del código generado con graphify en `Vault/graphify-out`.
 - `public/js/caida.js`: física de la caída libre (planeo / picada), el paracaídas (altura límite, frenos) y el deslizamiento, y los parámetros de animación que viajan por la red. Pruebas: `node tools/caida/pruebas.mjs`.
-- `public/js/main.js`: el juego en sí (cámara en tercera persona, física, disparo, HUD, minimapa, red).
-- `public/js/construccion.js`: reglas de la construcción, compartidas por el cliente y el servidor: ediciones válidas, superficie que se pisa y cajas que chocan de cada pieza editada, apoyo, derrumbes, vida que crece y qué baldosa se mira al editar.
+- `public/js/main.js`: el juego en sí (cámara en tercera persona, física, disparo, HUD, red).
+- `public/js/mapaHud.js`: minimapa que sigue al jugador, mapa grande (M), brújula y marcas (en el mapa y en el mundo, compartidas con la sala). Pinta la isla una vez por partida con los datos del mundo (relieve, agua, río, calles, casas). Estilos en `public/mapaHud.css`. Pruebas (Node, servidor y navegador): `node tools/mapaHud/pruebas.mjs`.
+- `public/js/construccion.js`: reglas de la construcción, compartidas por el cliente y el servidor: grilla de encastre (bordes de cada pieza, qué va donde, dónde cae la vista previa), ediciones válidas, superficie que se pisa y cajas que chocan de cada pieza editada, apoyo, derrumbes, vida que crece y qué baldosa se mira al editar.
 - `public/js/construccion3d.js`: mallas de las construcciones (texturas de tablas, bloques de piedra y chapa con remaches, marcos que rodean también los huecos editados), holograma de la vista previa, grilla de edición y el relleno de la pieza mientras se levanta.
 - `public/js/construir.js`: la construcción en el juego: modo construcción, dónde va cada pieza, colocar seguido, edición, material automático y la barra de piezas del HUD (la vida de lo que se mira la muestra `golpes.js`). Registra sus controles en `controles.js`.
-- `tools/construccion/pruebas.mjs`: pruebas de la construcción.
+- `tools/construccion/pruebas.mjs`: pruebas de la construcción. `tools/construccion/red.mjs`: el servidor rechaza piezas que no encajan.
 - `public/js/controles.js`: registro central de acciones y teclas (con contexto: siempre, combate, construcción o vehículo) y de las opciones del juego, guardados en `localStorage`. Cualquier control u opción nueva se agrega acá con `registrarAccion` / `registrarOpcion`.
 - `public/js/configuracion.js`: el panel de configuración (pestañas Juego, Video, Sonido y Controles).
 - `tools/controles/pruebas.mjs`: pruebas del registro de controles y opciones.
@@ -262,6 +270,9 @@ node tools/controles/pruebas.mjs
 ![Piezas de construcción en madera, piedra y metal, editadas](docs/construccion.png)
 ![Editando una pared: la grilla de 3×3](docs/construccion_edicion.png)
 ![La puerta hecha y la barra de piezas arriba del inventario](docs/construccion_puerta.png)
+![Grilla de encastre: la rampa que sube hasta el borde del piso de arriba encaja (azul)](docs/encastre_encaja.png)
+![Un piso sin nada que lo sostenga: rojo, con el motivo en la ayuda](docs/encastre_no_encaja.png)
+![Parado en la rampa: el piso de adelante va en su borde alto](docs/encastre_piso_rampa.png)
 ![Personajes](docs/personajes.png)
 
 ### Bots

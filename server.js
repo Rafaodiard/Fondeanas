@@ -11,8 +11,8 @@ import {
   WEAPONS, CONSUMABLES, AMMO, MATERIALS, BUILD_COST, MAX_MATS, PICKAXE, PUNTO_DEBIL, SLOTS, GRID, DIRS,
   randomWeapon, randomConsumable, randomAmmo, weaponDamage, weaponReload, structKey,
 } from './public/js/items.js';
-import { TIPOS, normalizar, tieneApoyo, sinApoyo, vidaDe, editValida, OBRA, ALCANCE_EDICION, cajaPieza, superficie, DEBAJO } from './public/js/construccion.js';
-import { AUTO, nuevoAuto, aplicarRed, estadoRed, autoPublico, asientoLibre, rapidez } from './public/js/autos.js';
+import { TIPOS, normalizar, motivoNoEncaja, sinApoyo, vidaDe, editValida, OBRA, ALCANCE_EDICION, cajaPieza, superficie, DEBAJO } from './public/js/construccion.js';
+import { AUTO, nuevoAuto, aplicarRed, estadoRed, autoPublico, asientoLibre, rapidez, materialChoque, impacto, claveChoque } from './public/js/autos.js';
 import { repartirLoot, acomodarLoot, LOOT_RADIO, LOOT_ALTO } from './public/js/lugarLoot.js';
 import { totalValido, dificultadValida, cuantosBots, BOT_TOTALES } from './public/js/opcionesBots.js';
 import { nuevoBot, nombresBots, prepararBots, actualizarBots, alRecibirDanio, alMatar } from './servidor/bots.js';
@@ -133,6 +133,7 @@ function matchSnapshot(room) {
     pzHp: room.pzHp.flatMap((hp, id) => { const pz = room.world.piezas[id]; return !pz.fija && !pz.rota && hp < pz.hp ? [[id, Math.ceil(hp)]] : []; }), // dañadas
     cofresMovidos: room.chests.flatMap((c, i) => (c.movido ? [[i, c.y]] : [])),
     autos: room.autos.map(autoPublico),
+    marcas: [...room.players.values()].filter((p) => p.alive && p.marca).map((p) => [p.id, p.marca]), // marcas del mapa
   };
 }
 // crece: segundos que le faltan para terminar de levantarse (obra: lo que tarda en total).
@@ -256,7 +257,7 @@ function sacarBots(room) {
 
 function resetPlayer(p, room) {
   p.hp = 100; p.shield = 0; p.alive = true; p.kills = 0; p.state = 'bus';
-  p.pos = [...room.bus.from]; p.lastShot = 0; p.lastSwing = 0; p.debil = null; p.use = null; p.auto = null;
+  p.pos = [...room.bus.from]; p.lastShot = 0; p.lastSwing = 0; p.debil = null; p.use = null; p.auto = null; p.marca = null;
   p.slots = Array(SLOTS).fill(null);
   p.ammo = { ligera: 0, media: 0, pesada: 0, cartuchos: 0, cohetes: 0 };
   p.mats = { madera: MATS_INICIALES, piedra: MATS_INICIALES, metal: MATS_INICIALES };
@@ -294,6 +295,7 @@ function killPlayer(room, victim, killer, cause) {
   if (!victim.alive) return;
   if (victim.auto) bajarDelAuto(room, victim);
   victim.alive = false; victim.hp = 0; victim.shield = 0; victim.state = 'dead';
+  victim.marca = null; // los clientes sacan su marca al recibir 'death'
   if (killer && killer !== victim) { killer.kills++; if (killer.bot) alMatar(room, killer, Date.now()); }
   // Tira todo lo que tenía.
   const drops = victim.slots.filter(Boolean);
@@ -621,9 +623,9 @@ function handleGame(room, player, msg) {
       if (Math.hypot(cx - player.pos[0], cz - player.pos[2]) > GRID * 3 || Math.abs(y - player.pos[1]) > GRID * 2.5) break;
       const s = normalizar({ type, i, j, y, dir, mat, e: 0 });
       s.key = structKey(s);
-      if (room.world.structs.has(s.key)) break;
-      // tiene que apoyarse en el piso, en el mapa o en otra construcción
-      if (!tieneApoyo(room.world, s)) break;
+      // grilla de encastre (construccion.js): lugar libre, misma grilla que lo que toca y apoyada en el piso,
+      // en el mapa o en el borde de otra construcción. Lo mismo que pinta de verde la vista previa.
+      if (motivoNoEncaja(room.world, s)) break;
       s.born = Date.now(); s.dano = 0;
       s.owner = player.id;
       room.world.addStruct(s);
@@ -718,6 +720,7 @@ function handleGame(room, player, msg) {
       // sin teletransportes: a lo sumo lo que se puede recorrer a toda velocidad desde el último estado
       const dtR = t ? Math.min(2, (now - t) / 1000) : 2;
       if (dist3(antes, [prueba.x, prueba.y, prueba.z]) > AUTO.TURBO_MAX * 1.6 * dtR + 4) break;
+      a.vAntes = rapidez(a); // para validar las embestidas (la velocidad pudo bajar justo al chocar)
       aplicarRed(a, msg);
       a.tRed = now;
       for (const id of a.seats) {
@@ -753,6 +756,50 @@ function handleGame(room, player, msg) {
       if (!a || a.ctrl !== player.id || a.rota || v < 12 || now - (a.tChoque || 0) < 400) break;
       a.tChoque = now;
       danarAuto(room, a, (v - 12) * 9, null);
+      break;
+    }
+    case 'marca': {
+      // marca en el mapa (mapaHud.js): [x, y, z] o null para sacarla; se le pasa al resto de la sala
+      if (!player.alive) break;
+      // límite de mensajes: hasta 8 seguidos y después uno cada 125 ms
+      player.marcaFichas = Math.min(8, (player.marcaFichas ?? 8) + (now - (player.marcaT || now)) / 125);
+      player.marcaT = now;
+      if (player.marcaFichas < 1) break;
+      player.marcaFichas--;
+      let p = null;
+      if (msg.p !== null) {
+        if (!Array.isArray(msg.p) || msg.p.length !== 3 || !msg.p.every(Number.isFinite)) break;
+        const lim = ISLAND_SIZE / 2 + 5;
+        if (Math.abs(msg.p[0]) > lim || Math.abs(msg.p[2]) > lim || msg.p[1] < -20 || msg.p[1] > 400) break;
+        p = msg.p.map((v) => Math.round(v * 10) / 10);
+      }
+      player.marca = p;
+      broadcast(room, { t: 'marca', id: player.id, p }, player.id);
+      break;
+    }
+    case 'embestida': {
+      // el auto le pegó a algo rompible (autos.js, embestir): el servidor decide con la vida de verdad y con la
+      // velocidad que conoce si lo daña o lo rompe, y cuánto se daña el auto al atravesarlo
+      const a = room.autos[msg.a];
+      if (!a || a.ctrl !== player.id || a.rota || !player.alive || room.phase !== 'playing') break;
+      const o = cosaEmbestida(msg.o);
+      const m = o && materialChoque(room.world, o);
+      if (!m) break;
+      // a lo sumo un poco más que la velocidad de los últimos estados (llegan 15 por segundo)
+      const v = Math.min(Number(msg.v) || 0, Math.max(rapidez(a), a.vAntes || 0) + 3, AUTO.TURBO_MAX + 3);
+      if (!(v > 0) || distEmbestida(room, o, a) > AUTO.LARGO / 2 + AUTO.RADIO + 1.5 + v * 0.15) break;
+      if (!a.embestidas) a.embestidas = new Map();
+      const id = claveChoque(o);
+      if (now - (a.embestidas.get(id) || 0) < 250) break;
+      a.embestidas.set(id, now);
+      if (a.embestidas.size > 40) for (const [k, t] of a.embestidas) if (now - t > 1000) a.embestidas.delete(k);
+      const hp = vidaEmbestida(room, o, now);
+      const r = impacto(m.mat, hp, v, m.esc);
+      if (!(r.dano > 0)) break;
+      if (o.pz !== undefined) damagePieza(room, o.pz, r.dano);
+      else if (o.key) damageStruct(room, room.world.structs.get(o.key), r.dano);
+      else danarRecurso(room, o.res, o.idx, r.dano);
+      if (r.rompe) danarAuto(room, a, r.danoAuto, null);
       break;
     }
     case 'fall': {
@@ -834,6 +881,46 @@ function danarAuto(room, a, dmg, atacante) {
   return true;
 }
 
+
+// ---------- Embestidas (autos que rompen lo que chocan) ----------
+// Cosa chocada que manda el cliente, validada: { pz } | { key } | { res, idx }, o null.
+function cosaEmbestida(o) {
+  if (!o || typeof o !== 'object') return null;
+  if (Number.isInteger(o.pz) && o.pz >= 0) return { pz: o.pz };
+  if (typeof o.key === 'string' && o.key.length < 40) return { key: o.key };
+  if ((o.res === 'tree' || o.res === 'rock') && Number.isInteger(o.idx) && o.idx >= 0) return { res: o.res, idx: o.idx };
+  return null;
+}
+// Distancia (horizontal) del centro del auto a la cosa.
+function distEmbestida(room, o, a) {
+  const W = room.world;
+  const caja = (b) => Math.hypot(Math.max(b[0] - a.x, 0, a.x - b[3]), Math.max(b[2] - a.z, 0, a.z - b[5]));
+  if (o.pz !== undefined) {
+    const p = W.piezas[o.pz];
+    return p && a.y + 1.6 > p.aabb[1] && a.y < p.aabb[4] ? caja(p.aabb) : Infinity;
+  }
+  if (o.key) {
+    const s = W.structs.get(o.key);
+    return s?.boxes?.length ? Math.min(...s.boxes.map((b) => caja([b.minX, b.minY, b.minZ, b.maxX, b.maxY, b.maxZ]))) : Infinity;
+  }
+  const r = (o.res === 'tree' ? W.trees : W.rocks)[o.idx];
+  return r ? Math.max(0, Math.hypot(r.x - a.x, r.z - a.z) - (r.circle?.r || 0)) : Infinity;
+}
+function vidaEmbestida(room, o, now) {
+  if (o.pz !== undefined) return room.pzHp[o.pz];
+  if (o.key) { const s = room.world.structs.get(o.key); return s ? vidaDe(s, now) : 0; }
+  return (o.res === 'tree' ? room.trees : room.rocks)[o.idx] ?? 0;
+}
+// Daño a un árbol o una roca (sin dar materiales: los da el pico). Devuelve true si se rompió.
+function danarRecurso(room, res, idx, dmg) {
+  const list = res === 'tree' ? room.trees : room.rocks;
+  if (!(list[idx] > 0)) return false;
+  list[idx] -= dmg;
+  if (list[idx] > 0) { broadcast(room, { t: 'resHit', res, idx }); return false; }
+  room.world.destroyResource(res, idx);
+  broadcast(room, { t: 'resGone', res, idx });
+  return true;
+}
 
 // Distancia de un punto a la caja de una pieza del mapa.
 function distPieza(room, id, p) {

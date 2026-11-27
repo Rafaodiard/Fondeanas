@@ -20,6 +20,7 @@ import { abrirConfig, cerrarConfig, abierto as configAbierta } from './configura
 import { crearConstruccion } from './construir.js';
 import { crearManejo } from './manejar.js';
 import { crearGolpes, objetivoDe, aMensaje } from './golpes.js';
+import { crearMapa } from './mapaHud.js';
 
 const GRAVITY = 25, WALK = 6, SPRINT = 9.5, AIM_WALK = 3.5, JUMP = 8.5, SWIM_Y = -1.3;
 const PICKUP_RANGE = 3;
@@ -159,7 +160,6 @@ let mouseDown = false, mouseClicked = false, locked = false, rmbDown = false;
 const tracers = [];
 const effects = [];
 const dmgNums = [];
-let minimapBase = null;
 let interact = null;
 // Construcción (construir.js): modo construcción, vista previa, edición y su HUD.
 const cons = crearConstruccion({ scene, camera, me, getWorld: () => world, getMyId: () => myId, sendMsg, ui, sfx, feed });
@@ -170,6 +170,7 @@ const autos = crearManejo({
   scene, camera, me, getWorld: () => world, getMyId: () => myId, sendMsg, ui, sfx, others,
   explosion: (p) => explosionFx(p.clone(), '#ff8a2a', 1.3),
   feed: (texto, color) => feed(texto, color),
+  vida: (o) => golpes.vida(o),
   alSubir: () => {
     // al subir se corta lo que se estaba haciendo a pie
     cons.cancelar();
@@ -181,6 +182,18 @@ const autos = crearManejo({
     updateSlots();
   },
   alBajar: () => updateSlots(),
+});
+// Minimapa, mapa grande (tecla M), brújula y marcas en el mapa y en el mundo (mapaHud.js).
+const mapa = crearMapa({
+  scene, camera, me, hud: ui.hud, minimapa: ui.minimap, others, autos, sendMsg, sfx,
+  getWorld: () => world, getRoom: () => room, getBus: () => bus, getMyId: () => myId,
+  rayo: (o, d, r) => castRay(o, d, r, 0.5).dist,
+  textoTormenta: () => ui.storm.textContent,
+  alAbrir: () => { document.exitPointerLock?.(); ui.click.classList.add('hidden'); },
+  alCerrar: () => {
+    if (PLAYING.includes(me.state)) canvas.requestPointerLock()?.catch?.(() => {});
+    ui.click.classList.toggle('hidden', locked || !PLAYING.includes(me.state));
+  },
 });
 me.cancelUse = () => { if (me.use) cancelUse(); };
 me.onBuildChange = () => { if (me.build && opcion('apuntarAlternar')) rmbDown = false; updateSlots(); };
@@ -243,6 +256,7 @@ if (urlCode) ui.code.value = urlCode.toUpperCase();
 
 function handle(m) {
   if (m.t.startsWith('auto') || m.t === 'bocina') { if (world) autos.mensaje(m); return; }
+  if (m.t === 'marca') { if (world) mapa.mensaje(m); return; }
   switch (m.t) {
     case 'error': ui.menuError.textContent = m.message; break;
     case 'welcome':
@@ -368,7 +382,7 @@ function handle(m) {
     }
     case 'death': onDeath(m); break;
     case 'matchEnd': onMatchEnd(m); break;
-    case 'left': removeOther(m.id); break;
+    case 'left': removeOther(m.id); mapa.quitar(m.id); break;
     case 'empujon':
       // me atropellaron: salgo volando para el lado que empujó el auto
       if (me.state === 'ground' && Array.isArray(m.v)) {
@@ -446,7 +460,7 @@ function ensureWorld(fresh = false) {
   }
   world = new World(room.seed, room.islandSize);
   world.build(scene);
-  minimapBase = world.minimapImage(200);
+  mapa.preparar(world);
   if (!bus) { bus = createBus(); bus.visible = false; scene.add(bus); }
 }
 
@@ -475,6 +489,7 @@ function showLobby() {
   for (const o of others.values()) o.mesh.visible = false;
   if (bus) bus.visible = false;
   stormMesh.visible = false;
+  mapa.cerrar();
   document.exitPointerLock?.();
   ui.roomCode.textContent = room.code;
   const personas = room.players.filter((p) => !p.bot);
@@ -527,6 +542,7 @@ function setupMatch(snap) {
     for (const [i, y] of snap.cofresMovidos || []) world.moveChest(i, y);
   }
   autos.iniciar(snap?.autos);
+  mapa.reiniciar(snap?.marcas);
   bus.visible = true;
   stormMesh.visible = true;
   updateHp(); updateSlots();
@@ -613,6 +629,7 @@ function nameOf(id) {
 
 const CAUSES = { storm: 'la tormenta', fall: 'una caída', pico: 'Pico', auto: 'un auto' };
 function onDeath(m) {
+  mapa.quitar(m.id); // la marca de un eliminado se va
   for (const p of m.players) {
     if (p.id === myId) me.kills = p.kills;
     const o = others.get(p.id);
@@ -677,7 +694,7 @@ canvas.addEventListener('click', () => {
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
   if (!locked) soltarEntradas();
-  ui.click.classList.toggle('hidden', locked || !PLAYING.includes(me.state));
+  ui.click.classList.toggle('hidden', locked || !PLAYING.includes(me.state) || mapa.abierto);
 });
 $('btnPausaConfig').addEventListener('click', (e) => { e.stopPropagation(); abrirConfigDesdeJuego(); });
 $('btnConfigMenu').addEventListener('click', () => abrirConfig());
@@ -725,6 +742,8 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (document.activeElement?.tagName === 'INPUT') return;
+  // con el mapa abierto, Esc lo cierra
+  if (e.code === 'Escape' && mapa.abierto) { mapa.cerrar(); return; }
   // Esc con el mouse suelto abre la configuración (con el mouse capturado, el navegador usa Esc para soltarlo)
   if (e.code === 'Escape') { if (!ui.hud.classList.contains('hidden') && !locked) abrirConfigDesdeJuego(); return; }
   if (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'Tab') e.preventDefault();
@@ -746,6 +765,7 @@ function liberar(code) {
   soltar(code);
   for (const a of accionesDe(code)) {
     if (a === 'disparar' && !activa('disparar')) mouseDown = false;
+    if (a === 'editar') cons.soltarEditar(); // "Confirmar la edición al soltar"
     if (a === 'apuntar' && !opcion('apuntarAlternar') && !activa('apuntar')) { rmbDown = false; me.aiming = false; }
   }
 }
@@ -770,6 +790,8 @@ function hacer(a, e) {
       cons.accion(a); break;
     case 'bajarAuto': case 'cambiarAsiento': case 'bocina':
       autos.accion(a); break;
+    case 'mapa': if (!ui.hud.classList.contains('hidden')) { mapa.alternar(); e?.preventDefault?.(); } break;
+    case 'marcar': mapa.marcar(); break;
     case 'chat':
       if (ui.hud.classList.contains('hidden')) break;
       document.exitPointerLock?.();
@@ -1443,39 +1465,6 @@ function updateStorm(t) {
   return s;
 }
 
-function drawMinimap(s) {
-  if (!minimapBase) return;
-  const ctx = ui.minimap.getContext('2d');
-  const W = ui.minimap.width, size = world.size, half = size / 2;
-  const toM = (x) => ((x + half) / size) * W;
-  ctx.drawImage(minimapBase, 0, 0, W, W);
-  ctx.font = 'bold 9px system-ui';
-  ctx.fillStyle = 'rgba(255,255,255,.9)';
-  ctx.textAlign = 'center';
-  ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
-  for (const p of world.pois) { const lx = toM(p.x + (p.lx || 0)), ly = toM(p.z + (p.lz || 0)) - 6; ctx.strokeText(p.name, lx, ly); ctx.fillText(p.name, lx, ly); }
-  if (s) {
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.arc(toM(s.next.x), toM(s.next.z), (s.next.r / size) * W, 0, Math.PI * 2); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.strokeStyle = '#a17bff'; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(toM(s.x), toM(s.z), Math.max(0.5, (s.r / size) * W), 0, Math.PI * 2); ctx.stroke();
-  }
-  if (me.state === 'bus' && room.bus) {
-    ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
-    ctx.beginPath(); ctx.moveTo(toM(room.bus.from[0]), toM(room.bus.from[2])); ctx.lineTo(toM(room.bus.to[0]), toM(room.bus.to[2])); ctx.stroke();
-    ctx.setLineDash([]);
-  }
-  autos.minimapa(ctx, toM, W / size);
-  const p = me.state === 'bus' ? bus.position : me.pos;
-  ctx.save();
-  ctx.translate(toM(p.x), toM(p.z));
-  ctx.rotate(-me.yaw);
-  ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(5, 5); ctx.lineTo(0, 2); ctx.lineTo(-5, 5); ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.restore();
-}
-
 function updateHud(t) {
   const alive = room.players.filter((p) => (p.id === myId ? me.state !== 'dead' && me.hp > 0 : others.get(p.id)?.info?.alive !== false && others.get(p.id)?.state !== 'dead')).length;
   ui.alive.textContent = `👤 ${alive} vivos`;
@@ -1514,7 +1503,7 @@ function frame() {
     world.updateStructs();
     golpes.update(dt, me.state === 'ground' && (!!me.build || cons.editando || me.sel === -1));
     const s = updateStorm(t);
-    drawMinimap(s);
+    mapa.update(dt, t, s);
     updateHud(t);
     sendTimer -= dt;
     if (sendTimer <= 0 && ['falling', 'glider', 'ground', 'auto'].includes(me.state)) {
@@ -1537,6 +1526,6 @@ frame();
 import * as ITEMS from "./items.js";
 window.__WEAPONS = ITEMS.WEAPONS;
 window.__game = {
-  me, others, items, camera, sendMsg, selectSlot, setBuild, doInteract, findInteract, trySwing, tryShoot, updateSlots, renderer, scene, cons, pulsar, liberar, autos, golpes, castRay,
+  me, others, items, camera, sendMsg, selectSlot, setBuild, doInteract, findInteract, trySwing, tryShoot, updateSlots, renderer, scene, cons, pulsar, liberar, autos, golpes, castRay, mapa,
   get room() { return room; }, get world() { return world; },
 };

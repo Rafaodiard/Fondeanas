@@ -10,7 +10,7 @@
 // tormenta. Se mueve con la misma física que el jugador (world.moveBody) y avisa su estado a los clientes con el
 // mismo mensaje 'state' que mandan ellos.
 import { WEAPONS, CONSUMABLES, AMMO, RARITIES, GRID, PICKAXE, BUILD_COST, weaponReload } from '../public/js/items.js';
-import { cajaPieza } from '../public/js/construccion.js';
+import { cajaPieza, nivelGrilla } from '../public/js/construccion.js';
 import { CAIDA, PARACAIDAS } from '../public/js/caida.js';
 import { BOT_DIFICULTADES } from '../public/js/opcionesBots.js';
 import { Navegacion } from './navegacion.js';
@@ -823,7 +823,7 @@ function cubrirse(room, p, E, ctx) {
   const yaw = yawHacia(E.x - B.p.x, E.z - B.p.z);
   const d = Math.round(((-yaw / (Math.PI / 2)) % 4 + 4) % 4) % 4; // 0=-Z,1=+X,2=+Z,3=-X (como construir.js)
   const ci = Math.floor(B.p.x / GRID), cj = Math.floor(B.p.z / GRID);
-  const y = Math.floor(B.p.y * 2) / 2;
+  const y = nivelGrilla(room.world, ci, cj, B.p.y); // en la grilla de lo que ya hay construido al lado
   ctx.handleGame(room, p, { t: 'build', type: 'pared', i: ci, j: cj, y, dir: d, mat });
   if (B.dif === 'dificil' && Math.random() < 0.5) {
     const m2 = ['madera', 'piedra', 'metal'].find((m) => p.mats[m] >= BUILD_COST);

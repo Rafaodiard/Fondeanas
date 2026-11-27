@@ -31,7 +31,7 @@ Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.
 - `damagePlayer` (el escudo absorbe primero), `killPlayer` (tira todo lo que tenía), `checkWinner`.
 - `addToInventory`, `spawnItem`, `spawnAround` (reparte con `repartirLoot` de [[lugarLoot.js]]: no atraviesa paredes) → [[Loot y rarezas]]
 - `acomodarItems(room, cajas)`: el loot cerca de esas cajas se acomoda con `acomodarLoot` de [[lugarLoot.js]] (sale de una pared nueva, sube arriba de un piso o rampa, cae si se rompió lo de abajo) y se reenvía con `itemsDel` + `itemsAdd`. Se llama al construir y editar (`build`, `edit`), al romperse una construcción (`damageStruct`) y en `damagePieza`. `derrumbar(room, cajas?)` suma a `cajas` las de las construcciones que se cayeron.
-- `handleGame`: un `case` por mensaje de juego (salto, estado, loot, cofres, recarga, disparo, pico, construcción, consumibles, caída).
+- `handleGame`: un `case` por mensaje de juego (salto, estado, loot, cofres, recarga, disparo, pico, construcción, consumibles, caída, marcas del mapa: `marca`, ver [[Mapa y marcas]]).
 - `explode` (lanzacohetes, daño en área; el que dispara recibe la mitad; también daña las piezas del mapa dentro del radio) y `damageStruct` (suma daño y compara con `vidaDe`) → [[Armas y disparo]], [[Construcción]]
 - `derrumbar` (saca las construcciones sin apoyo, también después de romperse una pieza del mapa), `structPublic` y los `case 'build'` / `case 'edit'` → [[Construcción]]. `SF_MATS` (variable de entorno) da materiales al empezar, para probar.
 - Punto débil del pico: `puntoGolpe`, `esCritico`, `nuevoDebil`, `avisarDebil` (`player.debil`) → [[Daño visible y punto débil]]
@@ -45,7 +45,7 @@ Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.
 
 ## Autos (2026-11-26)
 
-`room.autos` (de [[autos.js]] `nuevoAuto`, uno por `world.autoSpawns`) va en `matchSnapshot`. `player.auto = { a, k }` es el auto y el asiento; con eso el estado del jugador queda en `auto`. Mensajes `subir`, `bajar`, `asiento`, `auto`, `bocina`, `atropello` y `choque` ([[Protocolo de red]]). `avisarAsientos` manda `autoSeats`; `bajarDelAuto` libera el asiento (también al morir o desconectarse; si el que se desconecta simulaba un auto, el auto queda quieto). `danarAuto`: balas, pico (da metal), cohetes y choques; a 0 de vida explota (`autoBoom`): saca a los de adentro y lastima hasta 7 m (`70 × (1 − d/7) + 10`), con la causa `auto`. Ver [[Autos]].
+`room.autos` (de [[autos.js]] `nuevoAuto`, uno por `world.autoSpawns`) va en `matchSnapshot`. `player.auto = { a, k }` es el auto y el asiento; con eso el estado del jugador queda en `auto`. Mensajes `subir`, `bajar`, `asiento`, `auto`, `bocina`, `atropello`, `choque` y `embestida` ([[Protocolo de red]]). `embestida`: el auto le pegó a algo rompible; `cosaEmbestida` valida la cosa, `distEmbestida` que esté al lado del auto, la velocidad se limita a la de los últimos estados (`a.vAntes`) + 3, `vidaEmbestida` da la vida de verdad e `impacto` de [[autos.js]] decide; aplica con `damagePieza`, `damageStruct` o `danarRecurso` (árboles y rocas, sin dar materiales) y, si la rompió, `danarAuto`. `avisarAsientos` manda `autoSeats`; `bajarDelAuto` libera el asiento (también al morir o desconectarse; si el que se desconecta simulaba un auto, el auto queda quieto). `danarAuto`: balas, pico (da metal), cohetes y choques; a 0 de vida explota (`autoBoom`): saca a los de adentro y lastima hasta 7 m (`70 × (1 − d/7) + 10`), con la causa `auto`. Ver [[Autos]].
 
 ## Bots (2026-11-26)
 
