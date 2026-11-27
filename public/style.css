@@ -136,6 +136,7 @@ button:hover { filter: brightness(1.1); }
 #buildbar .pmat b { font-size: 14px; line-height: 1; }
 #buildbar .pmat span { font-size: 9px; font-weight: 800; text-transform: uppercase; opacity: .8; }
 #buildhint { display: flex; gap: 10px; font-size: 12px; font-weight: 700; text-shadow: 0 1px 2px #000; background: rgba(0,0,0,.35); padding: 4px 10px; border-radius: 7px; }
+#buildhint .no { color: #ff8a80; }
 #buildhint b { background: #fff; color: #000; padding: 0 5px; border-radius: 3px; margin-right: 3px; font-size: 11px; }
 /* Vida de lo que golpeás o mirás con el pico (golpes.js): barra con la parte recién perdida en blanco */
 #structhp { position: absolute; left: 50%; top: calc(50% + 28px); transform: translateX(-50%); display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; background: rgba(0,0,0,.5); padding: 3px 8px; border-radius: 7px; text-shadow: 0 1px 2px #000; pointer-events: none; }

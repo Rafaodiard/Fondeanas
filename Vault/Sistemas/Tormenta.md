@@ -15,3 +15,4 @@ Volver a [[Inicio]] · código en [[server.js]] (`startMatch`, `stormAt`, `tick`
 
 - Entre fases el radio y el centro se interpolan linealmente.
 - El daño **ignora el escudo** y no afecta a los que siguen en el bus.
+- En pantalla: el texto de `#stormInfo` (se cierra en / avanza / tormenta final), el cilindro violeta en el mundo y, en el minimapa y el mapa grande de [[mapaHud.js]], lo de afuera del círculo teñido de violeta, la próxima zona punteada en blanco y una línea hasta ella si estás afuera (la brújula también la marca). Ver [[Mapa y marcas]].

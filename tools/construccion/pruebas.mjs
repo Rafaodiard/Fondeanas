@@ -7,6 +7,7 @@ import { makeStructMesh } from '../../public/js/construccion3d.js';
 import { GRID, structKey } from '../../public/js/items.js';
 import {
   superficie, cajasPieza, editValida, resultadoEdicion, rayoEdicion, tieneApoyo, sinApoyo, normalizar, vidaDe, HP_INICIAL, OBRA, T3, ALTO_TECHO,
+  motivoNoEncaja, encaja, nivelGrilla, objetivoPieza, mismaGrilla, bordes,
 } from '../../public/js/construccion.js';
 
 let fallas = 0;
@@ -190,6 +191,111 @@ prueba('lo que se ve coincide con lo que se pisa (rampas, techos y pisos editado
     }
   }
 });
+
+// ---------- Grilla de encastre: cada pieza va donde termina otra ----------
+const motivo = (s) => motivoNoEncaja(world, s);
+const conY = (s, y) => { const o = normalizar({ ...s, y }); o.key = structKey(o); return o; };
+
+prueba('encastre: un piso va en el borde de arriba de una pared, nunca en el medio', () => {
+  limpiar();
+  const w = poner(pieza('pared', 0, 0, 0)); // borde -Z de la celda (0,0)
+  assert.equal(motivo(pieza('piso', 0, 0, 1)), null, 'piso arriba de la pared, del lado de adentro');
+  assert.equal(motivo(pieza('piso', 0, -1, 1)), null, 'piso arriba de la pared, del lado de afuera');
+  for (const dy of [0.5, 1, 2, 3, 3.5]) assert.equal(motivo(conY(pieza('piso', 0, 0, 0), w.y + dy)), 'grilla', `piso a ${dy} m de la base de la pared`);
+  assert.equal(motivo(pieza('piso', 3, 3, 1)), 'apoyo', 'piso flotando lejos');
+  assert.equal(motivo(pieza('piso', 1, 0, 1)), 'apoyo', 'piso que solo toca la punta de la pared (sin compartir un borde)');
+  assert.equal(motivo(pieza('pared', 0, 0, 0)), 'ocupado');
+});
+
+prueba('encastre: piso en el borde alto de una rampa y la rampa siguiente sale de ahí', () => {
+  limpiar();
+  poner(pieza('rampa', 0, 0, 0, 0)); // sube hacia -Z: el borde alto es el lado -Z de la celda
+  assert.equal(motivo(pieza('piso', 0, -1, 1)), null, 'piso adelante, a la altura de la punta de la rampa');
+  assert.equal(motivo(pieza('piso', 0, 0, 1)), null, 'piso arriba de la rampa (misma celda)');
+  assert.equal(motivo(pieza('rampa', 0, -1, 1, 0)), null, 'la rampa siguiente arranca donde termina la anterior');
+  assert.equal(motivo(pieza('piso', 1, 0, 1)), 'apoyo', 'piso al costado de la rampa, arriba: no comparte borde');
+  assert.equal(motivo(pieza('rampa', 1, 0, 0, 0)), null, 'otra rampa al lado, pegada de costado (y en el piso)');
+  assert.ok(enganchadas2(pieza('rampa', 0, 0, 0, 0), pieza('rampa', 1, 0, 0, 0)), 'dos rampas paralelas comparten el costado en diagonal');
+  assert.equal(motivo(conY(pieza('piso', 0, -1, 0), base.y + 2)), 'grilla', 'piso a media altura de la rampa');
+});
+
+prueba('encastre: el techo (cono) va arriba de un piso o de paredes, y no comparte la celda con una rampa', () => {
+  limpiar();
+  poner(pieza('pared', 0, 0, 0));
+  assert.equal(motivo(pieza('techo', 0, 0, 1)), null, 'techo arriba de la pared');
+  poner(pieza('piso', 3, 0, 0)); // un piso en el suelo
+  assert.equal(motivo(pieza('techo', 3, 0, 0)), null, 'techo arriba del piso (misma celda)');
+  assert.equal(motivo(pieza('techo', 3, 3, 1)), 'apoyo', 'techo flotando');
+  poner(pieza('rampa', 5, 0, 0, 1));
+  assert.equal(motivo(pieza('techo', 5, 0, 0)), 'ocupado', 'techo y rampa en la misma celda');
+  assert.equal(motivo(pieza('piso', 5, 0, 0)), null, 'piso y rampa en la misma celda sí');
+  poner(pieza('techo', 3, 0, 0));
+  assert.equal(motivo(pieza('rampa', 3, 0, 0, 2)), 'ocupado', 'rampa donde ya hay techo');
+});
+
+prueba('encastre: paredes una arriba de otra y de costado, nunca corridas de la grilla', () => {
+  limpiar();
+  poner(pieza('pared', 0, 0, 0));
+  assert.equal(motivo(pieza('pared', 0, 0, 1)), null, 'pared arriba de pared');
+  assert.equal(motivo(pieza('pared', 0, 0, 0, 3)), null, 'pared en esquina');
+  assert.equal(motivo(pieza('pared', 1, 0, 1)), 'apoyo', 'pared en el aire que solo toca una punta');
+  poner(pieza('pared', 0, 0, 1));
+  assert.equal(motivo(pieza('pared', 1, 0, 1)), null, 'pared en el aire pegada de costado a otra');
+  assert.equal(motivo(conY(pieza('pared', 1, 0, 0), base.y + 1.5)), 'grilla', 'pared corrida 1,5 m de la de al lado');
+});
+
+prueba('derrumbe de borde en borde: lo que se sostiene por otra pieza se cae con ella', () => {
+  limpiar();
+  const a = poner(pieza('pared', 0, 0, 0)), f = poner(pieza('piso', 0, 0, 1)), g = poner(pieza('piso', 1, 0, 1)), h = poner(pieza('piso', 4, 0, 1));
+  poner(pieza('pared', 4, 0, 0)); // sostiene el piso h
+  const suelta = poner(pieza('pared', 3, 0, 1)); // en el aire: solo toca la punta de otra
+  assert.deepEqual(sinApoyo(world), [suelta.key], 'tocar una punta no sostiene');
+  world.removeStruct(suelta.key);
+  world.removeStruct(a.key);
+  assert.deepEqual(sinApoyo(world).sort(), [f.key, g.key].sort(), 'el piso de arriba y el que salía de él se caen; el que está sobre otra pared queda');
+  assert.ok(h);
+});
+
+prueba('nivel de la grilla: al lado de una construcción lo nuevo se alinea a su grilla', () => {
+  limpiar();
+  poner(pieza('pared', 0, 0, 0));
+  assert.equal(nivelGrilla(world, base.i + 1, base.j, base.y + 0.5), base.y);
+  assert.equal(nivelGrilla(world, base.i + 1, base.j, base.y - 0.5), base.y, 'medio metro abajo (en una loma) sigue siendo el mismo nivel');
+  assert.equal(nivelGrilla(world, base.i, base.j, base.y + GRID), base.y + GRID, 'parado arriba: el nivel de arriba');
+  assert.equal(nivelGrilla(world, base.i + 9, base.j + 9, 7.3), 7, 'lejos de todo: el piso, a medio metro');
+});
+
+prueba('vista previa: mirando adelante, arriba y abajo cae siempre en un lugar de la grilla que encaja', () => {
+  limpiar();
+  const cx = x0() + GRID / 2, cz = z0() + GRID / 2;
+  const yo = { pos: { x: cx, y: world.groundHeight(cx, cz), z: cz }, yaw: 0, pitch: 0, mat: 'madera' }; // mira a -Z
+  const pared = objetivoPieza(world, yo, 'pared');
+  assert.equal(motivo(pared), null, 'la primera pared, en el piso');
+  poner(pared);
+  const piso = objetivoPieza(world, { ...yo, pitch: 0.7 }, 'piso');
+  assert.deepEqual([piso.i, piso.j, piso.y], [pared.i, pared.j, pared.y + GRID], 'mirando arriba, el piso va arriba de la pared');
+  assert.equal(motivo(piso), null);
+  const techo = objetivoPieza(world, { ...yo, pitch: 0.5 }, 'techo');
+  assert.equal(motivo(techo), null, 'techo arriba de la cabeza, sobre la pared');
+  const rampa = objetivoPieza(world, yo, 'rampa');
+  assert.deepEqual([rampa.i, rampa.j, rampa.y, rampa.dir], [base.i, base.j - 1, pared.y, 0], 'rampa adelante');
+  assert.equal(motivo(rampa), null);
+  poner(rampa);
+  // parado a mitad de la rampa, mirando para donde sube: la siguiente va arriba
+  const enRampa = { ...yo, pos: { x: cx, y: pared.y + 2, z: z0() - GRID / 2 } };
+  const otra = objetivoPieza(world, enRampa, 'rampa');
+  assert.deepEqual([otra.j, otra.y], [base.j - 2, pared.y + GRID], 'rampa siguiente, un nivel arriba');
+  assert.equal(motivo(otra), null);
+  // en cualquier dirección y mirada, nada queda a media altura de lo construido
+  for (let k = 0; k < 4; k++) for (let p = -1.3; p <= 1.2; p += 0.1) for (const t of ['pared', 'piso', 'rampa', 'techo']) {
+    for (const pos of [yo.pos, enRampa.pos, { x: cx + 0.7, y: yo.pos.y + 0.4, z: cz - 1 }]) {
+      const o = objetivoPieza(world, { ...yo, pos, yaw: -k * Math.PI / 2, pitch: p }, t);
+      assert.ok(mismaGrilla(o, pared), `${t} mirando ${k} con ${p.toFixed(1)}: queda a ${(o.y - pared.y).toFixed(2)} m`);
+    }
+  }
+});
+
+function enganchadas2(a, b) { const s = new Set(bordes(a)); return bordes(b).some((k) => s.has(k)); }
 
 limpiar();
 console.log(fallas ? `${fallas} pruebas fallaron` : 'todo OK');

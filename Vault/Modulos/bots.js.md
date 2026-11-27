@@ -22,6 +22,7 @@ Archivo: `servidor/bots.js`. Solo lo usa [[server.js]] (no lo sirve el servidor 
 - `combate`, `elegirArma`, `disparar`, `dispararA` (a una construcción), `cubrirse`, `recargar`, `curarse`.
 - `avisarEstado`: el mensaje `state` para los clientes.
 - `SF_BOTS_DEBUG=1`: muestra cada 10 s qué hace cada bot.
+- `SF_NAV_MS` (6 si no está): milisegundos por cuadro que `actualizarBots` le da a `room.nav.trabajar` para armar grillas de [[navegacion.js]]. En Render gratis vale 2 ([[render.yaml]], [[Jugar online]]).
 
 ## Usa
 

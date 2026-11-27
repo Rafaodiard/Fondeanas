@@ -10,7 +10,7 @@
 // tormenta. Se mueve con la misma física que el jugador (world.moveBody) y avisa su estado a los clientes con el
 // mismo mensaje 'state' que mandan ellos.
 import { WEAPONS, CONSUMABLES, AMMO, RARITIES, GRID, PICKAXE, BUILD_COST, weaponReload } from '../public/js/items.js';
-import { cajaPieza } from '../public/js/construccion.js';
+import { cajaPieza, nivelGrilla } from '../public/js/construccion.js';
 import { CAIDA, PARACAIDAS } from '../public/js/caida.js';
 import { BOT_DIFICULTADES } from '../public/js/opcionesBots.js';
 import { Navegacion } from './navegacion.js';
@@ -18,6 +18,9 @@ import { Navegacion } from './navegacion.js';
 // Física del jugador (los mismos números que main.js).
 const GRAVEDAD = 25, CAMINAR = 6, CORRER = 9.5, APUNTANDO = 3.5, NADANDO = 4, SALTO = 8.5, AGUA = -1.3;
 const RADIO = 0.42;
+// ms por cuadro (20 por segundo) para armar grillas de navegación. En un hosting chico (Render gratis, 0,1 CPU)
+// conviene SF_NAV_MS=2: los bots tardan un poco más en encontrar caminos pero no frenan la partida.
+const NAV_MS = Math.max(0.5, Number(process.env.SF_NAV_MS) || 6);
 const RANGO_AGARRAR = 2.6;  // el servidor acepta hasta 4.2 (PICKUP_RANGE + 1)
 const VISTA_ALTURA = 1.6;   // ojos
 const PECHO = 1.15;
@@ -143,7 +146,7 @@ function mostrar(room, now) {
 // ctx: { now, dt, handleGame(room, p, msg), broadcast(room, msg), stormAt(storm, now), busPos(room, now) }
 export function actualizarBots(room, ctx) {
   if (!room.nav) return;
-  room.nav.trabajar(6); // grillas de navegación pendientes, de a poco
+  room.nav.trabajar(NAV_MS); // grillas de navegación pendientes, de a poco
   room.rutasTick = 0;
   room.botTick = (room.botTick || 0) + 1;
   const avisar = room.botTick % 2 === 0; // estado a los clientes a 10 Hz
@@ -820,7 +823,7 @@ function cubrirse(room, p, E, ctx) {
   const yaw = yawHacia(E.x - B.p.x, E.z - B.p.z);
   const d = Math.round(((-yaw / (Math.PI / 2)) % 4 + 4) % 4) % 4; // 0=-Z,1=+X,2=+Z,3=-X (como construir.js)
   const ci = Math.floor(B.p.x / GRID), cj = Math.floor(B.p.z / GRID);
-  const y = Math.floor(B.p.y * 2) / 2;
+  const y = nivelGrilla(room.world, ci, cj, B.p.y); // en la grilla de lo que ya hay construido al lado
   ctx.handleGame(room, p, { t: 'build', type: 'pared', i: ci, j: cj, y, dir: d, mat });
   if (B.dif === 'dificil' && Math.random() < 0.5) {
     const m2 = ['madera', 'piedra', 'metal'].find((m) => p.mats[m] >= BUILD_COST);

@@ -9,11 +9,67 @@ npm install
 npm start
 ```
 
-Abrí http://localhost:3000, poné tu nombre y tocá **Crear sala**. Tus amigos entran con el código de 5 letras (o con el link `http://TU-IP:3000/?sala=CODIGO` si están en tu misma red). Para jugar por internet hay que subir el servidor a un hosting con Node y WebSockets (Render, Railway, Fly.io, etc.).
+Abrí http://localhost:3000, poné tu nombre y tocá **Crear sala**. Tus amigos entran con el código de 5 letras (o con el link `http://TU-IP:3000/?sala=CODIGO` si están en tu misma red). Para jugar por internet (por ejemplo desde la escuela) mirá [Jugar online](#jugar-online-render-gratis).
 
 **Después de cada `git pull`, cerrá el servidor (Ctrl+C) y volvé a correr `npm start`.** El servidor carga su código una sola vez al arrancar: si sigue prendido, el navegador recibe los archivos nuevos pero el servidor sigue con la lógica vieja, y lo nuevo no anda (por ejemplo, los autos muestran *E Manejar* pero no te dejan subir). Si pasa, el juego muestra un cartel rojo arriba que lo avisa y la consola del servidor también.
 
 Para jugar solo contra bots, tocá **🤖 Jugar con bots**: crea una sala con bots y la empieza enseguida (ver [Bots](#bots)).
+
+## Jugar online (Render gratis)
+
+El juego se puede subir a [Render](https://render.com) gratis y sin tarjeta: queda en una página pública (`https://salto-final.onrender.com` o parecida) a la que entra cualquiera con el link, sin correr nada en ninguna compu. Funciona por HTTPS y WebSocket seguro (WSS) en el puerto 443, que es lo que suelen dejar pasar las redes de las escuelas.
+
+### Cómo subirlo (lo hace Rafael con su cuenta)
+
+1. Entrá a https://render.com, tocá **Get Started** y registrate con **GitHub** (plan gratis, no pide tarjeta).
+2. En el panel de Render: **New → Blueprint**. Conectá GitHub si te lo pide y dale acceso al repo `Rafaodiard/Fondeanas`. Elegilo: Render lee el archivo `render.yaml` del repo y muestra el servicio `salto-final` (plan Free). Tocá **Apply** / **Deploy Blueprint**.
+   - Si en vez de eso te pide una tarjeta, cancelá y hacelo a mano con **New → Web Service**: elegí el repo, rama `main`, Language **Node**, Region **Virginia**, Build Command `npm ci`, Start Command `npm start`, Instance Type **Free**. En **Advanced** poné Health Check Path `/salud` y agregá las variables `SF_BOTS_MAX` = `4`, `SF_NAV_MS` = `2` y `NODE_VERSION` = `22`.
+3. Esperá a que el deploy diga **Live** (tarda unos minutos). Arriba a la izquierda está la dirección del juego (`https://salto-final.onrender.com` si el nombre estaba libre).
+4. Abrí la dirección, poné tu nombre y tocá **Crear sala**. Pasales a tus amigos el link y el código de 5 letras (o el link `https://…onrender.com/?sala=CODIGO`, que ya entra a la sala).
+5. **Probalo una vez desde la red de la escuela** antes del día que quieran jugar: abrí `https://…onrender.com/salud`. Si ves `{"ok":true,…}`, la página pasa; después creá una sala para ver que también pase el WebSocket (si la red lo cortara, el menú dice *No se pudo conectar con el servidor*). Si la escuela bloquea `onrender.com`, avisá: hay que buscar otro hosting.
+
+Cada vez que se mergea algo a `main`, Render lo sube solo (`autoDeployTrigger: commit` en `render.yaml`). Ojo: el deploy reinicia el servidor y **corta las partidas y salas que estén abiertas**. Si molesta, en Render → el servicio → **Settings → Auto-Deploy** se puede poner en *Off* y subir a mano con **Manual Deploy** cuando no haya nadie jugando.
+
+### Límites del plan gratis (medidos el 2026-11-26)
+
+- **Se duerme.** Sin nadie conectado 15 minutos, Render apaga el servidor. El que entra después espera ~1 minuto con una pantalla de carga de Render. Abrí la página un ratito antes de jugar. Con el servidor dormido o reiniciado se pierden las salas (viven en la memoria del servidor).
+- **750 horas por mes** para todos los servicios gratis de la cuenta: alcanza para tener uno solo prendido todo el mes. Si se acaban, Render lo suspende hasta el mes siguiente.
+- **5 GB por mes de datos que salen del servidor.** Si se pasa (sin tarjeta cargada), Render lo suspende hasta el mes siguiente. Lo que gasta el juego: la primera vez que alguien abre la página baja **6,9 MB** (con gzip; sin gzip eran 10,7 MB); al volver a entrar, casi nada (0,01 MB: el navegador ya lo tiene y el servidor contesta *no cambió*). En partida, cada jugador recibe unos **10 KB/s con 8 personas** (menos con menos gente). Una partida de 15 minutos con 5 personas gasta unos 25 MB y con 8, unos 75 MB: da para unas 200 partidas de 5 o 65 de 8 por mes. Con 16 personas son ~300 MB por partida.
+- **0,1 CPU y 512 MB.** Para personas sobra (probado con 16 jugadores simulados con la CPU limitada a 0,1: los estados llegan sin atrasos). Los **bots** son lo que más CPU gasta (cada uno ~4 % de un núcleo), así que en Render las salas tienen bots hasta **4 jugadores en total** (`SF_BOTS_MAX=4`; las opciones de más quedan grisadas en la sala). Con 8 bots en 0,1 CPU los bots se mueven a tirones (6 de 10 cuadros por segundo).
+- **El disco se borra** en cada deploy, reinicio o cuando se duerme. Nada que se quiera guardar puede ir a un archivo: por eso las cuentas van a una base Postgres gratis aparte (ver [Cuentas online](#cuentas-online-base-gratis-en-neon)).
+- Opcional: para que no se duerma durante el horario de la escuela se puede usar un servicio gratis como UptimeRobot o cron-job.org que abra `https://…onrender.com/salud` cada 10 minutos. Un solo servicio prendido todo el mes usa ~744 de las 750 horas.
+
+### Variables de entorno del servidor
+
+| Variable | Para qué | En Render |
+|---|---|---|
+| `PORT` | Puerto donde escucha (3000 si no está). | La pone Render sola. |
+| `SF_BOTS_MAX` | Tope de jugadores en total con bots por sala (redondea para abajo a 0, 4, 8, 12, 16, 20 o 24). Sin la variable, sin tope. | `4` |
+| `SF_NAV_MS` | Milisegundos por cuadro (20 por segundo) para armar los caminos de los bots. 6 si no está. | `2` |
+| `DATABASE_URL` | Postgres donde se guardan las cuentas. Sin la variable van a `datos/cuentas.json`, que en Render se borra. Si está pero la base no responde, el servidor no arranca. | la de Neon |
+| `SF_ADMIN_USUARIO`, `SF_ADMIN_CLAVE` | Crean la cuenta admin al arrancar (ver [Cuentas, tienda y skins](#cuentas-tienda-y-skins)). | las que elijas |
+| `SF_WS_COMPRIMIR` | `1` comprime los mensajes del WebSocket (permessage-deflate): gastan unas 5 veces menos datos, pero en 0,1 CPU traba la partida. Apagado si no está. | sin poner |
+
+`GET /salud` contesta `{"ok":true,"version":…,"salas":…,"conectados":…,"uptime":…}` (lo usa Render como health check). Las pruebas de todo esto: `node tools/hosting/pruebas.mjs`.
+
+### Cuentas online (base gratis en Neon)
+
+Las cuentas, los pavos y las skins tienen que sobrevivir a que Render se duerma o se reinicie, así que en Render se guardan en Postgres. [Neon](https://neon.tech) tiene un plan gratis sin tarjeta que no se vence (el Postgres gratis de Render se borra a los 30 días).
+
+1. Registrate en https://neon.tech (con GitHub o Google) y creá un proyecto (región *AWS US East*, la más cerca de Render Virginia).
+2. En **Connect**, copiá la *connection string*: `postgresql://usuario:clave@…neon.tech/neondb?sslmode=require`.
+3. En Render → el servicio → **Environment**, poné `DATABASE_URL` con esa dirección y `SF_ADMIN_USUARIO` / `SF_ADMIN_CLAVE` con la cuenta admin que quieras (si creaste el servicio con el Blueprint, Render ya te las pidió). Guardá: se reinicia solo.
+4. En **Logs** tiene que aparecer `Cuentas en Postgres (N cuentas)`. La tabla (`sf_datos`) la crea el servidor solo.
+
+### Por qué Render (opciones revisadas en noviembre de 2026)
+
+- **Render**: el único con plan gratis sin tarjeta que corre un servidor Node prendido con WebSockets.
+- **Koyeb**: tiene una instancia gratis (0,1 CPU, se duerme a la hora), pero desde febrero de 2026 pide tarjeta para registrarse.
+- **Railway**: después de la prueba de 30 días da 1 dólar por mes, que no alcanza para tener el servidor prendido.
+- **Fly.io**: sin plan gratis estable para cuentas nuevas (prueba corta; lo demás pide tarjeta).
+- **Hugging Face Spaces**: los Spaces con Docker (los que corren Node) pasaron a ser pagos; gratis solo quedan las páginas estáticas.
+- **Glitch**: dejó de hostear proyectos en julio de 2025.
+- **Correr el servidor en una compu con un túnel** (Cloudflare Tunnel, etc.): descartado porque depende de que esa compu esté prendida y las redes de las escuelas suelen bloquear los túneles.
 
 ## Bots
 
@@ -103,11 +159,12 @@ Para recorrer la isla sin jugar, con el servidor levantado abrí http://localhos
 - **Caída libre con control.** Yendo adelante con la mirada al horizonte se **planea**: cae lento (24 m/s) y llega lejos (unos 200 m desde el bus). Mirando abajo se va en **picada**: cae rápido (72 m/s) pero casi no avanza. En el medio se mezcla de a poco, y al doblar el cuerpo se ladea hacia la curva.
 - **Paracaídas.** Se abre y se cierra con la tecla de saltar mientras estés a más de **80 m** del piso (o del agua). Si bajás de esa altura se abre solo y ya no se puede cerrar. Abierto avanza más rápido con adelante (21 m/s), frena con atrás (y cae más despacio) y se mueve de costado con A/D; tirar de un freno baja ese lado de la vela y el cuerpo se inclina. Sale arrugado y se infla al abrirse, y al tocar el piso el personaje amortigua con las rodillas.
 - **Deslizarse.** Corriendo, **Ctrl** te tira al piso con un impulso: en el plano recorre unos 16 m, en bajada acelera y sigue, en subida frena. Se puede doblar un poco, saltar en medio sin perder velocidad y disparar mientras te deslizás.
-- **Autos.** 14 autos estacionados en las calles de los pueblos y en las rutas (hatchback modelado en Blender, cada uno de su color). Se suben hasta cuatro: conductor, acompañante y dos atrás. Aceleran fuerte, frenan, doblan menos cuanto más rápido van, derrapan con el freno de mano y tienen **turbo** (3 s, se recarga solo). Suben y bajan con el terreno, saltan en los lomos, chocan contra casas, árboles, construcciones y otros autos, y no entran al agua honda. Un choque fuerte los abolla; a las 800 de vida explotan. Atropellar a alguien rápido le hace daño y lo empuja. Se les puede disparar y pegar con el pico (dan metal), y uno se puede parar arriba. Al bajarse se sale por la propia puerta (o por donde haya lugar) con parte del envión, y el auto sigue solo hasta frenar. Adentro: cámara de persecución, velocímetro, vida del auto, turbo, sonido de motor, derrape y bocina, y el conductor con las manos en el volante, que gira con la dirección.
+- **Autos.** 14 autos estacionados en las calles de los pueblos y en las rutas (hatchback modelado en Blender, cada uno de su color). Se suben hasta cuatro: conductor, acompañante y dos atrás. Aceleran fuerte, frenan, doblan menos cuanto más rápido van, derrapan con el freno de mano y tienen **turbo** (3 s, se recarga solo). Suben y bajan con el terreno, saltan en los lomos, chocan contra casas, árboles, construcciones y otros autos, y no entran al agua honda. **Según la velocidad rompen o no lo que chocan**: despacio rebotan sin dañar nada; más rápido dañan lo que chocan (se ven las grietas) y, si el golpe alcanza, lo rompen y siguen de largo, más lentos y un poco dañados según lo que rompieron. Con vida llena: madera desde 45 km/h, árboles desde 55 km/h (los gruesos aguantan más), piedra casi a fondo (89 km/h), metal solo con turbo; las rocas, los postes y lo fijo del mapa los frenan siempre. Lo que ya está dañado se rompe más fácil. Lo decide el servidor y lo ven todos; los números están en la tabla `EMBESTIDA` de `public/js/autos.js`. Un choque fuerte los abolla; a las 800 de vida explotan. Atropellar a alguien rápido le hace daño y lo empuja. Se les puede disparar y pegar con el pico (dan metal), y uno se puede parar arriba. Al bajarse se sale por la propia puerta (o por donde haya lugar) con parte del envión, y el auto sigue solo hasta frenar. Adentro: cámara de persecución, velocímetro, vida del auto, turbo, sonido de motor, derrape y bocina, y el conductor con las manos en el volante, que gira con la dirección.
 - **Loot** en el piso y en **cofres**, con cinco rarezas (común, poco común, rara, épica y legendaria) que suben el daño y bajan el tiempo de recarga.
   - Cofre modelado en Blender (tablas, herrajes dorados, cerradura, manijas, tapa con bisagra e interior que brilla). Cerrado tiene un aura dorada que late y motas que suben; al abrirlo la tapa salta con rebote, sale una ráfaga de chispas y el loot sale volando del cofre hasta el piso. Cada cofre mira hacia el lado con más lugar libre (no queda con la cerradura contra la pared).
   - Objetos del piso modelados uno por uno: vendas, botiquín, frasco y bidón de escudo (vidrio con líquido que brilla), una caja por tipo de munición (con la franja del color de la munición y balas arriba), cohete, y pilas de madera, piedra y metal. Flotan y giran despacio sobre un anillo del color del objeto; las armas suman un haz de luz más alto y chispas más numerosas cuanto más rara es el arma.
   - Para verlo todo junto: `/loot.html` (vitrina del loot).
+  - **El loot no atraviesa paredes.** Lo que sale de un cofre, lo que soltás y lo que deja alguien al morir sale para los lados que estén libres y frena antes de las paredes, ventanas, muebles altos, construcciones, árboles y rocas: un cofre contra la pared nunca tira cosas al cuarto de al lado ni afuera de la casa. Si sale por el borde de un balcón o una escalera cae al piso de abajo, y en el agua queda flotando. Si alguien construye una pared encima de un objeto, el objeto sale para su lado; si un piso o una rampa lo atraviesa, queda arriba; si se rompe lo que tenía abajo, cae. El salto desde el cofre tampoco pasa techos bajos. Las pruebas: `node tools/loot/pruebas.mjs` (con el reparto de antes, 1164 de 2640 objetos de los cofres del mapa salían del otro lado de una pared; ahora ninguno).
 - **Armas:** pistola, subfusil, rifle de asalto, escopeta, francotirador con mira y lanzacohetes con daño en área. Cada una usa su tipo de munición. Cada arma tiene su propio retroceso al disparar (sube, patea y se corre hacia atrás) y sus recargas animadas, revisadas para que el arma no atraviese el cuerpo.
 - **Personaje animado** con esqueleto: camina, trota, corre y esprinta mezclando los ciclos según la velocidad, con los brazos al costado del cuerpo (sin meterse en la cadera, el cinturón ni el chaleco) y el pico sostenido al costado mientras corre.
 - **Inventario** con 5 slots y el pico fijo. Cada lugar muestra la **foto del arma u objeto**, sacada al cargar el juego del mismo modelo 3D que se ve en la mano (con la franja del color de la rareza), sobre el fondo de su rareza, con la munición o la cantidad arriba. A la izquierda de la barra se lee el nombre de lo que tenés en la mano y, si es un arma, su rareza. Las pruebas (necesitan Playwright): `node tools/iconos/pruebas.mjs` (con `CAPTURAS=carpeta` guarda una hoja con todas las fotos).
@@ -118,17 +175,20 @@ Para recorrer la isla sin jugar, con el servidor levantado abrí http://localhos
 - **Daño visible y golpes críticos:** las paredes, pisos, techos y demás piezas del mapa, y las construcciones, se van agrietando y oscureciendo a medida que pierden vida (lo ven todos en la sala). Debajo de la mira aparece la barra de vida de lo que golpeás o mirás con el pico, con la parte recién perdida en blanco. Al picar una estructura, un árbol o una roca aparece un **punto débil** (círculo celeste) cerca del golpe: pegarle ahí es un crítico que hace el doble de daño (100 en vez de 50), con número celeste, destello y sonido propio, y el punto se mueve a otro lado. Si le pegás a otro lado el punto se queda; si dejás de picar 6 s, se va.
 - **Construcción** (ver abajo): pared, piso, rampa y techo en una grilla de 4 m, en madera, piedra o metal, que se pueden editar.
 - **Escudo y curación:** vendas, botiquín, frasco azul y bidón azul.
-- Al morir, el jugador tira todo lo que tenía. También hay daño por caída, tormenta por fases, números de daño, minimapa, killfeed, chat, modo espectador y sonidos sintetizados.
+- **Mapa, brújula y marcas:** arriba a la derecha hay un minimapa que te sigue (con el norte arriba; se aleja en el bus y en la caída) con la tormenta, la próxima zona, el recorrido del bus, los autos y tus marcas; si estás afuera de la zona, una línea te muestra por dónde ir. Arriba al centro, una brújula con hacia dónde mirás y a cuántos metros está cada marca. Con **M** se abre el mapa grande de la isla (relieve, agua, río, calles, casas, grilla A–J / 1–10 y los pueblos): rueda para acercar, arrastrar para moverlo y **clic para marcar** un lugar (otro clic la mueve, clic sobre ella o clic derecho la saca). También se marca sin abrir el mapa con el **clic de la rueda** (o T) mirando a un lugar. Cada jugador tiene una marca de su color que se ve en el mapa, en el minimapa, en la brújula y en el mundo como un haz de luz con la distancia. La ve toda la sala (se puede desactivar en Configuración).
+- Al morir, el jugador tira todo lo que tenía. También hay daño por caída, tormenta por fases, números de daño, killfeed, chat, modo espectador y sonidos sintetizados.
 
 ## Construcción
 
 Como en los battle royale del género:
 
 - **Cuatro piezas:** pared, piso, rampa y techo (una pirámide baja). Cada una cuesta 10 del material. Arriba del inventario está la barra con las cuatro piezas y la tecla de cada una, y el material que estás usando con cuánto te queda.
-- **Vista previa:** la pieza aparece como un holograma azul donde va a ir (rojo si no se puede: ya hay una, no alcanza el material o no tiene apoyo). Se ubica sola según hacia dónde mirás: la pared en el borde de tu celda, el piso adelante (mirando arriba, sobre tu cabeza; mirando abajo, bajo los pies), la rampa adelante subiendo hacia donde mirás (R la gira) y el techo adelante o sobre tu cabeza. Parado en una rampa, la pieza de adelante va un nivel más arriba, así se sube construyendo rampas seguidas. Manteniendo el clic se construye seguido.
+- **Grilla de encastre:** todas las piezas van en una grilla de celdas de 4 × 4 × 4 m, y cada una tiene que arrancar donde termina otra, como en el juego original. Las paredes van en los lados de una celda, los pisos en su cara de abajo, y la rampa o el techo (uno de los dos) adentro. Un piso solo se puede poner en el suelo, en el borde de arriba (o de abajo) de una pared, en el borde alto o bajo de una rampa o pegado al borde de otro piso; nunca a media pared. El techo va arriba de un piso o de paredes; las paredes, una arriba de otra o de costado. Dos piezas se sostienen cuando comparten un borde entero de la grilla (tocarse en una punta no alcanza), y todo lo que se arma cerca de una construcción queda en su misma grilla de altura. El servidor revisa las mismas reglas, así que un cliente tramposo no puede meter piezas corridas.
+- **Vista previa:** la pieza aparece como un holograma azul donde va a ir, y en rojo si no se puede, con el motivo en la ayuda de construcción (no encaja con la grilla de al lado, no tiene apoyo o no alcanza el material). Se ubica sola según hacia dónde mirás: la pared en el borde de tu celda, el piso adelante (mirando arriba, sobre tu cabeza; mirando abajo, bajo los pies), la rampa adelante subiendo hacia donde mirás (R la gira) y el techo adelante o sobre tu cabeza. Parado en una rampa, la pieza de adelante va un nivel más arriba, así se sube construyendo rampas seguidas. Manteniendo el clic se construye seguido.
 - **Se levantan de a poco:** la pieza aparece en holograma y se va llenando de abajo hacia arriba; arranca con el 30 % de su vida y llega al máximo cuando termina (madera 150 en 2,5 s, piedra 300 en 5 s, metal 450 en 7,5 s). Apuntando a una construcción se ve su vida debajo de la mira, y las dañadas se ven agrietadas.
-- **Apoyo y derrumbes:** una pieza nueva tiene que tocar el piso, una estructura del mapa u otra construcción. Si se rompe lo que sostiene algo (una pieza tuya o una pieza del mapa), todo lo que deja de llegar al piso se cae.
-- **Edición** (F mirando una construcción tuya): aparece la grilla de la pieza y se marcan baldosas con clic (manteniendo apretado se marcan varias). F otra vez confirma; clic derecho la deja como nueva.
+- **Apoyo y derrumbes:** una pieza nueva tiene que apoyarse en el suelo o en una estructura del mapa, o compartir un borde con otra construcción. Si se rompe lo que sostiene algo (una pieza tuya o una pieza del mapa), todo lo que deja de llegar al piso pasando de borde en borde se cae.
+- **Para construir rápido** (opciones en la pestaña Juego de la configuración): *Confirmar la edición al soltar la tecla* (prendida de fábrica: mantenés F, marcás y al soltar se confirma; un toque corto deja la edición abierta como antes), *Construir seguido manteniendo el clic* (prendida) y *Volver a la pared al entrar a construir* (apagada: Q vuelve a la última pieza). Si una rampa o un piso aparece donde estás parado, te sube arriba en vez de dejarte adentro.
+- **Edición** (F mirando una construcción tuya): aparece la grilla de la pieza y se marcan baldosas con clic (manteniendo apretado se marcan varias). F otra vez (o soltar F, si la mantuviste) confirma; clic derecho la deja como nueva. Una pieza editada sigue sosteniendo lo que tiene arriba.
   - Pared (3×3): lo marcado se saca. Así se hacen puertas, ventanas, arcos o media pared, y se puede pasar y disparar por el hueco.
   - Piso (2×2): lo marcado se saca y se cae por el hueco.
   - Rampa (3×3, vista desde arriba): se arrastra en la dirección en que tiene que subir, y si marcás solo una o dos columnas queda una rampa angosta.
@@ -136,10 +196,12 @@ Como en los battle royale del género:
 - **Material automático:** si se te termina el material elegido, pasa solo al siguiente que alcance para una pieza. Con clic derecho en modo construcción se cambia a mano.
 - Las piezas nuevas no se pueden poner cayendo ni planeando. Los pisos, rampas y techos de construcción hacen de techo: saltando abajo no se atraviesan.
 
-Las pruebas de la construcción (choques con las piezas editadas, que lo que se ve coincida con lo que se pisa, apoyo, derrumbes y vida):
+Las pruebas de la construcción (choques con las piezas editadas, que lo que se ve coincida con lo que se pisa, la grilla de encastre, apoyo, derrumbes y vida) y las del servidor rechazando piezas mal puestas por red:
 
 ```bash
 node tools/construccion/pruebas.mjs
+node tools/construccion/red.mjs
+CAPTURAS=capturas node tools/construccion/capturas.mjs   # fotos del encastre en el juego (Playwright)
 ```
 
 Para probar a construir sin juntar materiales: `SF_MATS=500 npm start` arranca cada partida con 500 de cada material.
@@ -164,8 +226,10 @@ Estas son las teclas de fábrica. **Todas se pueden cambiar** desde **⚙ Config
 | F | Editar la construcción que mirás / confirmar la edición |
 | G | Tirar el objeto que tenés en la mano |
 | B | Bailar |
+| M | Abrir y cerrar el mapa (con el mapa abierto: clic marca, clic derecho saca la marca, rueda acerca, arrastrar mueve) |
+| Clic de la rueda o T | Marcar el lugar al que apuntás (otra vez en el mismo lugar la saca) |
 | Enter | Chat |
-| Esc | Soltar el mouse / abrir la configuración |
+| Esc | Soltar el mouse / abrir la configuración (con el mapa abierto, lo cierra) |
 
 En el auto:
 
@@ -185,7 +249,7 @@ En pantalla no hay una lista de controles: en el auto aparece una ayuda corta co
 
 El panel tiene cuatro pestañas y todo se guarda en el navegador (`localStorage`), así que queda para la próxima vez:
 
-- **Juego:** sensibilidad del mouse, sensibilidad apuntando y con mira telescópica, invertir el eje vertical, apuntar manteniendo o alternando, correr siempre, números de daño, y los bots de las salas que crees (hasta cuántos jugadores completan y su dificultad).
+- **Juego:** sensibilidad del mouse, sensibilidad apuntando y con mira telescópica, invertir el eje vertical, apuntar manteniendo o alternando, correr siempre, números de daño, las opciones de construcción (confirmar la edición al soltar, construir seguido, volver a la pared al entrar a construir), compartir tus marcas con la sala, zoom del minimapa (cerca, medio o lejos), y los bots de las salas que crees (hasta cuántos jugadores completan y su dificultad).
 - **Video:** calidad gráfica (baja sin sombras, media y alta), resolución 3D, campo de visión, color de la mira y contador de FPS.
 - **Sonido:** volumen general.
 - **Controles:** cambiar cualquier tecla. Si elegís una que ya usaba otra acción, se la saca a esa y te avisa. Una tecla puede repetirse entre combate y construcción (por ejemplo, R recarga y en modo construcción gira la rampa) porque no se usan a la vez. Lo mismo con los controles del auto (grupo *Vehículos*): solo valen sentado en un auto, así que repiten las de a pie.
@@ -199,6 +263,7 @@ node tools/controles/pruebas.mjs
 ## Estructura
 
 - `server.js`: servidor HTTP + WebSocket. Maneja salas por código, el recorrido del bus, la tormenta, la vida, el daño, las piezas del mapa que se rompen, los bots y quién gana.
+- `servidor/hosting.js`: lo que necesita el servidor en un hosting: archivos con ETag y gzip, `/salud`, latido de los WebSocket (un ping cada 25 s) y el tope de bots. `render.yaml`: la configuración de Render. `tools/hosting/pruebas.mjs`: sus pruebas. Ver [Jugar online](#jugar-online-render-gratis).
 - `servidor/bots.js`: los bots (solo corren en el servidor): salto del bus, caída, loot, pelea, construcción, curación y tormenta. Sus acciones pasan por el mismo `handleGame` que las de los jugadores.
 - `servidor/navegacion.js`: grillas de lugares donde se puede estar parado (terreno, pisos, escaleras, techos, agua) y rutas por ellas, para que los bots caminen por el mapa.
 - `public/js/opcionesBots.js`: totales y dificultades de los bots, compartido por el servidor, la sala y Configuración.
@@ -210,15 +275,16 @@ node tools/controles/pruebas.mjs
 - `public/js/mallas.js`: junta las estructuras en pocas mallas y les dibuja texturas procedurales (ladrillo, tablas, tejas, chapa, adobe...).
 - `public/mapa.html`: visor del mapa (`/mapa.html`).
 - `tools/mapa/pruebas.mjs`: pruebas automáticas del mapa (colisiones, loot alcanzable, las pruebas visuales de `tools/mapa/visuales.mjs` y la de caminos de `tools/mapa/caminos.mjs`).
-- `public/js/autos.js`: los autos, compartido por el cliente y el servidor: medidas, asientos, física de manejo (motor, frenos, dirección, derrape, turbo, ruedas contra el piso), choques, dónde pega un disparo, dónde se baja cada uno y el estado que viaja por la red.
+- `public/js/autos.js`: los autos, compartido por el cliente y el servidor: medidas, asientos, física de manejo (motor, frenos, dirección, derrape, turbo, ruedas contra el piso), choques, qué rompen según la velocidad (tabla `EMBESTIDA` e `impacto`), dónde pega un disparo, dónde se baja cada uno y el estado que viaja por la red.
 - `public/js/manejar.js`: los autos en el juego: mallas, manejar el propio, ver los de los demás, subir, bajar y cambiar de asiento, gente sentada, atropellos, HUD, minimapa y sonidos.
-- `tools/autos/pruebas.mjs`: pruebas de los autos (lugares de salida libres, manejar desde cada uno sin meterse en nada, choque contra una casa, agua, dos autos, techo, balas, bajarse y red): `node tools/autos/pruebas.mjs`.
+- `tools/autos/pruebas.mjs`: pruebas de los autos (lugares de salida libres, manejar desde cada uno sin meterse en nada, choque contra una casa, agua, dos autos, techo, balas, bajarse y red): `node tools/autos/pruebas.mjs`. `tools/autos/embestidas.mjs` (a qué velocidad se rompe cada material y la física de atravesar o rebotar) y `tools/autos/servidor.mjs` (las embestidas contra el servidor: velocidad que no se puede mentir, cosas lejos, el que no maneja, árboles y rocas): `node tools/autos/embestidas.mjs` y `node tools/autos/servidor.mjs`.
 - `public/js/items.js`: armas, rarezas, munición, consumibles y materiales, y el punto débil del pico (`PUNTO_DEBIL`) (lo usan el cliente y el servidor).
 - `public/js/golpes.js`: daño visible en el cliente: grietas encima de las piezas dañadas (shader procedural), barra de vida de lo que golpeás o mirás y el punto débil del pico (círculo, crítico, número, aro y sonido). El servidor elige el punto débil y decide si un golpe fue crítico.
 - `tools/golpes/pruebas.mjs`: pruebas del punto débil y la vida de lo dañado contra el servidor de verdad (por WebSocket): `node tools/golpes/pruebas.mjs`.
 - `public/js/audio.js`: efectos de sonido sintetizados.
 - `public/models/*.glb`: modelos 3D hechos en Blender (personaje, bus volador, auto, paracaídas, armas y pico, pino, árbol, roca, cofre y objetos del piso). El color de la ropa y de las rarezas se tiñe en el juego.
 - `public/js/loot.js`: objetos del piso y cofres en el juego, con sus efectos (anillo, haz y chispas por rareza, aura del cofre, apertura animada y loot que sale volando). `public/loot.html`: vitrina del loot (`/loot.html`).
+- `public/js/lugarLoot.js`: dónde cae el loot sin atravesar paredes (compartido por el servidor, el cliente y las pruebas): reparte lo que sale de un cofre o de un jugador, acomoda lo que tapa una construcción nueva y deja caer lo que quedó en el aire. `tools/loot/pruebas.mjs`: sus pruebas (`node tools/loot/pruebas.mjs`).
 - `public/js/assets.js`: carga los GLB. Si alguno no carga, el juego usa los modelos procedurales de `models.js`.
 - `public/js/models.js`: arma los personajes, el bus, el paracaídas, las armas y los objetos del piso a partir de los GLB. Si un GLB no carga, usa modelos low-poly hechos con primitivas como respaldo.
 - `public/js/rig.js`: anima el personaje con su esqueleto (capas de piernas, torso y brazo izquierdo, mezcla de locomoción, poses de armas, recargas, bombeo y retroceso por arma, caída libre, paracaídas, aterrizaje y deslizarse). Cuelga el paracaídas de los hombros, lo abre con la vela inflándose, baja los frenos y dibuja sus cuerdas hasta las manos. Después dobla la columna para mirar y apuntar adonde va la cámara, con topes para que los brazos no se metan en el cuerpo.
@@ -226,11 +292,12 @@ node tools/controles/pruebas.mjs
 - `tools/blender/`: scripts de Blender que generan el personaje (`heroe_*.py`; `heroe_caida.py` hace los clips de caída, paracaídas, aterrizaje y deslizarse sobre el esqueleto que trae `heroe_importar.py` del GLB del juego), el paracaídas (`paracaidas.py`), las armas (`armas_*.py`), el bus volador (`bus.py`) y sus animaciones, el auto (`auto.py`), y el cofre y los objetos del piso (`loot_modelos.py`, `loot_export.py`). `heroe_reemplazar_clips.mjs` cambia solo algunos clips del personaje sin tocar el resto del GLB. `recargas_control.py`, `armas_choque.py` y `brazos_choque.py` revisan las animaciones sin renderizar (brazos, saltos entre cuadros, cuánto se mete el arma en el cuerpo y cuánto se meten los brazos y las manos en el cuerpo con las mismas mezclas del juego, mirando derecho, abajo y arriba). `tools/texturas/`: máscaras de la cara y el tatuaje.
 - `Vault/`: vault de Obsidian que documenta el proyecto (empezar por `Vault/Inicio.md`) y grafo del código generado con graphify en `Vault/graphify-out`.
 - `public/js/caida.js`: física de la caída libre (planeo / picada), el paracaídas (altura límite, frenos) y el deslizamiento, y los parámetros de animación que viajan por la red. Pruebas: `node tools/caida/pruebas.mjs`.
-- `public/js/main.js`: el juego en sí (cámara en tercera persona, física, disparo, HUD, minimapa, red).
-- `public/js/construccion.js`: reglas de la construcción, compartidas por el cliente y el servidor: ediciones válidas, superficie que se pisa y cajas que chocan de cada pieza editada, apoyo, derrumbes, vida que crece y qué baldosa se mira al editar.
+- `public/js/main.js`: el juego en sí (cámara en tercera persona, física, disparo, HUD, red).
+- `public/js/mapaHud.js`: minimapa que sigue al jugador, mapa grande (M), brújula y marcas (en el mapa y en el mundo, compartidas con la sala). Pinta la isla una vez por partida con los datos del mundo (relieve, agua, río, calles, casas). Estilos en `public/mapaHud.css`. Pruebas (Node, servidor y navegador): `node tools/mapaHud/pruebas.mjs`.
+- `public/js/construccion.js`: reglas de la construcción, compartidas por el cliente y el servidor: grilla de encastre (bordes de cada pieza, qué va donde, dónde cae la vista previa), ediciones válidas, superficie que se pisa y cajas que chocan de cada pieza editada, apoyo, derrumbes, vida que crece y qué baldosa se mira al editar.
 - `public/js/construccion3d.js`: mallas de las construcciones (texturas de tablas, bloques de piedra y chapa con remaches, marcos que rodean también los huecos editados), holograma de la vista previa, grilla de edición y el relleno de la pieza mientras se levanta.
 - `public/js/construir.js`: la construcción en el juego: modo construcción, dónde va cada pieza, colocar seguido, edición, material automático y la barra de piezas del HUD (la vida de lo que se mira la muestra `golpes.js`). Registra sus controles en `controles.js`.
-- `tools/construccion/pruebas.mjs`: pruebas de la construcción.
+- `tools/construccion/pruebas.mjs`: pruebas de la construcción. `tools/construccion/red.mjs`: el servidor rechaza piezas que no encajan.
 - `public/js/skins.js`: catálogo de skins, rarezas y precios (cliente y servidor). `public/js/tienda.js`: reglas de la tienda, cajas, apuestas y pavos por partida (cliente y servidor).
 - `public/js/aspecto.js`: cómo se ve cada skin (shader de colores, patrones y efectos, accesorios colgados de los huesos). `public/models/skins.glb`: los accesorios, hechos con `tools/blender/skins_base.py`, `skins.py` y `skins_export.py`. `public/skins.html`: vitrina de todas las skins.
 - `public/js/menu.js`: el menú con cuentas (tienda, casillero, cajas, apuestas, admin). `public/js/vitrina.js`: el personaje del menú y las fotos de las tarjetas.
@@ -249,6 +316,9 @@ node tools/controles/pruebas.mjs
 ![Piezas de construcción en madera, piedra y metal, editadas](docs/construccion.png)
 ![Editando una pared: la grilla de 3×3](docs/construccion_edicion.png)
 ![La puerta hecha y la barra de piezas arriba del inventario](docs/construccion_puerta.png)
+![Grilla de encastre: la rampa que sube hasta el borde del piso de arriba encaja (azul)](docs/encastre_encaja.png)
+![Un piso sin nada que lo sostenga: rojo, con el motivo en la ayuda](docs/encastre_no_encaja.png)
+![Parado en la rampa: el piso de adelante va en su borde alto](docs/encastre_piso_rampa.png)
 ![Personajes](docs/personajes.png)
 
 ### Bots

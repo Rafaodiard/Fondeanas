@@ -8,13 +8,13 @@ Archivo: `public/js/main.js`. Es el juego en el cliente; lo carga [[index.html]]
 
 - Escena Three.js: cielo, sol, nubes, renderer y cámara en tercera persona (`updateCamera`).
 - Red: `connect`, `sendMsg`, `enter` (crear/unirse) y `handle(m)`, que procesa todos los mensajes del servidor. Ver [[Protocolo de red]].
-- Interfaz: menú, sala de espera y HUD de [[index.html]] (`showLobby`, `updateSlots` (fotos de [[iconos.js]] en cada lugar y el nombre de lo que tenés en la mano en `#itemMano`), `updateHp`, `feed`, `addChat`, `drawMinimap` (con los nombres de los pueblos con borde oscuro), `updateHud`). El nombre se guarda en `localStorage` (`br-name`).
+- Interfaz: menú, sala de espera y HUD de [[index.html]] (`showLobby`, `updateSlots` (fotos de [[iconos.js]] en cada lugar y el nombre de lo que tenés en la mano en `#itemMano`), `updateHp`, `feed`, `addChat`, `updateHud`; el minimapa, el mapa grande, la brújula y las marcas los dibuja [[mapaHud.js]], que se crea con `crearMapa` y se llama en cada cuadro con `mapa.update(dt, t, tormenta)`). El nombre se guarda en `localStorage` (`br-name`).
 - Física propia del jugador (`updateMe`): gravedad, caminar/correr, salto, nado, caída libre y paracaídas (física en [[caida.js]] con `fisicaAire`), deslizarse (`intentarDeslizar`, `pendiente`, `fisicaDeslizar`); el movimiento lo resuelve `world.moveBody` de [[world.js]] en pasos chicos con piso, techo y paredes.
 - Combate: `tryShoot` (raycasts contra jugadores, estructuras y terreno), `trySwing` (pico), `startReload`, retícula y mira (`updateCrosshair`), efectos (`addTracer`, `addRocket`, `explosionFx`, `sparks`, `addDmgNum`).
 - Estructuras del mapa: `castRay` sabe qué pieza tocó por `userData.triPz` de la malla de choque (y devuelve la normal de la cara, `n`), el pico y los disparos le mandan el id al servidor (el pico con el punto `at` y la normal, para el punto débil), y `pzRota` la saca del mundo y tira escombros de su color (`escombros`). Ver [[Estructuras rompibles]].
 - Daño visible y punto débil: los maneja [[golpes.js]] (`golpes`): `trySwing` llama `golpes.golpePico`, `tryShoot` muestra la barra de lo que le pegó, `pzHp`/`structHp`/`debil` le llegan, `golpes.update` corre en cada cuadro y `golpes.reiniciar` en cada partida. `addDmgNum` acepta una clase (`estr`, `crit`). Ver [[Daño visible y punto débil]].
 - Construcción: la maneja [[construir.js]] (`cons`): `hacer` le pasa las acciones de construcción, `contexto()` sale de `cons.contexto()`, `cons.update` corre en cada cuadro, `cons.hud` dentro de `updateSlots`, `cons.autoMaterial` en cada `inv`, y `structAdd`/`structDel` (con `caidas`)/`structHp`/`structEdit` van a [[world.js]]. Prende `renderer.localClippingEnabled` para el relleno de las piezas que se levantan. Ya no hay ayuda de controles en pantalla. Ver [[Construcción]].
-- Otros jugadores (`updateOthers`), loot del piso y cofres (`updateItems` llama a `animarLoot` de [[loot.js]]), bus (`updateBus`), tormenta (`updateStorm`), espectador (`startSpectating`).
+- Otros jugadores (`updateOthers`), loot del piso y cofres (`updateItems` llama a `animarLoot` de [[loot.js]] con el `world`, para que el salto desde el cofre no pase techos ni pisos), bus (`updateBus`), tormenta (`updateStorm`), espectador (`startSpectating`).
 - Entrada: todas las teclas pasan por [[controles.js]] (`pulsar` → `accionesDe` → `hacer`), y las opciones (sensibilidad, FOV, calidad, volumen, color de mira, FPS…) se aplican con `aplicarOpciones` / `aplicarVideo`. Esc abre [[configuracion.js]]. Ver [[Configuración y controles]].
 - Bucle principal: `frame()` (también cuenta los FPS).
 
@@ -50,6 +50,10 @@ Los autos van en [[manejar.js]] (`crearManejo`). [[main.js]] le pasa los mensaje
 - `showLobby`: lista solo a las personas, agrega "🤖 + N bots (dificultad)", muestra los selectores solo al anfitrión y el botón dice "Empezar con N bots".
 - `onMatchEnd`: con `botsVivos` muestra "Quedaban N bots en pie".
 - Los bots llegan en `room.players` (con `bot: true`) y se dibujan y animan como cualquier otro jugador (`others`). Ver [[Bots]].
+
+## Mapa y marcas (2026-11-26)
+
+[[mapaHud.js]] (`crearMapa`) reemplazó a `drawMinimap` y `minimapBase`. [[main.js]] le pasa `castRay` (para marcar donde apunta la cámara), `alAbrir` / `alCerrar` (soltar y volver a capturar el mouse) y el texto de la tormenta. Llamadas: `mapa.preparar(world)` en `ensureWorld`, `mapa.reiniciar(snap.marcas)` en `setupMatch`, `mapa.mensaje(m)` para `marca`, `mapa.quitar(id)` en `onDeath` y `left`, `mapa.cerrar()` en `showLobby`, `case 'mapa'` y `case 'marcar'` en `hacer()`, Esc cierra el mapa antes de abrir la configuración y *Hacé clic para jugar* no aparece con el mapa abierto. Ver [[Mapa y marcas]].
 
 ## Cuentas y skins (2026-11-26)
 
