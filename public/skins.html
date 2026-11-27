@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Salto Final · Vitrina de skins</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #1b2140; color: #fff; font: 14px system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; }
+  #panel { position: fixed; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.55); padding: 10px 12px; border-radius: 10px; max-width: 320px; }
+  #panel h1 { font-size: 15px; margin: 0 0 8px; }
+  #panel button { margin: 2px 4px 2px 0; }
+  #info { margin-top: 8px; color: #cde; font-size: 12px; line-height: 1.4; }
+</style>
+<script type="importmap">
+  { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="panel">
+  <h1>Vitrina de skins</h1>
+  <button data-t="personaje">Trajes</button><button data-t="mochila">Mochilas</button><button data-t="pico">Picos</button><button data-t="planeador">Planeadores</button><button data-t="envoltorio">Envoltorios</button>
+  <div id="info">Todas las skins con el mismo aspecto que en la partida (los efectos se animan). Arrastrá para girar y rueda para acercar.</div>
+</div>
+<script type="module">
+// Vitrina para revisar las skins (public/js/skins.js + aspecto.js): una fila de personajes por tipo de skin.
+// window.SKINS sirve para capturas automáticas (Playwright): SKINS.mostrar(tipo), SKINS.view(...).
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { loadAssets } from './js/assets.js';
+import { setRigEnv } from './js/rig.js';
+import { createCharacter, animateCharacter, setHeld, createNameTag } from './js/models.js';
+import { SKINS as LISTA, RAREZAS } from './js/skins.js';
+import { avanzarAspecto } from './js/aspecto.js';
+
+await loadAssets();
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.appendChild(renderer.domElement);
+setRigEnv(renderer);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#2a3360');
+scene.add(new THREE.HemisphereLight('#e6f0ff', '#3a3550', 1.4));
+const sun = new THREE.DirectionalLight('#fff1d6', 2.6);
+sun.position.set(6, 14, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 80 });
+scene.add(sun);
+const contra = new THREE.DirectionalLight('#9ad1ff', 1.2);
+contra.position.set(-6, 6, -10);
+scene.add(contra);
+const piso = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: '#3a4270', roughness: 1 }));
+piso.rotation.x = -Math.PI / 2;
+piso.receiveShadow = true;
+scene.add(piso);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 500);
+const controls = new OrbitControls(camera, renderer.domElement);
+
+let actuales = [];
+function mostrar(tipo, columnas = 10, sep = 1.6) {
+  for (const a of actuales) scene.remove(a);
+  actuales = [];
+  const lista = LISTA.filter((s) => s.tipo === tipo);
+  lista.forEach((s, i) => {
+    const sk = { personaje: 'recluta', mochila: null, pico: 'pico', planeador: 'clasico', envoltorio: null };
+    sk[tipo] = s.id;
+    const c = createCharacter('#ff5a5f', sk);
+    const col = i % columnas, fila = Math.floor(i / columnas);
+    c.position.set((col - (columnas - 1) / 2) * sep, 0, -fila * 2.6);
+    if (tipo === 'mochila') c.rotation.y = 0; else c.rotation.y = Math.PI;
+    if (tipo === 'envoltorio') setHeld(c, 'rifle', RAREZAS[s.rareza].color);
+    c.userData.estado = tipo === 'planeador' ? 'glider' : 'ground';
+    if (tipo === 'planeador') c.position.y = 1.2;
+    const tag = createNameTag(s.nombre, RAREZAS[s.rareza].color);
+    tag.position.y = tipo === 'planeador' ? 5.2 : 2.35;
+    c.add(tag);
+    scene.add(c);
+    actuales.push(c);
+  });
+  const filas = Math.ceil(lista.length / columnas);
+  view(0, 3.2, 7 + filas * 1.2, 0, 1, -(filas - 1) * 1.3);
+}
+function view(px, py, pz, tx, ty, tz) { camera.position.set(px, py, pz); controls.target.set(tx, ty, tz); controls.update(); }
+for (const b of document.querySelectorAll('[data-t]')) b.onclick = () => mostrar(b.dataset.t);
+function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+const clock = new THREE.Clock();
+function animar(dt) {
+  avanzarAspecto(dt);
+  for (const c of actuales) animateCharacter(c, c.userData.estado, 0, dt, false, {});
+}
+let pausado = new URLSearchParams(location.search).has('pausa'); // para capturas: se dibuja solo a pedido
+function frame() {
+  requestAnimationFrame(frame);
+  if (pausado) return;
+  const dt = Math.min(clock.getDelta(), 0.05);
+  controls.update();
+  animar(dt);
+  renderer.render(scene, camera);
+}
+mostrar('personaje');
+requestAnimationFrame(frame);
+function foto() { controls.update(); renderer.render(scene, camera); return renderer.domElement.toDataURL('image/png'); }
+window.SKINS = { scene, camera, renderer, mostrar, view, animar, foto, get actuales() { return actuales; }, set pausado(v) { pausado = v; }, ready: true };
+</script>
+</body>
+</html>

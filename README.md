@@ -1,6 +1,6 @@
 # Salto Final
 
-Battle royale 3D para navegador: una isla con 10 pueblos distintos, bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica, salas privadas a las que se entra con un código y bots para jugar solo o completar la sala.
+Battle royale 3D para navegador: una isla con 10 pueblos distintos, bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica, salas privadas a las que se entra con un código, bots para jugar solo o completar la sala, y cuentas con pavos, tienda, cajas y 84 skins.
 
 ## Cómo jugar en tu compu
 
@@ -36,7 +36,7 @@ Cada vez que se mergea algo a `main`, Render lo sube solo (`autoDeployTrigger: c
 - **750 horas por mes** para todos los servicios gratis de la cuenta: alcanza para tener uno solo prendido todo el mes. Si se acaban, Render lo suspende hasta el mes siguiente.
 - **5 GB por mes de datos que salen del servidor.** Si se pasa (sin tarjeta cargada), Render lo suspende hasta el mes siguiente. Lo que gasta el juego: la primera vez que alguien abre la página baja **6,9 MB** (con gzip; sin gzip eran 10,7 MB); al volver a entrar, casi nada (0,01 MB: el navegador ya lo tiene y el servidor contesta *no cambió*). En partida, cada jugador recibe unos **10 KB/s con 8 personas** (menos con menos gente). Una partida de 15 minutos con 5 personas gasta unos 25 MB y con 8, unos 75 MB: da para unas 200 partidas de 5 o 65 de 8 por mes. Con 16 personas son ~300 MB por partida.
 - **0,1 CPU y 512 MB.** Para personas sobra (probado con 16 jugadores simulados con la CPU limitada a 0,1: los estados llegan sin atrasos). Los **bots** son lo que más CPU gasta (cada uno ~4 % de un núcleo), así que en Render las salas tienen bots hasta **4 jugadores en total** (`SF_BOTS_MAX=4`; las opciones de más quedan grisadas en la sala). Con 8 bots en 0,1 CPU los bots se mueven a tirones (6 de 10 cuadros por segundo).
-- **El disco se borra** en cada deploy, reinicio o cuando se duerme. Nada que se quiera guardar (por ejemplo cuentas) puede ir a un archivo: necesita una base de datos aparte.
+- **El disco se borra** en cada deploy, reinicio o cuando se duerme. Nada que se quiera guardar puede ir a un archivo: por eso las cuentas van a una base Postgres gratis aparte (ver [Cuentas online](#cuentas-online-base-gratis-en-neon)).
 - Opcional: para que no se duerma durante el horario de la escuela se puede usar un servicio gratis como UptimeRobot o cron-job.org que abra `https://…onrender.com/salud` cada 10 minutos. Un solo servicio prendido todo el mes usa ~744 de las 750 horas.
 
 ### Variables de entorno del servidor
@@ -46,9 +46,20 @@ Cada vez que se mergea algo a `main`, Render lo sube solo (`autoDeployTrigger: c
 | `PORT` | Puerto donde escucha (3000 si no está). | La pone Render sola. |
 | `SF_BOTS_MAX` | Tope de jugadores en total con bots por sala (redondea para abajo a 0, 4, 8, 12, 16, 20 o 24). Sin la variable, sin tope. | `4` |
 | `SF_NAV_MS` | Milisegundos por cuadro (20 por segundo) para armar los caminos de los bots. 6 si no está. | `2` |
+| `DATABASE_URL` | Postgres donde se guardan las cuentas. Sin la variable van a `datos/cuentas.json`, que en Render se borra. Si está pero la base no responde, el servidor no arranca. | la de Neon |
+| `SF_ADMIN_USUARIO`, `SF_ADMIN_CLAVE` | Crean la cuenta admin al arrancar (ver [Cuentas, tienda y skins](#cuentas-tienda-y-skins)). | las que elijas |
 | `SF_WS_COMPRIMIR` | `1` comprime los mensajes del WebSocket (permessage-deflate): gastan unas 5 veces menos datos, pero en 0,1 CPU traba la partida. Apagado si no está. | sin poner |
 
 `GET /salud` contesta `{"ok":true,"version":…,"salas":…,"conectados":…,"uptime":…}` (lo usa Render como health check). Las pruebas de todo esto: `node tools/hosting/pruebas.mjs`.
+
+### Cuentas online (base gratis en Neon)
+
+Las cuentas, los pavos y las skins tienen que sobrevivir a que Render se duerma o se reinicie, así que en Render se guardan en Postgres. [Neon](https://neon.tech) tiene un plan gratis sin tarjeta que no se vence (el Postgres gratis de Render se borra a los 30 días).
+
+1. Registrate en https://neon.tech (con GitHub o Google) y creá un proyecto (región *AWS US East*, la más cerca de Render Virginia).
+2. En **Connect**, copiá la *connection string*: `postgresql://usuario:clave@…neon.tech/neondb?sslmode=require`.
+3. En Render → el servicio → **Environment**, poné `DATABASE_URL` con esa dirección y `SF_ADMIN_USUARIO` / `SF_ADMIN_CLAVE` con la cuenta admin que quieras (si creaste el servicio con el Blueprint, Render ya te las pidió). Guardá: se reinicia solo.
+4. En **Logs** tiene que aparecer `Cuentas en Postgres (N cuentas)`. La tabla (`sf_datos`) la crea el servidor solo.
 
 ### Por qué Render (opciones revisadas en noviembre de 2026)
 
@@ -74,6 +85,37 @@ Para mirar una partida solo de bots: `SF_BOTS_HASTA_EL_FINAL=1 npm start` sigue 
 ```bash
 node tools/bots/pruebas.mjs      # rutas, llegar caminando a los cofres, salir de pisos altos
 node tools/bots/partida.mjs      # una partida entera solo con bots (12 jugadores, normal; acepta total, dificultad y segundos)
+```
+
+## Cuentas, tienda y skins
+
+Al abrir el juego podés **crear una cuenta** (arrancás con **1000 pavos**, la moneda del juego) o seguir como invitado. Los pavos son virtuales: no se compran ni se cambian por plata.
+
+- **Skins (84):** 38 trajes (16 humanos, 10 monstruos, 8 animales, 4 robots), 14 mochilas, 11 picos, 10 planeadores y 11 envoltorios para las armas, en las mismas cinco rarezas del loot (Común a Legendaria). Todas usan el mismo esqueleto, el mismo tamaño y la misma hitbox: son solo de mirar, ninguna da ventaja. Se ven en la partida, también en los demás jugadores y en los bots.
+- **Tienda:** 2 destacadas y 6 del día, distintas para cada cuenta, que cambian a la medianoche de Buenos Aires. **Reroll** para volver a sortearla: 100, 200, 400, 800 y 1600 pavos.
+- **Casillero:** equipar lo que tenés y vender (devuelve el 40 %). En la sala de espera, *🎒 Cambiar skins*.
+- **Cajas:** ruleta como en los shooters. Recluta (300), Arsenal (400, picos y envoltorios), Salvaje (600, monstruos, animales, robots y mochilas) y Leyenda (1200, de Rara para arriba). El menú muestra la probabilidad de cada rareza. Si sale una repetida, devuelve la mitad de lo que vale.
+- **Apuestas:** cara o cruz (de 10 a 2000 pavos, 50 y 50) y contrato (5 skins de una rareza por 1 de la siguiente).
+- **Pavos por partida:** 20 por jugar, 25 por eliminar a una persona, 10 por un bot (hasta 20), y 150 por ganar contra personas o 60 si eran solo bots.
+- **Cuenta admin:** la crean las variables de entorno al arrancar (nunca hay una contraseña en el repo). Tiene la pestaña *Admin* para buscar usuarios y darles o sacarles pavos y skins.
+
+```bash
+SF_ADMIN_USUARIO=Rafael SF_ADMIN_CLAVE='una-clave-larga' npm start
+```
+
+| Variable | Para qué |
+|---|---|
+| `SF_ADMIN_USUARIO`, `SF_ADMIN_CLAVE` | crea la cuenta admin (o le pone esa clave y le da admin si ya existía) |
+| `DATABASE_URL` | guarda las cuentas en Postgres (para hostings sin disco fijo, como Render gratis con Neon). Si está pero la base no responde, el servidor no arranca, para no perder cuentas |
+| `SF_DATOS` | sin `DATABASE_URL`, carpeta donde va `cuentas.json` (por defecto `datos/`, que no se sube a git) |
+| `SF_LIMITE_LOGIN` | intentos de entrar o registrarse por minuto y por IP (12) |
+
+Las contraseñas se guardan con scrypt y las sesiones como hash, todo lo que cambia pavos o skins lo decide el servidor. Para ver todas las skins: `/skins.html`. Pruebas:
+
+```bash
+node tools/cuentas/pruebas.mjs   # cuentas, tienda, probabilidades de las cajas, apuestas, admin, API y pavos por partida
+node tools/menu/pruebas.mjs      # el menú en el navegador: crear cuenta, comprar, equipar, caja, cara o cruz, admin y partida
+node tools/skins/pruebas.mjs     # la vitrina de skins carga sin errores y los accesorios van en su lugar
 ```
 
 ## El mapa
@@ -256,11 +298,23 @@ node tools/controles/pruebas.mjs
 - `public/js/construccion3d.js`: mallas de las construcciones (texturas de tablas, bloques de piedra y chapa con remaches, marcos que rodean también los huecos editados), holograma de la vista previa, grilla de edición y el relleno de la pieza mientras se levanta.
 - `public/js/construir.js`: la construcción en el juego: modo construcción, dónde va cada pieza, colocar seguido, edición, material automático y la barra de piezas del HUD (la vida de lo que se mira la muestra `golpes.js`). Registra sus controles en `controles.js`.
 - `tools/construccion/pruebas.mjs`: pruebas de la construcción. `tools/construccion/red.mjs`: el servidor rechaza piezas que no encajan.
+- `public/js/skins.js`: catálogo de skins, rarezas y precios (cliente y servidor). `public/js/tienda.js`: reglas de la tienda, cajas, apuestas y pavos por partida (cliente y servidor).
+- `public/js/aspecto.js`: cómo se ve cada skin (shader de colores, patrones y efectos, accesorios colgados de los huesos). `public/models/skins.glb`: los accesorios, hechos con `tools/blender/skins_base.py`, `skins.py` y `skins_export.py`. `public/skins.html`: vitrina de todas las skins.
+- `public/js/menu.js`: el menú con cuentas (tienda, casillero, cajas, apuestas, admin). `public/js/vitrina.js`: el personaje del menú y las fotos de las tarjetas.
+- `servidor/cuentas.js`: cuentas, pavos, skins, tienda, cajas, apuestas y admin. `servidor/api.js`: la API `/api/*`. `servidor/almacenPg.js`: guardar en Postgres con `DATABASE_URL`.
 - `public/js/controles.js`: registro central de acciones y teclas (con contexto: siempre, combate, construcción o vehículo) y de las opciones del juego, guardados en `localStorage`. Cualquier control u opción nueva se agrega acá con `registrarAccion` / `registrarOpcion`.
 - `public/js/configuracion.js`: el panel de configuración (pestañas Juego, Video, Sonido y Controles).
 - `tools/controles/pruebas.mjs`: pruebas del registro de controles y opciones.
 
 ## Capturas
+
+![Tienda del día: destacadas, del día y el personaje probándose la skin elegida](docs/menu_tienda.jpg)
+![Caja abierta: la ruleta frena en el premio](docs/menu_caja.jpg)
+![Apuestas: cara o cruz y contrato](docs/menu_apuestas.jpg)
+![Panel admin: dar pavos y skins](docs/menu_admin.jpg)
+![Los 38 trajes: humanos, monstruos, animales y robots, todos del mismo tamaño](docs/skins_trajes.jpg)
+![Mochilas](docs/skins_mochilas.jpg)
+![Picos](docs/skins_picos.jpg)
 
 ![Golpe crítico en el punto débil: 100 de daño, chispas celestes y la barra de vida de la pared](docs/golpes_critico.jpg)
 ![Paredes con distinto daño: las grietas se abren a medida que pierden vida](docs/golpes_grietas.jpg)

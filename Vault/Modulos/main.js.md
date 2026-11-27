@@ -54,3 +54,10 @@ Los autos van en [[manejar.js]] (`crearManejo`). [[main.js]] le pasa los mensaje
 ## Mapa y marcas (2026-11-26)
 
 [[mapaHud.js]] (`crearMapa`) reemplazó a `drawMinimap` y `minimapBase`. [[main.js]] le pasa `castRay` (para marcar donde apunta la cámara), `alAbrir` / `alCerrar` (soltar y volver a capturar el mouse) y el texto de la tormenta. Llamadas: `mapa.preparar(world)` en `ensureWorld`, `mapa.reiniciar(snap.marcas)` en `setupMatch`, `mapa.mensaje(m)` para `marca`, `mapa.quitar(id)` en `onDeath` y `left`, `mapa.cerrar()` en `showLobby`, `case 'mapa'` y `case 'marcar'` en `hacer()`, Esc cierra el mapa antes de abrir la configuración y *Hacé clic para jugar* no aparece con el mapa abierto. Ver [[Mapa y marcas]].
+
+## Cuentas y skins (2026-11-26)
+
+- Después de cargar los modelos llama `iniciarMenu()` de [[menu.js]]. Manda `token` en `create`/`join`, y pasa `welcome.cuenta`, `cuenta` y `pavos` al menú.
+- `setRoom` crea a cada jugador con sus skins (`createCharacter(p.color, p.sk)`) y lo vuelve a vestir si cambió `sk` en la sala (`vestirPersonaje`). El propio sale con `me.sk` en `setupMatch`.
+- `frame` avanza el tiempo de los efectos de las skins (`avanzarAspecto`, [[aspecto.js]]).
+- *🎒 Cambiar skins* en la sala abre el menú arriba (`abrirSobreSala`); `showLobby` no lo esconde mientras está abierto.

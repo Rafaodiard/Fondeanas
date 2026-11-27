@@ -20,3 +20,9 @@ Usa [[assets.js]] y [[rig.js]]. Lo usan [[main.js]] y [[visor.html]].
 ## Autos (2026-11-26)
 
 `createAuto(color)`: clona `auto.glb` con `Pintura` teñida, un material propio por auto con el cielo de reflejo del bus (`cieloBus`), `Vidrio` transparente y la chapa de doble cara (se ve por dentro desde las ventanillas). Guarda en `userData` las ruedas (orden de giro `YXZ`: doblar y rodar), el volante, el material de las luces de freno (`frenos`, `frenoBase`) y `quemar()` (queda oscuro y sin vidrios al explotar). Sin el GLB arma un auto de cajas. Lo usan [[manejar.js]] y [[mapa.html]]. Ver [[Pipeline del auto]].
+
+## Skins (2026-11-26)
+
+- `createCharacter(color, sk)`: con el esqueleto, viste al personaje con `vestir` de [[aspecto.js]] (traje, accesorios, mochila y tela del paracaídas). Sin `sk`, lo inicial.
+- `vestirPersonaje(personaje, sk, color)`: cambia las skins de un personaje ya creado y vuelve a poner lo que tenía en la mano.
+- `setHeld` guarda lo que tiene en la mano (`heldArgs`); el pico de la mano sale de `modeloPico` (skin) o del de `armas.glb`, y las armas llevan el envoltorio (`envolver`).

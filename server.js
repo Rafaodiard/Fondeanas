@@ -16,6 +16,10 @@ import { AUTO, nuevoAuto, aplicarRed, estadoRed, autoPublico, asientoLibre, rapi
 import { repartirLoot, acomodarLoot, LOOT_RADIO, LOOT_ALTO } from './public/js/lugarLoot.js';
 import { totalValido, dificultadValida, cuantosBots, BOT_TOTALES } from './public/js/opcionesBots.js';
 import { nuevoBot, nombresBots, prepararBots, actualizarBots, alRecibirDanio, alMatar } from './servidor/bots.js';
+import { Cuentas } from './servidor/cuentas.js';
+import { almacenPostgres } from './servidor/almacenPg.js';
+import { crearApi } from './servidor/api.js';
+import { SKINS, EQUIPO_INICIAL } from './public/js/skins.js';
 import { servirArchivo, salud, latido, topeBots } from './servidor/hosting.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,6 +38,47 @@ const BOTS_MAX = topeBots(BOT_TOTALES, process.env.SF_BOTS_MAX);
 const PICKUP_RANGE = 3.2;
 // Sólo para probar la construcción: SF_MATS=500 npm start arranca cada partida con 500 de cada material.
 const MATS_INICIALES = Math.max(0, Math.min(MAX_MATS, Number(process.env.SF_MATS) || 0));
+
+// ---------- Cuentas (servidor/cuentas.js) ----------
+// Se guardan en Postgres si existe DATABASE_URL (hosting sin disco fijo, servidor/almacenPg.js) y si no en
+// datos/cuentas.json (o en la carpeta de SF_DATOS). La cuenta admin sale de SF_ADMIN_USUARIO y SF_ADMIN_CLAVE: si
+// existen, al arrancar se crea esa cuenta (o se le da admin y se le pone esa clave).
+let cuentas;
+if (process.env.DATABASE_URL) {
+  try {
+    cuentas = new Cuentas({ almacen: await almacenPostgres(process.env.DATABASE_URL) });
+    await cuentas.cargar();
+    console.log(`Cuentas en Postgres (${Object.keys(cuentas.datos.usuarios).length} cuentas)`);
+  } catch (e) {
+    // sin base no se arranca: si siguiera con un archivo, al volver la base se perderían las cuentas nuevas
+    console.error(`No se pudo conectar a Postgres (DATABASE_URL): ${e.message}`);
+    process.exit(1);
+  }
+} else cuentas = new Cuentas({ carpeta: process.env.SF_DATOS || path.join(__dirname, 'datos') });
+if (process.env.SF_ADMIN_USUARIO && process.env.SF_ADMIN_CLAVE) {
+  const adm = await cuentas.asegurarAdmin(process.env.SF_ADMIN_USUARIO, process.env.SF_ADMIN_CLAVE);
+  if (adm) console.log(`Cuenta admin: ${adm.usuario}`);
+}
+for (const sen of ['SIGINT', 'SIGTERM']) {
+  process.on(sen, async () => {
+    try { await Promise.race([cuentas.guardarYa(), new Promise((r) => setTimeout(r, 4000))]); } catch { /* nada */ }
+    process.exit(0);
+  });
+}
+// cuando cambia una cuenta (compró, equipó, el admin le dio algo): avisarle a esa persona y, si está en una sala
+// esperando, mostrarle a los demás el traje nuevo
+function alCambiarCuenta(nombre) {
+  const u = cuentas.usuario(nombre);
+  if (!u) return;
+  for (const room of rooms.values()) {
+    for (const p of room.players.values()) {
+      if (p.cuenta !== nombre.toLowerCase()) continue;
+      send(p.ws, { t: 'cuenta', cuenta: cuentas.publica(u) });
+      if (room.phase === 'lobby') { p.sk = cuentas.publica(u).equipo; broadcast(room, { t: 'room', room: roomInfo(room) }); }
+    }
+  }
+}
+const api = crearApi(cuentas, { alCambiarCuenta });
 
 // ---------- HTTP estático ----------
 const MIME = {
@@ -64,6 +109,11 @@ const ROOTS = {
   '/': path.join(__dirname, 'public/'),
 };
 const server = http.createServer((req, res) => {
+  if (req.url.startsWith('/api/')) {
+    let u;
+    try { u = new URL(req.url, 'http://x'); } catch { res.writeHead(400); return res.end(); }
+    return api(req, res, u).catch((e) => { console.error(e); if (!res.headersSent) { res.writeHead(500); res.end('{"ok":false,"error":"Error del servidor."}'); } });
+  }
   let url;
   try { url = decodeURIComponent(req.url.split('?')[0]); } catch { res.writeHead(400); return res.end('Dirección inválida'); } // "/%" tiraba el servidor
   if (url === '/salud') return salud(res, { version: VERSION, salas: rooms.size, conectados: wss.clients.size });
@@ -111,7 +161,17 @@ function broadcast(room, msg, exceptId) {
   const data = JSON.stringify(msg);
   for (const p of room.players.values()) if (p.id !== exceptId && p.ws && p.ws.readyState === 1) p.ws.send(data);
 }
-const publicPlayer = (p) => ({ id: p.id, name: p.name, color: p.color, alive: p.alive, kills: p.kills, state: p.state, ...(p.bot ? { bot: true } : {}) });
+const publicPlayer = (p) => ({ id: p.id, name: p.name, color: p.color, alive: p.alive, kills: p.kills, state: p.state, sk: p.sk || EQUIPO_INICIAL, ...(p.bot ? { bot: true } : {}), ...(p.cuenta ? { cuenta: true } : {}) });
+
+// Los bots salen con skins al azar (son solo cosméticas)
+function skinsBot() {
+  const de = (tipo) => SKINS.filter((s) => s.tipo === tipo);
+  const azar = (l) => l[Math.floor(Math.random() * l.length)].id;
+  return {
+    personaje: azar(de('personaje')), mochila: Math.random() < 0.5 ? azar(de('mochila')) : null, pico: azar(de('pico')),
+    planeador: azar(de('planeador')), envoltorio: Math.random() < 0.4 ? azar(de('envoltorio')) : null,
+  };
+}
 const personas = (room) => [...room.players.values()].filter((p) => !p.bot);
 
 function roomInfo(room) {
@@ -231,6 +291,7 @@ function startMatch(room) {
     start: room.bus.start,
   };
   room.partida++;
+  room.personasInicio = personas(room).length;
   agregarBots(room);
   for (const p of room.players.values()) resetPlayer(p, room);
   prepararBots(room);
@@ -247,7 +308,7 @@ function agregarBots(room) {
   const libres = [...COLORS.filter((c) => !usados.has(c)), ...COLORS];
   const nombres = nombresBots(n, new Set([...room.players.values()].map((p) => p.name)));
   for (let k = 0; k < n; k++) {
-    const p = { ...nuevoBot(room.bots.dif), id: nextId++, name: nombres[k], color: libres[k % libres.length], kills: 0 };
+    const p = { ...nuevoBot(room.bots.dif), id: nextId++, name: nombres[k], color: libres[k % libres.length], kills: 0, sk: skinsBot() };
     room.players.set(p.id, p);
   }
 }
@@ -256,7 +317,7 @@ function sacarBots(room) {
 }
 
 function resetPlayer(p, room) {
-  p.hp = 100; p.shield = 0; p.alive = true; p.kills = 0; p.state = 'bus';
+  p.hp = 100; p.shield = 0; p.alive = true; p.kills = 0; p.killsP = 0; p.killsB = 0; p.premiada = 0; p.state = 'bus';
   p.pos = [...room.bus.from]; p.lastShot = 0; p.lastSwing = 0; p.debil = null; p.use = null; p.auto = null; p.marca = null;
   p.slots = Array(SLOTS).fill(null);
   p.ammo = { ligera: 0, media: 0, pesada: 0, cartuchos: 0, cohetes: 0 };
@@ -296,7 +357,12 @@ function killPlayer(room, victim, killer, cause) {
   if (victim.auto) bajarDelAuto(room, victim);
   victim.alive = false; victim.hp = 0; victim.shield = 0; victim.state = 'dead';
   victim.marca = null; // los clientes sacan su marca al recibir 'death'
-  if (killer && killer !== victim) { killer.kills++; if (killer.bot) alMatar(room, killer, Date.now()); }
+  if (killer && killer !== victim) {
+    killer.kills++;
+    if (victim.bot) killer.killsB = (killer.killsB || 0) + 1; else killer.killsP = (killer.killsP || 0) + 1;
+    if (killer.bot) alMatar(room, killer, Date.now());
+  }
+  premiar(room, victim, false);
   // Tira todo lo que tenía.
   const drops = victim.slots.filter(Boolean);
   for (const [a, n] of Object.entries(victim.ammo)) if (n > 0) drops.push({ kind: 'ammo', a, count: n });
@@ -321,9 +387,20 @@ function checkWinner(room) {
     }, 4500);
   }
 }
+// Pavos por la partida (una vez por partida y por persona con cuenta): al morir o al terminar la partida.
+function premiar(room, p, gano) {
+  if (!p.cuenta || p.bot || p.premiada === room.partida) return;
+  const u = cuentas.usuario(p.cuenta);
+  if (!u) return;
+  p.premiada = room.partida;
+  const r = cuentas.premiar(u, { killsPersonas: p.killsP || 0, killsBots: p.killsB || 0, gano, contraPersonas: (room.personasInicio || 1) > 1 });
+  send(p.ws, { t: 'pavos', ganados: r.total, detalle: r.detalle, cuenta: cuentas.publica(u) });
+}
+
 function endMatch(room, winner, botsVivos = 0) {
   room.phase = 'ended';
   room.winner = winner;
+  for (const p of room.players.values()) if (p.alive) premiar(room, p, p.id === winner);
   broadcast(room, { t: 'matchEnd', winner, players: [...room.players.values()].map(publicPlayer), ...(botsVivos ? { botsVivos } : {}) });
   const n = room.partida;
   setTimeout(() => {
@@ -1117,9 +1194,14 @@ wss.on('connection', (ws) => {
         if (!room) return send(ws, { t: 'error', message: 'No existe una sala con ese código.' });
         if (personas(room).length >= MAX_PLAYERS) { room = null; return send(ws, { t: 'error', message: 'La sala está llena.' }); }
       }
-      const name = String(msg.name || 'Jugador').replace(/[<>]/g, '').slice(0, 16) || 'Jugador';
+      // con sesión iniciada: el nombre es el de la cuenta y se ponen sus skins; sin sesión, invitado con lo básico
+      const cu = cuentas.deToken(msg.token);
+      let name = String(msg.name || 'Jugador').replace(/[<>]/g, '').slice(0, 16) || 'Jugador';
+      if (cu) name = cu.usuario;
+      else if (cuentas.usuario(name)) name = `${name.slice(0, 15)}*`; // un invitado no puede usar el nombre de una cuenta
       const used = new Set([...room.players.values()].map((p) => p.color));
       player = {
+        cuenta: cu ? cu.usuario.toLowerCase() : null, sk: cu ? cuentas.publica(cu).equipo : { ...EQUIPO_INICIAL },
         id: nextId++, ws, name, color: COLORS.find((c) => !used.has(c)) || COLORS[0],
         hp: 100, shield: 0, alive: room.phase === 'lobby', kills: 0,
         state: room.phase === 'lobby' ? 'lobby' : 'dead', pos: [0, 0, 0],
@@ -1127,7 +1209,7 @@ wss.on('connection', (ws) => {
       };
       room.players.set(player.id, player);
       if (!room.hostId) room.hostId = player.id;
-      send(ws, { t: 'welcome', id: player.id, version: VERSION, viejo: codigoViejo(), room: roomInfo(room), snap: room.world && room.phase !== 'lobby' ? matchSnapshot(room) : null });
+      send(ws, { t: 'welcome', id: player.id, version: VERSION, viejo: codigoViejo(), room: roomInfo(room), snap: room.world && room.phase !== 'lobby' ? matchSnapshot(room) : null, ...(cu ? { cuenta: cuentas.publica(cu) } : {}) });
       broadcast(room, { t: 'room', room: roomInfo(room) }, player.id);
       return;
     }

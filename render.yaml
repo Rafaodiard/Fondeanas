@@ -20,3 +20,11 @@ services:
       # menos tiempo por cuadro para armar caminos de los bots, para que no frenen la partida (servidor/bots.js)
       - key: SF_NAV_MS
         value: "2"
+      # cuentas: sin base de datos se borrarían en cada deploy o cuando se duerme (el disco de Render gratis no queda).
+      # Render las pide al crear el Blueprint (sync: false = no se guardan en el repo). Ver README, "Cuentas online".
+      - key: DATABASE_URL        # Postgres gratis de Neon (postgresql://…?sslmode=require)
+        sync: false
+      - key: SF_ADMIN_USUARIO    # la cuenta admin (puede dar pavos y skins)
+        sync: false
+      - key: SF_ADMIN_CLAVE
+        sync: false

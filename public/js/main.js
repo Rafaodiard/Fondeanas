@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { World, makeStructMesh, MODEL } from './world.js';
 import { loadAssets, cloneAsset, bakedParts } from './assets.js';
 import { createChest, abrirCofre, animarLoot, luzLoot } from './loot.js';
-import { createCharacter, animateCharacter, createBus, createNameTag, createItemMesh, setHeld, weaponAction, stopWeaponAction, weaponShot } from './models.js';
+import { createCharacter, animateCharacter, createBus, createNameTag, createItemMesh, setHeld, weaponAction, stopWeaponAction, weaponShot, vestirPersonaje } from './models.js';
+import { avanzarAspecto } from './aspecto.js';
+import { iniciarMenu, sesion, ponerCuenta, avisoPavos, abrirSobreSala, colorDelJugador } from './menu.js';
 import {
   WEAPONS, CONSUMABLES, AMMO, MATERIALS, MAT_ORDER, RARITIES, BUILD_COST, PICKAXE, SLOTS, GRID, DIRS,
   itemLabel, itemColor, weaponReload, structKey,
@@ -48,6 +50,8 @@ await loadAssets((k) => { ui.menuError.textContent = `Cargando modelos… ${Math
 MODEL.clone = cloneAsset; MODEL.baked = bakedParts; MODEL.cofre = createChest; MODEL.abrirCofre = abrirCofre;
 btns.forEach((b) => { b.disabled = false; });
 ui.menuError.textContent = '';
+await iniciarMenu(); // cuentas, tienda y vitrina (menu.js)
+$('btnSkinsSala').onclick = abrirSobreSala;
 function storageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function storageSet(k, v) { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } }
 
@@ -224,7 +228,7 @@ function enter(type, conBots = false) {
   ui.menuError.textContent = '';
   // la sala nueva arranca con los bots de Configuración (o con los de "Jugar con bots")
   alCrear = type === 'create' ? { total: conBots ? opcion('botsTotal') || BOT_TOTAL_DEF : opcion('botsTotal'), dif: opcion('botsDificultad'), empezar: conBots } : null;
-  const go = () => sendMsg({ t: type, name, code });
+  const go = () => sendMsg({ t: type, name, code, token: sesion.token || undefined });
   if (ws && ws.readyState === 1) go(); else connect(go);
 }
 $('btnCreate').onclick = () => enter('create');
@@ -259,8 +263,11 @@ function handle(m) {
   if (m.t === 'marca') { if (world) mapa.mensaje(m); return; }
   switch (m.t) {
     case 'error': ui.menuError.textContent = m.message; break;
+    case 'cuenta': ponerCuenta(m.cuenta); break;
+    case 'pavos': avisoPavos(m); break;
     case 'welcome':
       myId = m.id;
+      if (m.cuenta) ponerCuenta(m.cuenta);
       // servidor viejo: no manda versión (antes de los autos) o el código cambió en el disco después de arrancarlo
       if (!m.version || m.viejo) {
         $('avisoServidor').textContent = 'El servidor está corriendo una versión vieja del juego: cerralo (Ctrl+C) y volvé a abrirlo con npm start. Mientras tanto los autos y lo nuevo no andan.';
@@ -419,10 +426,11 @@ function setRoom(r) {
   const ids = new Set(r.players.map((p) => p.id));
   for (const id of [...others.keys()]) if (!ids.has(id)) removeOther(id);
   for (const p of r.players) {
-    if (p.id === myId) { me.kills = p.kills; me.color = p.color; me.name = p.name; continue; }
+    if (p.id === myId) { me.kills = p.kills; me.color = p.color; me.name = p.name; me.sk = p.sk; colorDelJugador(p.color); continue; }
     let o = others.get(p.id);
+    if (o && JSON.stringify(o.info?.sk) !== JSON.stringify(p.sk)) vestirPersonaje(o.mesh, p.sk, p.color); // cambió de skins en la sala
     if (!o) {
-      const mesh = createCharacter(p.color);
+      const mesh = createCharacter(p.color, p.sk);
       const tag = createNameTag(p.name, p.color);
       mesh.add(tag);
       mesh.visible = false;
@@ -481,7 +489,7 @@ function removeItem(id) {
 
 // ---------- Pantallas ----------
 function showLobby() {
-  ui.menu.classList.add('hidden');
+  if (!ui.menu.classList.contains('sobre-sala')) ui.menu.classList.add('hidden'); // salvo si está cambiando de skins
   ui.hud.classList.add('hidden');
   ui.lobby.classList.remove('hidden');
   me.state = 'lobby';
@@ -516,6 +524,7 @@ function showLobby() {
 function setupMatch(snap) {
   ui.lobby.classList.add('hidden');
   ui.menu.classList.add('hidden');
+  ui.menu.classList.remove('sobre-sala');
   ui.hud.classList.remove('hidden');
   ui.killfeed.innerHTML = '';
   cons.cancelar();
@@ -527,7 +536,7 @@ function setupMatch(snap) {
   me.vel.set(0, 0, 0);
   me.yaw = Math.atan2(-(room.bus.to[0] - room.bus.from[0]), -(room.bus.to[2] - room.bus.from[2]));
   if (me.mesh) scene.remove(me.mesh);
-  me.mesh = createCharacter(me.color || '#ffffff');
+  me.mesh = createCharacter(me.color || '#ffffff', me.sk);
   me.mesh.visible = false;
   scene.add(me.mesh);
   for (const o of others.values()) { o.state = 'bus'; o.mesh.visible = false; o.seen = false; }
@@ -1490,6 +1499,7 @@ function frame() {
   requestAnimationFrame(frame);
   const rawDt = clock.getDelta();
   const dt = Math.min(rawDt, 0.05);
+  avanzarAspecto(dt); // efectos animados de las skins
   fpsN++; fpsT += rawDt;
   if (fpsT >= 0.5) { if (opcion('fps')) $('fps').textContent = `${Math.round(fpsN / fpsT)} FPS`; fpsN = 0; fpsT = 0; }
   const t = now();

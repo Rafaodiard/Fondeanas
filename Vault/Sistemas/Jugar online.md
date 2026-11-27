@@ -16,4 +16,4 @@ Render gratis da 0,1 CPU, 512 MB, 5 GB por mes de salida, 750 horas por mes, dis
 
 ## Lo que no se guarda
 
-Las salas viven en memoria: un deploy, un reinicio o que se duerma las borra. El disco de Render gratis se borra, así que lo que haya que guardar (cuentas) necesita una base de datos aparte.
+Las salas viven en memoria: un deploy, un reinicio o que se duerma las borra. El disco de Render gratis se borra, así que las cuentas van a Postgres con `DATABASE_URL` (Neon gratis, ver [[almacenPg.js]] y [[Cuentas, tienda y skins (sistema)]]); `render.yaml` pide `DATABASE_URL`, `SF_ADMIN_USUARIO` y `SF_ADMIN_CLAVE` con `sync: false` (2026-11-27).

@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { cloneAsset } from './assets.js';
 import { hasRig, createRigCharacter, animateRig, placeGlider, placeParachute, weaponRig, rigAction, rigStopAction, rigShot } from './rig.js';
+import { vestir, modeloPico, envolver } from './aspecto.js';
 
 export { rigAction as weaponAction, rigStopAction as stopWeaponAction, rigShot as weaponShot };
 
@@ -15,7 +16,8 @@ function box(w, h, d, mat, x = 0, y = 0, z = 0) {
 }
 
 // Personaje articulado: el grupo raíz está en los pies, mira hacia -Z.
-export function createCharacter(color) {
+// sk: las skins equipadas ({ personaje, mochila, pico, planeador, envoltorio }, ver skins.js); sin sk, lo inicial.
+export function createCharacter(color, sk = null) {
   if (hasRig()) {
     const root = createRigCharacter(color);
     const para = cloneAsset('paracaidas', null, { Tela: color });
@@ -25,6 +27,7 @@ export function createCharacter(color) {
       glider.visible = false;
       placeGlider(root, glider);
     }
+    vestir(root, sk, color);
     setHeld(root, 'pico');
     return root;
   }
@@ -366,9 +369,19 @@ export function createPickaxe() {
   return g;
 }
 
+// Cambiar las skins de un personaje ya creado (por ejemplo si las cambió en la sala de espera).
+export function vestirPersonaje(char, sk, color) {
+  const u = char.userData;
+  if (!u.rig) return;
+  vestir(char, sk, color ?? u.colorJugador);
+  if (u.heldArgs) { u.held = null; setHeld(char, ...u.heldArgs); }
+}
+
 export function setHeld(char, what, color = '#b8bcc4') {
   const u = char.userData;
-  const key = `${what}:${color}`;
+  u.heldArgs = [what, color];
+  // el pico y el envoltorio dependen de las skins puestas
+  const key = `${what}:${color}:${u.sk?.pico || ''}:${u.sk?.envoltorio || ''}`;
   if (u.held === key) return;
   u.held = key;
   if (u.rig) return setHeldRig(u, what, color);
@@ -397,12 +410,13 @@ function setHeldRig(u, what, color) {
   u.accion = null;
   u.muzzle.position.set(0, 0.09, -0.3);
   if (what === 'pico') {
-    const glb = cloneAsset('armas', 'pico');
+    const glb = modeloPico(u.sk?.pico) || cloneAsset('armas', 'pico');
     const p = new THREE.Group();
     if (glb) p.add(glb); else { const q = createPickaxe(); q.rotation.x = Math.PI; p.add(q); }
     u.gun.add(p);
   } else if (WEAPON_SHAPES[what]) {
     const w = createWeaponModel(what, color, true);
+    envolver(w, u.sk?.envoltorio);
     u.gun.add(w);
     const glb = w.userData.glb ? w.children[0] : null;
     const boca = glb?.getObjectByName(`${what}_boca`);

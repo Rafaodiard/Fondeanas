@@ -57,7 +57,7 @@ function rigClips() {
 // materiales PBR horneados se ven apagados y la piel muy oscura.
 export function setRigEnv(renderer, intensity = 0.55) {
   const tex = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
-  for (const name of ['personaje', 'armas']) {
+  for (const name of ['personaje', 'armas', 'skins']) {
     ASSETS[name]?.traverse((o) => {
       if (!o.isMesh) return;
       for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
