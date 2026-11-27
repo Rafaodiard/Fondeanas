@@ -59,3 +59,10 @@ Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.
 - `huellaCodigo()`: sha1 de los `.js` de la raíz, `servidor/` y `public/js` al arrancar (`VERSION`). `codigoViejo()` la recalcula cuando alguien entra a una sala: si cambió (un `git pull` con el servidor prendido) avisa una vez en la consola y manda `viejo: true` en `welcome`.
 - Los archivos estáticos salen con `Cache-Control: no-cache`, para que después de actualizar el navegador no mezcle archivos viejos con nuevos.
 - Por qué: [[Autos funcionales]] (Rafael actualizó sin reiniciar el servidor y los autos "no andaban").
+
+## Cuentas y skins (2026-11-26)
+
+- Al arrancar crea `Cuentas` ([[cuentas.js]]): en Postgres si hay `DATABASE_URL` ([[almacenPg.js]]; si la base no responde, no arranca) o en `datos/cuentas.json` (`SF_DATOS` cambia la carpeta). Con `SF_ADMIN_USUARIO` y `SF_ADMIN_CLAVE` asegura la cuenta admin. Con SIGINT/SIGTERM guarda antes de salir.
+- El handler HTTP manda `/api/*` a [[api.js]]. `alCambiarCuenta(usuario)` le manda `cuenta` a esa persona y, si está en la sala de espera, le cambia `sk` y reenvía la sala.
+- `create`/`join` con `token`: nombre de la cuenta y sus skins (`p.sk`); un invitado con el nombre de una cuenta queda con `*`. `publicPlayer` agrega `sk` y `cuenta`. `skinsBot()` le da skins al azar a cada bot.
+- Pavos: `killPlayer` cuenta eliminaciones de personas (`killsP`) y de bots (`killsB`); `premiar(room, p, gano)` suma los pavos al morir o en `endMatch` (una vez por partida, `p.premiada`) y manda `pavos`.

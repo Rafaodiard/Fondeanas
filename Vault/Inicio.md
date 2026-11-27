@@ -1,10 +1,10 @@
 # Salto Final · Inicio
 
-Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]), autos que se manejan ([[Autos]]), bots que completan la sala ([[Bots]]), bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica y salas privadas a las que se entra con un código de 5 letras.
+Battle royale 3D para navegador con cuentas, pavos y 84 skins ([[Cuentas, tienda y skins (sistema)]]): isla fija con 10 pueblos ([[Mapa de la isla]]), autos que se manejan ([[Autos]]), bots que completan la sala ([[Bots]]), bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica y salas privadas a las que se entra con un código de 5 letras.
 
 - Repo: https://github.com/Rafaodiard/Fondeanas
 - Stack: Node (`server.js` con `ws`) + Three.js 0.170 como ES modules sin bundler. `npm start` levanta todo en el puerto 3000 (`PORT` lo cambia).
-- Vault actualizado con las fotos de las armas en la barra de items (rama `claude/project-thread-re7eeo`, 2026-11-26), los bots (rama `claude/project-thread-jzsanm`, 2026-11-26), el daño visible y el punto débil del pico (rama `claude/project-thread-rrpo2j`, 2026-11-26), los autos manejables, además de la construcción estilo battle royale, el cofre y los objetos del piso modelados, y la caída libre, el paracaídas y deslizarse. El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
+- Vault actualizado con las cuentas, la tienda y las skins (rama `claude/project-thread-aj77ft`, 2026-11-26), las fotos de las armas en la barra de items (rama `claude/project-thread-re7eeo`, 2026-11-26), los bots (rama `claude/project-thread-jzsanm`, 2026-11-26), el daño visible y el punto débil del pico (rama `claude/project-thread-rrpo2j`, 2026-11-26), los autos manejables, además de la construcción estilo battle royale, el cofre y los objetos del piso modelados, y la caída libre, el paracaídas y deslizarse. El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
 
 ## Cómo está armado
 
@@ -42,6 +42,14 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 | [[opcionesBots.js]] | `public/js/opcionesBots.js` | Totales y dificultades de los bots (compartido) |
 | [[bots.js]] | `servidor/bots.js` | Los bots: salto, caída, loot, pelea, construcción, curación y tormenta (solo servidor) |
 | [[navegacion.js]] | `servidor/navegacion.js` | Grillas de lugares pisables y rutas para que los bots caminen por el mapa (solo servidor) |
+| [[skins.js]] | `public/js/skins.js` | Catálogo de las 84 skins, rarezas y precios (compartido) |
+| [[tienda.js]] | `public/js/tienda.js` | Reglas de la economía: tienda diaria, reroll, cajas, apuestas, premios (compartido) |
+| [[aspecto.js]] | `public/js/aspecto.js` | Cómo se ve cada skin: shader de colores, patrones y efectos, accesorios colgados de los huesos |
+| [[vitrina.js]] | `public/js/vitrina.js` | El personaje del menú y las fotos de las tarjetas de skins |
+| [[menu.js]] | `public/js/menu.js` | Menú con cuentas: entrar, tienda, casillero, cajas, apuestas y admin |
+| [[cuentas.js]] | `servidor/cuentas.js` | Cuentas, pavos, skins, tienda, cajas, apuestas y admin (solo servidor) |
+| [[api.js]] | `servidor/api.js` | API HTTP `/api/*` del menú (solo servidor) |
+| [[almacenPg.js]] | `servidor/almacenPg.js` | Guardar las cuentas en Postgres si hay `DATABASE_URL` (solo servidor) |
 
 ## Pantallas
 
@@ -49,15 +57,17 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 - [[visor.html]]: visor del personaje para revisar animaciones.
 - [[mapa.html]]: visor del mapa para recorrer la isla.
 - [[loot.html]]: vitrina del loot (cofres, armas por rareza y objetos).
+- [[skins.html]]: vitrina de todas las skins como se ven en el juego.
 
 ## Sistemas del juego
 
-- [[Mapa de la isla]] · [[Estructuras rompibles]] · [[Daño visible y punto débil]] · [[Salas y partidas]] · [[Bus, caída y paracaídas]] · [[Deslizarse]] · [[Tormenta]] · [[Loot y rarezas]] · [[Armas y disparo]] · [[Construcción]] · [[Autos]] · [[Bots]] · [[Pico y recursos]] · [[Curación y escudo]] · [[Configuración y controles]]
+- [[Mapa de la isla]] · [[Estructuras rompibles]] · [[Daño visible y punto débil]] · [[Salas y partidas]] · [[Bus, caída y paracaídas]] · [[Deslizarse]] · [[Tormenta]] · [[Loot y rarezas]] · [[Armas y disparo]] · [[Construcción]] · [[Autos]] · [[Bots]] · [[Pico y recursos]] · [[Curación y escudo]] · [[Configuración y controles]] · [[Cuentas, tienda y skins (sistema)]]
 
 ## Arte y herramientas
 
 - [[Modelos GLB]]: los archivos de `public/models` y quién los usa.
 - [[Pipeline del héroe]]: scripts de Blender del personaje (malla, ropa, rig, clips, export).
+- [[Pipeline de skins]]: accesorios de las skins (`skins.glb`) y cómo se ven en el juego.
 - [[Pipeline del loot]]: scripts de Blender del cofre y los objetos del piso.
 - [[Pipeline de armas]]: scripts de Blender de las armas (modelado, horneado, recargas, export).
 - [[Pipeline del bus]]: script de Blender del bus volador (modelado, fotos y export).

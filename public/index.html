@@ -12,22 +12,70 @@
 <body>
 <canvas id="game"></canvas>
 
-<!-- Menú principal -->
-<div id="menu" class="screen">
-  <div class="panel">
-    <h1>SALTO FINAL</h1>
-    <p class="sub">Saltá del bus, sobreviví a la tormenta, quedá último en pie.</p>
-    <label>Tu nombre <input id="name" maxlength="16" placeholder="Jugador"></label>
-    <button id="btnCreate" class="primary">Crear sala</button>
-    <button id="btnBots" class="btn-bots" type="button">🤖 Jugar con bots<small id="botsResumenMenu"></small></button>
-    <div class="row">
-      <input id="code" maxlength="5" placeholder="CÓDIGO" autocomplete="off">
-      <button id="btnJoin">Unirse</button>
+<!-- Menú principal (menu.js): pestañas Jugar / Tienda / Casillero / Cajas / Apuestas / Admin y la vitrina 3D -->
+<div id="menu" class="screen menu2">
+  <header class="m-barra">
+    <div class="m-logo">SALTO FINAL</div>
+    <nav id="pestanas" class="m-pestanas">
+      <button type="button" data-p="jugar" class="on">▶ Jugar</button>
+      <button type="button" data-p="tienda">🛒 Tienda</button>
+      <button type="button" data-p="casillero">🎒 Casillero</button>
+      <button type="button" data-p="cajas">📦 Cajas</button>
+      <button type="button" data-p="apuestas">🎲 Apuestas</button>
+      <button type="button" data-p="admin" class="hidden">🛡 Admin</button>
+    </nav>
+    <div class="m-cuenta">
+      <button id="btnVolverSala" type="button" class="chico">← Volver a la sala</button>
+      <span id="mPavos" class="m-pavos hidden" title="Pavos"><i class="pavo"></i><b>0</b></span>
+      <button id="btnCuenta" type="button" class="m-usuario">Entrar</button>
     </div>
-    <p id="menuError" class="error"></p>
-    <button id="btnConfigMenu" class="btn-config" type="button">⚙ Configuración</button>
+  </header>
+  <div class="m-cuerpo">
+    <section class="m-contenido">
+      <div id="p-jugar" class="pest">
+        <div class="panel">
+          <p class="sub">Saltá del bus, sobreviví a la tormenta, quedá último en pie.</p>
+          <label>Tu nombre <input id="name" maxlength="16" placeholder="Jugador"></label>
+          <button id="btnCreate" class="primary">Crear sala</button>
+          <button id="btnBots" class="btn-bots" type="button">🤖 Jugar con bots<small id="botsResumenMenu"></small></button>
+          <div class="row">
+            <input id="code" maxlength="5" placeholder="CÓDIGO" autocomplete="off">
+            <button id="btnJoin">Unirse</button>
+          </div>
+          <p id="menuError" class="error"></p>
+          <button id="btnConfigMenu" class="btn-config" type="button">⚙ Configuración</button>
+        </div>
+      </div>
+      <div id="p-tienda" class="pest hidden"></div>
+      <div id="p-casillero" class="pest hidden"></div>
+      <div id="p-cajas" class="pest hidden"></div>
+      <div id="p-apuestas" class="pest hidden"></div>
+      <div id="p-admin" class="pest hidden"></div>
+    </section>
+    <aside class="m-lado">
+      <canvas id="vitrina"></canvas>
+      <div id="detalle" class="m-detalle"></div>
+    </aside>
   </div>
+  <div id="cuentaMenu" class="m-popover hidden"></div>
 </div>
+
+<!-- Entrar / crear cuenta -->
+<div id="login" class="screen capa hidden" data-modo="entrar">
+  <form id="lgForm" class="panel" autocomplete="on">
+    <h2 id="lgTitulo">Entrar</h2>
+    <label>Usuario <input id="lgUsuario" maxlength="16" autocomplete="username" placeholder="3 a 16 letras, números o _"></label>
+    <label>Contraseña <input id="lgClave" type="password" maxlength="100" autocomplete="current-password" placeholder="Al menos 6 caracteres"></label>
+    <p id="lgError" class="error"></p>
+    <button id="lgOk" class="primary" type="submit">Entrar</button>
+    <button id="lgCambiar" class="link" type="button"></button>
+    <button id="lgInvitado" class="link" type="button">Seguir como invitado (sin pavos ni skins)</button>
+  </form>
+</div>
+<!-- ruleta de las cajas, contrato y "qué trae la caja" -->
+<div id="ruleta" class="screen capa hidden"></div>
+<!-- cartel de pavos ganados (también se ve en la partida) -->
+<div id="avisoPavos" class="aviso-pavos hidden"></div>
 
 <!-- Sala de espera -->
 <div id="lobby" class="screen hidden">
@@ -46,6 +94,7 @@
       <p id="botsResumen" class="hint"></p>
     </div>
     <button id="btnStart" class="primary">Empezar partida</button>
+    <button id="btnSkinsSala" type="button" class="btn-config">🎒 Cambiar skins</button>
     <p id="waitHost" class="hint">Esperando a que el anfitrión empiece…</p>
     <button id="btnConfigSala" class="btn-config" type="button">⚙ Configuración</button>
   </div>

@@ -1,6 +1,6 @@
 # Salto Final
 
-Battle royale 3D para navegador: una isla con 10 pueblos distintos, bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica, salas privadas a las que se entra con un código y bots para jugar solo o completar la sala.
+Battle royale 3D para navegador: una isla con 10 pueblos distintos, bus volador, caída libre con planeo y picada, paracaídas que se abre y se cierra, deslizarse, tormenta que se achica, salas privadas a las que se entra con un código, bots para jugar solo o completar la sala, y cuentas con pavos, tienda, cajas y 84 skins.
 
 ## Cómo jugar en tu compu
 
@@ -29,6 +29,37 @@ Para mirar una partida solo de bots: `SF_BOTS_HASTA_EL_FINAL=1 npm start` sigue 
 ```bash
 node tools/bots/pruebas.mjs      # rutas, llegar caminando a los cofres, salir de pisos altos
 node tools/bots/partida.mjs      # una partida entera solo con bots (12 jugadores, normal; acepta total, dificultad y segundos)
+```
+
+## Cuentas, tienda y skins
+
+Al abrir el juego podés **crear una cuenta** (arrancás con **1000 pavos**, la moneda del juego) o seguir como invitado. Los pavos son virtuales: no se compran ni se cambian por plata.
+
+- **Skins (84):** 38 trajes (16 humanos, 10 monstruos, 8 animales, 4 robots), 14 mochilas, 11 picos, 10 planeadores y 11 envoltorios para las armas, en las mismas cinco rarezas del loot (Común a Legendaria). Todas usan el mismo esqueleto, el mismo tamaño y la misma hitbox: son solo de mirar, ninguna da ventaja. Se ven en la partida, también en los demás jugadores y en los bots.
+- **Tienda:** 2 destacadas y 6 del día, distintas para cada cuenta, que cambian a la medianoche de Buenos Aires. **Reroll** para volver a sortearla: 100, 200, 400, 800 y 1600 pavos.
+- **Casillero:** equipar lo que tenés y vender (devuelve el 40 %). En la sala de espera, *🎒 Cambiar skins*.
+- **Cajas:** ruleta como en los shooters. Recluta (300), Arsenal (400, picos y envoltorios), Salvaje (600, monstruos, animales, robots y mochilas) y Leyenda (1200, de Rara para arriba). El menú muestra la probabilidad de cada rareza. Si sale una repetida, devuelve la mitad de lo que vale.
+- **Apuestas:** cara o cruz (de 10 a 2000 pavos, 50 y 50) y contrato (5 skins de una rareza por 1 de la siguiente).
+- **Pavos por partida:** 20 por jugar, 25 por eliminar a una persona, 10 por un bot (hasta 20), y 150 por ganar contra personas o 60 si eran solo bots.
+- **Cuenta admin:** la crean las variables de entorno al arrancar (nunca hay una contraseña en el repo). Tiene la pestaña *Admin* para buscar usuarios y darles o sacarles pavos y skins.
+
+```bash
+SF_ADMIN_USUARIO=Rafael SF_ADMIN_CLAVE='una-clave-larga' npm start
+```
+
+| Variable | Para qué |
+|---|---|
+| `SF_ADMIN_USUARIO`, `SF_ADMIN_CLAVE` | crea la cuenta admin (o le pone esa clave y le da admin si ya existía) |
+| `DATABASE_URL` | guarda las cuentas en Postgres (para hostings sin disco fijo, como Render gratis con Neon). Si está pero la base no responde, el servidor no arranca, para no perder cuentas |
+| `SF_DATOS` | sin `DATABASE_URL`, carpeta donde va `cuentas.json` (por defecto `datos/`, que no se sube a git) |
+| `SF_LIMITE_LOGIN` | intentos de entrar o registrarse por minuto y por IP (12) |
+
+Las contraseñas se guardan con scrypt y las sesiones como hash, todo lo que cambia pavos o skins lo decide el servidor. Para ver todas las skins: `/skins.html`. Pruebas:
+
+```bash
+node tools/cuentas/pruebas.mjs   # cuentas, tienda, probabilidades de las cajas, apuestas, admin, API y pavos por partida
+node tools/menu/pruebas.mjs      # el menú en el navegador: crear cuenta, comprar, equipar, caja, cara o cruz, admin y partida
+node tools/skins/pruebas.mjs     # la vitrina de skins carga sin errores y los accesorios van en su lugar
 ```
 
 ## El mapa
@@ -200,6 +231,10 @@ node tools/controles/pruebas.mjs
 - `public/js/construccion3d.js`: mallas de las construcciones (texturas de tablas, bloques de piedra y chapa con remaches, marcos que rodean también los huecos editados), holograma de la vista previa, grilla de edición y el relleno de la pieza mientras se levanta.
 - `public/js/construir.js`: la construcción en el juego: modo construcción, dónde va cada pieza, colocar seguido, edición, material automático y la barra de piezas del HUD (la vida de lo que se mira la muestra `golpes.js`). Registra sus controles en `controles.js`.
 - `tools/construccion/pruebas.mjs`: pruebas de la construcción.
+- `public/js/skins.js`: catálogo de skins, rarezas y precios (cliente y servidor). `public/js/tienda.js`: reglas de la tienda, cajas, apuestas y pavos por partida (cliente y servidor).
+- `public/js/aspecto.js`: cómo se ve cada skin (shader de colores, patrones y efectos, accesorios colgados de los huesos). `public/models/skins.glb`: los accesorios, hechos con `tools/blender/skins_base.py`, `skins.py` y `skins_export.py`. `public/skins.html`: vitrina de todas las skins.
+- `public/js/menu.js`: el menú con cuentas (tienda, casillero, cajas, apuestas, admin). `public/js/vitrina.js`: el personaje del menú y las fotos de las tarjetas.
+- `servidor/cuentas.js`: cuentas, pavos, skins, tienda, cajas, apuestas y admin. `servidor/api.js`: la API `/api/*`. `servidor/almacenPg.js`: guardar en Postgres con `DATABASE_URL`.
 - `public/js/controles.js`: registro central de acciones y teclas (con contexto: siempre, combate, construcción o vehículo) y de las opciones del juego, guardados en `localStorage`. Cualquier control u opción nueva se agrega acá con `registrarAccion` / `registrarOpcion`.
 - `public/js/configuracion.js`: el panel de configuración (pestañas Juego, Video, Sonido y Controles).
 - `tools/controles/pruebas.mjs`: pruebas del registro de controles y opciones.

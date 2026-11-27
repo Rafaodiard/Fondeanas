@@ -50,3 +50,10 @@ Los autos van en [[manejar.js]] (`crearManejo`). [[main.js]] le pasa los mensaje
 - `showLobby`: lista solo a las personas, agrega "🤖 + N bots (dificultad)", muestra los selectores solo al anfitrión y el botón dice "Empezar con N bots".
 - `onMatchEnd`: con `botsVivos` muestra "Quedaban N bots en pie".
 - Los bots llegan en `room.players` (con `bot: true`) y se dibujan y animan como cualquier otro jugador (`others`). Ver [[Bots]].
+
+## Cuentas y skins (2026-11-26)
+
+- Después de cargar los modelos llama `iniciarMenu()` de [[menu.js]]. Manda `token` en `create`/`join`, y pasa `welcome.cuenta`, `cuenta` y `pavos` al menú.
+- `setRoom` crea a cada jugador con sus skins (`createCharacter(p.color, p.sk)`) y lo vuelve a vestir si cambió `sk` en la sala (`vestirPersonaje`). El propio sale con `me.sk` en `setupMatch`.
+- `frame` avanza el tiempo de los efectos de las skins (`avanzarAspecto`, [[aspecto.js]]).
+- *🎒 Cambiar skins* en la sala abre el menú arriba (`abrirSobreSala`); `showLobby` no lo esconde mientras está abierto.

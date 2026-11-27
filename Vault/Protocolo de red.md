@@ -7,7 +7,7 @@ WebSocket sobre el mismo servidor HTTP de [[server.js]]. Cada mensaje es un JSON
 ## Cliente → servidor
 
 Antes de estar en una sala:
-- `create` (con `name`): crea una sala y entra como anfitrión.
+- `create` (con `name`): crea una sala y entra como anfitrión. `create` y `join` pueden llevar `token` (la sesión de la cuenta, ver [[Cuentas, tienda y skins (sistema)]]): entonces el nombre es el de la cuenta y el jugador sale con sus skins.
 - `join` (con `code`, `name`): entra a una sala existente. Errores: sala inexistente o llena (máximo 16).
 
 En la sala:
@@ -30,6 +30,7 @@ Los procesa `handle(m)` en [[main.js]]:
 
 `error`, `welcome`, `room`, `matchStart`, `phase`, `forceJump`, `jumped`, `state`, `shot`, `swing`, `boom`, `hitConfirm`, `inv`, `itemsAdd`, `itemsDel`, `chestOpen`, `resHit`, `resGone`, `structAdd`, `structDel` (con `caidas`: las que se cayeron sin apoyo), `structHp` (con `dano`), `structEdit`, `pzRota`, `pzHp` (`ids`, `hp`: vida de piezas del mapa dañadas, a todos), `debil` (solo al que pica: `o`, `p`, `n`, `crit`, `hp`, `max`), `chestMove`, `death`, `matchEnd`, `left`, `chat`, y los de los autos (los procesa [[manejar.js]]): `auto` (estado de un auto, a todos menos al que lo simula), `autoSeats` (`a`, `seats`, `ctrl`: quién va en cada asiento y quién simula el auto), `autoHp`, `autoBoom` (explotó), `autoNo` (`a`, `por`: lleno, lejos, roto o estado; no se pudo subir), `bocina`, y `empujon` (`v`: al que atropellaron, sale volando con esa velocidad).
 
+- Cuentas (2026-11-26): `welcome` lleva `cuenta` si entró con sesión; `cuenta` (`cuenta`: la cuenta actualizada, cuando cambia por la API o el admin) y `pavos` (`ganados`, `detalle` {partida, kills, victoria}, `cuenta`: lo que ganó en la partida, al morir o al terminar). Cada jugador de `roomInfo` lleva `sk` (las skins puestas: personaje, mochila, pico, planeador, envoltorio) y `cuenta: true` si tiene cuenta; los bots llevan skins al azar.
 - `welcome` lleva `version` (huella del código del servidor) y `viejo` (true si los archivos cambiaron en el disco después de arrancar el servidor). Sin `version` (servidor anterior al 2026-11-26) o con `viejo`, [[main.js]] muestra el cartel de reiniciar el servidor.
 - `inv` lleva vida, escudo, slots, munición y materiales del jugador (lo arma `invMsg` en el servidor).
 - `matchStart` y `welcome` (si la partida ya empezó) llevan un snapshot de la partida (`matchSnapshot`), con las piezas del mapa ya rotas (`piezas`), las dañadas con su vida (`pzHp`: `[[id, vida], ...]`) y los cofres que bajaron (`cofresMovidos`), y los autos (`autos`: posición, vida, si está roto, asientos y color).
