@@ -9,11 +9,56 @@ npm install
 npm start
 ```
 
-Abrí http://localhost:3000, poné tu nombre y tocá **Crear sala**. Tus amigos entran con el código de 5 letras (o con el link `http://TU-IP:3000/?sala=CODIGO` si están en tu misma red). Para jugar por internet hay que subir el servidor a un hosting con Node y WebSockets (Render, Railway, Fly.io, etc.).
+Abrí http://localhost:3000, poné tu nombre y tocá **Crear sala**. Tus amigos entran con el código de 5 letras (o con el link `http://TU-IP:3000/?sala=CODIGO` si están en tu misma red). Para jugar por internet (por ejemplo desde la escuela) mirá [Jugar online](#jugar-online-render-gratis).
 
 **Después de cada `git pull`, cerrá el servidor (Ctrl+C) y volvé a correr `npm start`.** El servidor carga su código una sola vez al arrancar: si sigue prendido, el navegador recibe los archivos nuevos pero el servidor sigue con la lógica vieja, y lo nuevo no anda (por ejemplo, los autos muestran *E Manejar* pero no te dejan subir). Si pasa, el juego muestra un cartel rojo arriba que lo avisa y la consola del servidor también.
 
 Para jugar solo contra bots, tocá **🤖 Jugar con bots**: crea una sala con bots y la empieza enseguida (ver [Bots](#bots)).
+
+## Jugar online (Render gratis)
+
+El juego se puede subir a [Render](https://render.com) gratis y sin tarjeta: queda en una página pública (`https://salto-final.onrender.com` o parecida) a la que entra cualquiera con el link, sin correr nada en ninguna compu. Funciona por HTTPS y WebSocket seguro (WSS) en el puerto 443, que es lo que suelen dejar pasar las redes de las escuelas.
+
+### Cómo subirlo (lo hace Rafael con su cuenta)
+
+1. Entrá a https://render.com, tocá **Get Started** y registrate con **GitHub** (plan gratis, no pide tarjeta).
+2. En el panel de Render: **New → Blueprint**. Conectá GitHub si te lo pide y dale acceso al repo `Rafaodiard/Fondeanas`. Elegilo: Render lee el archivo `render.yaml` del repo y muestra el servicio `salto-final` (plan Free). Tocá **Apply** / **Deploy Blueprint**.
+   - Si en vez de eso te pide una tarjeta, cancelá y hacelo a mano con **New → Web Service**: elegí el repo, rama `main`, Language **Node**, Region **Virginia**, Build Command `npm ci`, Start Command `npm start`, Instance Type **Free**. En **Advanced** poné Health Check Path `/salud` y agregá las variables `SF_BOTS_MAX` = `4`, `SF_NAV_MS` = `2` y `NODE_VERSION` = `22`.
+3. Esperá a que el deploy diga **Live** (tarda unos minutos). Arriba a la izquierda está la dirección del juego (`https://salto-final.onrender.com` si el nombre estaba libre).
+4. Abrí la dirección, poné tu nombre y tocá **Crear sala**. Pasales a tus amigos el link y el código de 5 letras (o el link `https://…onrender.com/?sala=CODIGO`, que ya entra a la sala).
+5. **Probalo una vez desde la red de la escuela** antes del día que quieran jugar: abrí `https://…onrender.com/salud`. Si ves `{"ok":true,…}`, la página pasa; después creá una sala para ver que también pase el WebSocket (si la red lo cortara, el menú dice *No se pudo conectar con el servidor*). Si la escuela bloquea `onrender.com`, avisá: hay que buscar otro hosting.
+
+Cada vez que se mergea algo a `main`, Render lo sube solo (`autoDeployTrigger: commit` en `render.yaml`). Ojo: el deploy reinicia el servidor y **corta las partidas y salas que estén abiertas**. Si molesta, en Render → el servicio → **Settings → Auto-Deploy** se puede poner en *Off* y subir a mano con **Manual Deploy** cuando no haya nadie jugando.
+
+### Límites del plan gratis (medidos el 2026-11-26)
+
+- **Se duerme.** Sin nadie conectado 15 minutos, Render apaga el servidor. El que entra después espera ~1 minuto con una pantalla de carga de Render. Abrí la página un ratito antes de jugar. Con el servidor dormido o reiniciado se pierden las salas (viven en la memoria del servidor).
+- **750 horas por mes** para todos los servicios gratis de la cuenta: alcanza para tener uno solo prendido todo el mes. Si se acaban, Render lo suspende hasta el mes siguiente.
+- **5 GB por mes de datos que salen del servidor.** Si se pasa (sin tarjeta cargada), Render lo suspende hasta el mes siguiente. Lo que gasta el juego: la primera vez que alguien abre la página baja **6,9 MB** (con gzip; sin gzip eran 10,7 MB); al volver a entrar, casi nada (0,01 MB: el navegador ya lo tiene y el servidor contesta *no cambió*). En partida, cada jugador recibe unos **10 KB/s con 8 personas** (menos con menos gente). Una partida de 15 minutos con 5 personas gasta unos 25 MB y con 8, unos 75 MB: da para unas 200 partidas de 5 o 65 de 8 por mes. Con 16 personas son ~300 MB por partida.
+- **0,1 CPU y 512 MB.** Para personas sobra (probado con 16 jugadores simulados con la CPU limitada a 0,1: los estados llegan sin atrasos). Los **bots** son lo que más CPU gasta (cada uno ~4 % de un núcleo), así que en Render las salas tienen bots hasta **4 jugadores en total** (`SF_BOTS_MAX=4`; las opciones de más quedan grisadas en la sala). Con 8 bots en 0,1 CPU los bots se mueven a tirones (6 de 10 cuadros por segundo).
+- **El disco se borra** en cada deploy, reinicio o cuando se duerme. Nada que se quiera guardar (por ejemplo cuentas) puede ir a un archivo: necesita una base de datos aparte.
+- Opcional: para que no se duerma durante el horario de la escuela se puede usar un servicio gratis como UptimeRobot o cron-job.org que abra `https://…onrender.com/salud` cada 10 minutos. Un solo servicio prendido todo el mes usa ~744 de las 750 horas.
+
+### Variables de entorno del servidor
+
+| Variable | Para qué | En Render |
+|---|---|---|
+| `PORT` | Puerto donde escucha (3000 si no está). | La pone Render sola. |
+| `SF_BOTS_MAX` | Tope de jugadores en total con bots por sala (redondea para abajo a 0, 4, 8, 12, 16, 20 o 24). Sin la variable, sin tope. | `4` |
+| `SF_NAV_MS` | Milisegundos por cuadro (20 por segundo) para armar los caminos de los bots. 6 si no está. | `2` |
+| `SF_WS_COMPRIMIR` | `1` comprime los mensajes del WebSocket (permessage-deflate): gastan unas 5 veces menos datos, pero en 0,1 CPU traba la partida. Apagado si no está. | sin poner |
+
+`GET /salud` contesta `{"ok":true,"version":…,"salas":…,"conectados":…,"uptime":…}` (lo usa Render como health check). Las pruebas de todo esto: `node tools/hosting/pruebas.mjs`.
+
+### Por qué Render (opciones revisadas en noviembre de 2026)
+
+- **Render**: el único con plan gratis sin tarjeta que corre un servidor Node prendido con WebSockets.
+- **Koyeb**: tiene una instancia gratis (0,1 CPU, se duerme a la hora), pero desde febrero de 2026 pide tarjeta para registrarse.
+- **Railway**: después de la prueba de 30 días da 1 dólar por mes, que no alcanza para tener el servidor prendido.
+- **Fly.io**: sin plan gratis estable para cuentas nuevas (prueba corta; lo demás pide tarjeta).
+- **Hugging Face Spaces**: los Spaces con Docker (los que corren Node) pasaron a ser pagos; gratis solo quedan las páginas estáticas.
+- **Glitch**: dejó de hostear proyectos en julio de 2025.
+- **Correr el servidor en una compu con un túnel** (Cloudflare Tunnel, etc.): descartado porque depende de que esa compu esté prendida y las redes de las escuelas suelen bloquear los túneles.
 
 ## Bots
 
@@ -169,6 +214,7 @@ node tools/controles/pruebas.mjs
 ## Estructura
 
 - `server.js`: servidor HTTP + WebSocket. Maneja salas por código, el recorrido del bus, la tormenta, la vida, el daño, las piezas del mapa que se rompen, los bots y quién gana.
+- `servidor/hosting.js`: lo que necesita el servidor en un hosting: archivos con ETag y gzip, `/salud`, latido de los WebSocket (un ping cada 25 s) y el tope de bots. `render.yaml`: la configuración de Render. `tools/hosting/pruebas.mjs`: sus pruebas. Ver [Jugar online](#jugar-online-render-gratis).
 - `servidor/bots.js`: los bots (solo corren en el servidor): salto del bus, caída, loot, pelea, construcción, curación y tormenta. Sus acciones pasan por el mismo `handleGame` que las de los jugadores.
 - `servidor/navegacion.js`: grillas de lugares donde se puede estar parado (terreno, pisos, escaleras, techos, agua) y rutas por ellas, para que los bots caminen por el mapa.
 - `public/js/opcionesBots.js`: totales y dificultades de los bots, compartido por el servidor, la sala y Configuración.

@@ -18,6 +18,9 @@ import { Navegacion } from './navegacion.js';
 // Física del jugador (los mismos números que main.js).
 const GRAVEDAD = 25, CAMINAR = 6, CORRER = 9.5, APUNTANDO = 3.5, NADANDO = 4, SALTO = 8.5, AGUA = -1.3;
 const RADIO = 0.42;
+// ms por cuadro (20 por segundo) para armar grillas de navegación. En un hosting chico (Render gratis, 0,1 CPU)
+// conviene SF_NAV_MS=2: los bots tardan un poco más en encontrar caminos pero no frenan la partida.
+const NAV_MS = Math.max(0.5, Number(process.env.SF_NAV_MS) || 6);
 const RANGO_AGARRAR = 2.6;  // el servidor acepta hasta 4.2 (PICKUP_RANGE + 1)
 const VISTA_ALTURA = 1.6;   // ojos
 const PECHO = 1.15;
@@ -143,7 +146,7 @@ function mostrar(room, now) {
 // ctx: { now, dt, handleGame(room, p, msg), broadcast(room, msg), stormAt(storm, now), busPos(room, now) }
 export function actualizarBots(room, ctx) {
   if (!room.nav) return;
-  room.nav.trabajar(6); // grillas de navegación pendientes, de a poco
+  room.nav.trabajar(NAV_MS); // grillas de navegación pendientes, de a poco
   room.rutasTick = 0;
   room.botTick = (room.botTick || 0) + 1;
   const avisar = room.botTick % 2 === 0; // estado a los clientes a 10 Hz

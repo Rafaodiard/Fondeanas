@@ -490,6 +490,8 @@ function showLobby() {
   ui.btnStart.textContent = nBots ? `Empezar con ${nBots} ${nBots === 1 ? 'bot' : 'bots'}` : personas.length > 1 ? 'Empezar partida' : 'Empezar (solo, para explorar)';
   // el anfitrión elige los bots; los demás ven lo que eligió
   ui.botsElegir.classList.toggle('hidden', !host);
+  // un servidor chico (SF_BOTS_MAX, por ejemplo Render gratis) no deja elegir más bots de los que aguanta
+  for (const o of ui.botsTotal.options) o.disabled = room.botsMax != null && Number(o.value) > room.botsMax;
   ui.botsTotal.value = String(bots.total);
   ui.botsDif.value = bots.dif;
   ui.botsResumen.textContent = !bots.total ? (host ? 'Sin bots: solo juegan las personas de la sala.' : 'Sin bots.')

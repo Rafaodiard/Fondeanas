@@ -1,0 +1,22 @@
+# Salto Final en Render, plan gratis (sin tarjeta). Guía paso a paso: README, sección "Jugar online (Render gratis)".
+# Render lee este archivo al crear el "Blueprint" desde el repo de GitHub.
+services:
+  - type: web
+    name: salto-final          # la dirección queda https://salto-final.onrender.com (o con un sufijo si ya existe)
+    runtime: node
+    plan: free                 # 512 MB, 0,1 CPU, se duerme a los 15 min sin nadie y tarda ~1 min en despertar
+    region: virginia           # la más cerca de Argentina de las que ofrece Render
+    branch: main
+    buildCommand: npm ci
+    startCommand: npm start    # server.js escucha en el PORT que pone Render
+    healthCheckPath: /salud
+    autoDeployTrigger: commit  # cada merge a main se sube solo (corta las partidas que se estén jugando)
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # 0,1 CPU no alcanza para muchos bots: hasta 4 jugadores en total con bots (servidor/hosting.js topeBots)
+      - key: SF_BOTS_MAX
+        value: "4"
+      # menos tiempo por cuadro para armar caminos de los bots, para que no frenen la partida (servidor/bots.js)
+      - key: SF_NAV_MS
+        value: "2"

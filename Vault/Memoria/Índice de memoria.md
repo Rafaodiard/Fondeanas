@@ -26,4 +26,5 @@ Memoria secundaria del proyecto: decisiones, reglas y hechos que dijo Rafael. Un
 
 - [[Jugar con bots]]: el pedido de jugar con bots y lo que se decidió (nombres, fin de partida, límite de 24).
 - [[Loot sin atravesar paredes]]: el pedido de que el loot no atraviese paredes y lo que se decidió (qué frena, qué pasa al construir encima, agua).
+- [[Jugar online desde la escuela]]: el pedido de jugar online desde la escuela y por qué se eligió Render gratis.
 - [[Fotos de armas en la barra]]: el pedido de ver las armas en la barra de items y lo que se decidió (fotos sacadas de los modelos 3D).

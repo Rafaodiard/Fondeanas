@@ -2,7 +2,7 @@
 
 Volver a [[Inicio]] · código en [[bots.js]] y [[navegacion.js]] · pedido en [[Jugar con bots]]
 
-Jugadores que maneja el servidor. Completan la sala hasta un total de jugadores que elige el anfitrión (Sin bots, 4, 8, 12, 16, 20 o 24) con una dificultad (Fácil, Normal o Difícil). Si hay 3 personas y el total es 12, entran 9 bots. Los valores y `cuantosBots` están en [[opcionesBots.js]].
+Jugadores que maneja el servidor. Completan la sala hasta un total de jugadores que elige el anfitrión (Sin bots, 4, 8, 12, 16, 20 o 24) con una dificultad (Fácil, Normal o Difícil). Si hay 3 personas y el total es 12, entran 9 bots. Los valores y `cuantosBots` están en [[opcionesBots.js]]. Un servidor con `SF_BOTS_MAX` (Render gratis: 4) no deja pasar de ese total y la sala deja grisadas las opciones de más (ver [[Jugar online]]).
 
 ## Dónde se eligen
 
