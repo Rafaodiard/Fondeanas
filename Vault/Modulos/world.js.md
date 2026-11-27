@@ -28,7 +28,7 @@ Arma la isla de Salto Final. El mapa es **fijo**: usa `MAP_SEED = 20261124` para
 - **Construcciones de jugadores**: `structs` (Map), `addStruct` (cajas de choque con `cajasPieza`), `editStruct(key, e, dir)`, `removeStruct`, `mallaStruct`, `updateStructs` (avanza el relleno de las que se levantan, `obras`); `groundHeight` usa `superficie` y `moveBody` frena la cabeza con `techoConstruido`. Las mallas salen de [[construccion3d.js]] (`makeStructMesh`, reexportada) y las reglas de [[construccion.js]]. Ver [[Construcción]].
 - `rayTerrain`, `minimapImage` (terreno, río, calles, plazoletas y techos).
 - `distPoly(p, pts)` (exportada): distancia de un punto a una polilínea.
-- `pois`: un punto por pueblo (nombre, centro, radio y desplazamiento opcional de la etiqueta del minimapa).
+- `pois`: un punto por pueblo (nombre, centro, radio y desplazamiento opcional de la etiqueta del minimapa). El minimapa y el mapa grande de [[mapaHud.js]] se pintan con `terrainHeight`, la malla del terreno (`terrainMesh`, sus colores), `swamp`, `river`, `ribbons`, `plazas` y `placed`; `minimapImage(px)` queda para [[mapa.html]].
 
 ## Modelos
 

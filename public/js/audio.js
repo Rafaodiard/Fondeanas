@@ -172,4 +172,7 @@ export const sfx = {
   puerta() { burst({ dur: 0.09, freq: 900, q: 1.5, vol: 0.6, type: 'bandpass' }); tone({ f1: 160, f2: 90, dur: 0.1, vol: 0.25, type: 'sine', delay: 0.03 }); },
   turbo() { burst({ dur: 0.45, freq: 2200, q: 0.4, vol: 0.4, type: 'highpass' }); },
   click() { tone({ f1: 1200, f2: 1100, dur: 0.03, vol: 0.12, type: 'square' }); },
+  // marcas del mapa (mapaHud.js): poner y sacar
+  marca() { tone({ f1: 880, f2: 990, dur: 0.09, vol: 0.2, type: 'triangle' }); tone({ f1: 1320, f2: 1480, dur: 0.14, vol: 0.18, type: 'triangle', delay: 0.07 }); },
+  quitarMarca() { tone({ f1: 900, f2: 520, dur: 0.12, vol: 0.16, type: 'triangle' }); },
 };

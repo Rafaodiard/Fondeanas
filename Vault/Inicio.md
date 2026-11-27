@@ -4,7 +4,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 
 - Repo: https://github.com/Rafaodiard/Fondeanas
 - Stack: Node (`server.js` con `ws`) + Three.js 0.170 como ES modules sin bundler. `npm start` levanta todo en el puerto 3000 (`PORT` lo cambia).
-- Vault actualizado con las fotos de las armas en la barra de items (rama `claude/project-thread-re7eeo`, 2026-11-26), los bots (rama `claude/project-thread-jzsanm`, 2026-11-26), el daño visible y el punto débil del pico (rama `claude/project-thread-rrpo2j`, 2026-11-26), los autos manejables, además de la construcción estilo battle royale, el cofre y los objetos del piso modelados, y la caída libre, el paracaídas y deslizarse. El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
+- Vault actualizado con el mapa abrible, el minimapa con zoom, la brújula y las marcas (rama `claude/project-thread-gkrms5`, 2026-11-26), las fotos de las armas en la barra de items (rama `claude/project-thread-re7eeo`, 2026-11-26), los bots (rama `claude/project-thread-jzsanm`, 2026-11-26), el daño visible y el punto débil del pico (rama `claude/project-thread-rrpo2j`, 2026-11-26), los autos manejables, además de la construcción estilo battle royale, el cofre y los objetos del piso modelados, y la caída libre, el paracaídas y deslizarse. El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
 
 ## Cómo está armado
 
@@ -38,6 +38,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 | [[construir.js]] | `public/js/construir.js` | La construcción en el juego: modo construcción, colocar, editar, material automático y su HUD |
 | [[configuracion.js]] | `public/js/configuracion.js` | Panel de configuración: Juego, Video, Sonido y Controles |
 | [[autos.js]] | `public/js/autos.js` | Autos: medidas, asientos, física de manejo, choques y estado de red (compartido) |
+| [[mapaHud.js]] | `public/js/mapaHud.js` | Minimapa que sigue al jugador, mapa grande (M), brújula y marcas en el mapa y en el mundo |
 | [[golpes.js]] | `public/js/golpes.js` | Grietas de lo dañado, barra de vida de lo que golpeás o mirás y punto débil del pico |
 | [[manejar.js]] | `public/js/manejar.js` | Los autos en el juego: manejar, autos de los demás, subir y bajar, gente sentada, HUD y sonidos |
 | [[opcionesBots.js]] | `public/js/opcionesBots.js` | Totales y dificultades de los bots (compartido) |
@@ -53,7 +54,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 
 ## Sistemas del juego
 
-- [[Mapa de la isla]] · [[Estructuras rompibles]] · [[Daño visible y punto débil]] · [[Salas y partidas]] · [[Bus, caída y paracaídas]] · [[Deslizarse]] · [[Tormenta]] · [[Loot y rarezas]] · [[Armas y disparo]] · [[Construcción]] · [[Autos]] · [[Bots]] · [[Pico y recursos]] · [[Curación y escudo]] · [[Configuración y controles]]
+- [[Mapa de la isla]] · [[Mapa y marcas]] · [[Estructuras rompibles]] · [[Daño visible y punto débil]] · [[Salas y partidas]] · [[Bus, caída y paracaídas]] · [[Deslizarse]] · [[Tormenta]] · [[Loot y rarezas]] · [[Armas y disparo]] · [[Construcción]] · [[Autos]] · [[Bots]] · [[Pico y recursos]] · [[Curación y escudo]] · [[Configuración y controles]]
 
 ## Arte y herramientas
 
@@ -66,6 +67,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 - `tools/autos/pruebas.mjs`: pruebas de los autos (ver [[autos.js]]). `tools/autos/embestidas.mjs` y `tools/autos/servidor.mjs`: pruebas de los autos que rompen lo que chocan según la velocidad (física y contra el servidor, ver [[Autos]]).
 - `tools/bots/pruebas.mjs` y `tools/bots/partida.mjs`: pruebas de los bots y una partida entera solo con bots (ver [[Bots]]).
 - `tools/iconos/pruebas.mjs`: pruebas de las fotos de la barra de items en el navegador (ver [[iconos.js]]).
+- `tools/mapaHud/pruebas.mjs`: pruebas del minimapa, el mapa grande y las marcas, en Node, contra el servidor y en el navegador (ver [[mapaHud.js]]).
 - `tools/golpes/pruebas.mjs`: pruebas del punto débil y la vida de lo dañado contra el servidor (ver [[Daño visible y punto débil]]).
 - [[sf_tools.py]]: herramientas base de modelado por script.
 - [[Texturas]]: máscaras de cara y tatuaje hechas con Python.

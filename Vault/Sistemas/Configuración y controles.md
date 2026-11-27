@@ -12,3 +12,7 @@ Volver a [[Inicio]]
 ## Bots (2026-11-26)
 
 En la pestaña Juego: *Bots: completar la sala hasta* (`botsTotal`: Sin bots, 4… 24 jugadores) y *Dificultad de los bots* (`botsDificultad`). Es lo que se pone al crear una sala y lo que usa *Jugar con bots* (si dice "Sin bots", usa 12). Cambiarlo en la sala también lo guarda acá. Ver [[Bots]].
+
+## Mapa y marcas (2026-11-26)
+
+[[mapaHud.js]] registra sus propios controles y opciones (como [[construir.js]]): *Abrir / cerrar el mapa* (`mapa`, M) y *Marcar donde apuntás* (`marcar`, clic de la rueda y T), los dos en el grupo *Otros* con contexto `siempre` (valen a pie, construyendo y en el auto). Opciones en la pestaña Juego: *Compartir tus marcas con la sala* (`compartirMarcas`, sí) y *Zoom del minimapa* (`minimapaZoom`: cerca, medio o lejos). Con el mapa abierto, Esc lo cierra en vez de abrir el panel. Ver [[Mapa y marcas]].
