@@ -14,8 +14,9 @@ import {
 import { TIPOS, normalizar, motivoNoEncaja, sinApoyo, vidaDe, editValida, OBRA, ALCANCE_EDICION, cajaPieza, superficie, DEBAJO } from './public/js/construccion.js';
 import { AUTO, nuevoAuto, aplicarRed, estadoRed, autoPublico, asientoLibre, rapidez, materialChoque, impacto, claveChoque } from './public/js/autos.js';
 import { repartirLoot, acomodarLoot, LOOT_RADIO, LOOT_ALTO } from './public/js/lugarLoot.js';
-import { totalValido, dificultadValida, cuantosBots } from './public/js/opcionesBots.js';
+import { totalValido, dificultadValida, cuantosBots, BOT_TOTALES } from './public/js/opcionesBots.js';
 import { nuevoBot, nombresBots, prepararBots, actualizarBots, alRecibirDanio, alMatar } from './servidor/bots.js';
+import { servirArchivo, salud, latido, topeBots } from './servidor/hosting.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -28,6 +29,8 @@ const BOT_MS = 50;      // los bots se mueven a 20 Hz
 // Sólo para mirar o probar a los bots: SF_BOTS_HASTA_EL_FINAL=1 npm start sigue la partida aunque ya no quede
 // ninguna persona viva (si no, termina a los pocos segundos de morir la última).
 const BOTS_HASTA_EL_FINAL = !!process.env.SF_BOTS_HASTA_EL_FINAL;
+// En un hosting chico (Render gratis): SF_BOTS_MAX=8 limita los bots de cada sala a 8 jugadores en total.
+const BOTS_MAX = topeBots(BOT_TOTALES, process.env.SF_BOTS_MAX);
 const PICKUP_RANGE = 3.2;
 // Sólo para probar la construcción: SF_MATS=500 npm start arranca cada partida con 500 de cada material.
 const MATS_INICIALES = Math.max(0, Math.min(MAX_MATS, Number(process.env.SF_MATS) || 0));
@@ -61,18 +64,17 @@ const ROOTS = {
   '/': path.join(__dirname, 'public/'),
 };
 const server = http.createServer((req, res) => {
-  let url = decodeURIComponent(req.url.split('?')[0]);
+  let url;
+  try { url = decodeURIComponent(req.url.split('?')[0]); } catch { res.writeHead(400); return res.end('Dirección inválida'); } // "/%" tiraba el servidor
+  if (url === '/salud') return salud(res, { version: VERSION, salas: rooms.size, conectados: wss.clients.size });
   if (url === '/') url = '/index.html';
   for (const [prefix, dir] of Object.entries(ROOTS)) {
     if (!url.startsWith(prefix)) continue;
     const file = path.normalize(path.join(dir, url.slice(prefix.length)));
     if (!file.startsWith(dir)) break;
-    return fs.readFile(file, (err, data) => {
-      if (err) { res.writeHead(404); return res.end('No encontrado'); }
-      // sin caché: después de un git pull el navegador trae los archivos nuevos (no mezcla código viejo con nuevo)
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
-      res.end(data);
-    });
+    // sin caché fija pero con ETag y gzip (servidor/hosting.js): después de un git pull el navegador trae los
+    // archivos nuevos (no mezcla código viejo con nuevo) y lo que no cambió no se vuelve a bajar
+    return servirArchivo(req, res, file, MIME[path.extname(file)] || 'application/octet-stream');
   }
   res.writeHead(404); res.end('No encontrado');
 });
@@ -114,7 +116,7 @@ const personas = (room) => [...room.players.values()].filter((p) => !p.bot);
 
 function roomInfo(room) {
   return {
-    code: room.code, seed: room.seed, phase: room.phase, hostId: room.hostId, islandSize: ISLAND_SIZE, bots: room.bots,
+    code: room.code, seed: room.seed, phase: room.phase, hostId: room.hostId, islandSize: ISLAND_SIZE, bots: room.bots, botsMax: BOTS_MAX,
     players: [...room.players.values()].map(publicPlayer), bus: room.bus, storm: room.storm, serverTime: Date.now(),
   };
 }
@@ -1093,7 +1095,10 @@ function derrumbar(room, cajas = null) {
 }
 
 // ---------- WebSocket ----------
-const wss = new WebSocketServer({ server });
+// permessage-deflate (SF_WS_COMPRIMIR=1): los mensajes viajan comprimidos y gastan unas 5 veces menos ancho de banda (medido con 8 jugadores), pero
+// comprimir para cada jugador cuesta CPU: con 0,1 CPU (Render gratis) la partida se traba, por eso viene apagado.
+const wss = new WebSocketServer({ server, perMessageDeflate: process.env.SF_WS_COMPRIMIR === '1' ? { threshold: 64, zlibDeflateOptions: { level: 1 } } : false });
+latido(wss);
 
 wss.on('connection', (ws) => {
   let player = null;
@@ -1136,7 +1141,7 @@ wss.on('connection', (ws) => {
       if (player.id !== room.hostId || room.phase !== 'lobby') return;
       const total = Number(msg.total), dif = String(msg.dif || room.bots.dif);
       if (!totalValido(total) || !dificultadValida(dif)) return;
-      room.bots = { total, dif };
+      room.bots = { total: BOTS_MAX == null ? total : Math.min(total, BOTS_MAX), dif };
       broadcast(room, { t: 'room', room: roomInfo(room) });
       return;
     }

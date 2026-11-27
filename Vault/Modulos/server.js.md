@@ -6,7 +6,7 @@ Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.
 
 ## Qué hace
 
-1. **HTTP estático**: sirve `public/` en `/` y `node_modules/three/` en `/vendor/three/` (lo usa el import map de [[index.html]]).
+1. **HTTP estático**: sirve `public/` en `/` y `node_modules/three/` en `/vendor/three/` (lo usa el import map de [[index.html]]) con `servirArchivo` de [[hosting.js]] (ETag, 304 y gzip). `GET /salud` contesta el health check. Una dirección mal escrita (`/%`) da 400.
 2. **WebSocket** (`ws`) sobre el mismo servidor: salas, partida y chat. Ver [[Protocolo de red]].
 3. **Tick** cada 100 ms (`TICK_MS`): pasa de `bus` a `playing`, fuerza el salto cuando termina el recorrido del bus y aplica la [[Tormenta]].
 
@@ -58,5 +58,12 @@ Archivo: `server.js` (raíz del repo). Se arranca con `npm start` (`node server.
 ## Versión y caché (2026-11-26)
 
 - `huellaCodigo()`: sha1 de los `.js` de la raíz, `servidor/` y `public/js` al arrancar (`VERSION`). `codigoViejo()` la recalcula cuando alguien entra a una sala: si cambió (un `git pull` con el servidor prendido) avisa una vez en la consola y manda `viejo: true` en `welcome`.
-- Los archivos estáticos salen con `Cache-Control: no-cache`, para que después de actualizar el navegador no mezcle archivos viejos con nuevos.
+- Los archivos estáticos salen con `Cache-Control: no-cache` y `ETag` ([[hosting.js]]): después de actualizar el navegador no mezcla archivos viejos con nuevos, y lo que no cambió no se vuelve a bajar (304).
 - Por qué: [[Autos funcionales]] (Rafael actualizó sin reiniciar el servidor y los autos "no andaban").
+
+## Hosting (2026-11-26)
+
+- `BOTS_MAX = topeBots(BOT_TOTALES, SF_BOTS_MAX)` ([[hosting.js]]): el mensaje `bots` guarda `min(total, BOTS_MAX)` y `roomInfo` manda `botsMax` (o `null` sin tope).
+- `latido(wss)`: ping cada 25 s a cada WebSocket.
+- `perMessageDeflate` solo con `SF_WS_COMPRIMIR=1` (apagado por defecto: en 0,1 CPU traba la partida).
+- Ver [[Jugar online]] y [[render.yaml]].

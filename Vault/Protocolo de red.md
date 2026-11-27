@@ -2,7 +2,7 @@
 
 Volver a [[Inicio]] · [[Arquitectura]]
 
-WebSocket sobre el mismo servidor HTTP de [[server.js]]. Cada mensaje es un JSON con el tipo en el campo `t`.
+WebSocket sobre el mismo servidor HTTP de [[server.js]]. Cada mensaje es un JSON con el tipo en el campo `t`. El servidor manda un ping cada 25 s y corta a quien no contesta ([[hosting.js]] `latido`). Por HTTP, `GET /salud` devuelve `{ ok, version, salas, conectados, uptime }`.
 
 ## Cliente → servidor
 
@@ -36,5 +36,5 @@ Los procesa `handle(m)` en [[main.js]]:
 - `matchStart` y `welcome` (si la partida ya empezó) llevan un snapshot de la partida (`matchSnapshot`), con las piezas del mapa ya rotas (`piezas`), las dañadas con su vida (`pzHp`: `[[id, vida], ...]`) y los cofres que bajaron (`cofresMovidos`), los autos (`autos`: posición, vida, si está roto, asientos y color) y las marcas de los vivos (`marcas`: `[[id, [x, y, z]], ...]`).
 - `pzRota` (`ids`): piezas del mapa que se rompieron; la primera es la que recibió el golpe y las demás se cayeron por quedar sin apoyo. `chestMove` (`idx`, `y`): un cofre bajó porque se rompió el piso donde estaba.
 
-- `room` lleva `bots` (`{ total, dif }`) y cada jugador de la lista puede traer `bot: true`. Los bots mandan su estado con el mismo `state` que los jugadores (lo arma el servidor, ver [[Bots]]).
+- `room` lleva `botsMax` (el tope de bots del servidor, `SF_BOTS_MAX`, o `null`; ver [[hosting.js]]) y `bots` (`{ total, dif }`) y cada jugador de la lista puede traer `bot: true`. Los bots mandan su estado con el mismo `state` que los jugadores (lo arma el servidor, ver [[Bots]]).
 - `matchEnd` puede traer `botsVivos`: la partida terminó porque no quedaba ninguna persona viva.

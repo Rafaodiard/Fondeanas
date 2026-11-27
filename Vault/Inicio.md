@@ -4,7 +4,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 
 - Repo: https://github.com/Rafaodiard/Fondeanas
 - Stack: Node (`server.js` con `ws`) + Three.js 0.170 como ES modules sin bundler. `npm start` levanta todo en el puerto 3000 (`PORT` lo cambia).
-- Vault actualizado con el mapa abrible, el minimapa con zoom, la brújula y las marcas (rama `claude/project-thread-gkrms5`, 2026-11-26), las fotos de las armas en la barra de items (rama `claude/project-thread-re7eeo`, 2026-11-26), los bots (rama `claude/project-thread-jzsanm`, 2026-11-26), el daño visible y el punto débil del pico (rama `claude/project-thread-rrpo2j`, 2026-11-26), los autos manejables, además de la construcción estilo battle royale, el cofre y los objetos del piso modelados, y la caída libre, el paracaídas y deslizarse. El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
+- Vault actualizado con el hosting en Render gratis (rama `claude/project-thread-f5a861`, 2026-11-26, ver [[Jugar online]]), el mapa abrible, el minimapa con zoom, la brújula y las marcas (rama `claude/project-thread-gkrms5`, 2026-11-26), las fotos de las armas en la barra de items (rama `claude/project-thread-re7eeo`, 2026-11-26), los bots (rama `claude/project-thread-jzsanm`, 2026-11-26), el daño visible y el punto débil del pico (rama `claude/project-thread-rrpo2j`, 2026-11-26), los autos manejables, además de la construcción estilo battle royale, el cofre y los objetos del piso modelados, y la caída libre, el paracaídas y deslizarse. El grafo de graphify no se regeneró en esta tanda (ver [[Graphify de la PC de Rafael]]).
 
 ## Cómo está armado
 
@@ -43,6 +43,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 | [[manejar.js]] | `public/js/manejar.js` | Los autos en el juego: manejar, autos de los demás, subir y bajar, gente sentada, HUD y sonidos |
 | [[opcionesBots.js]] | `public/js/opcionesBots.js` | Totales y dificultades de los bots (compartido) |
 | [[bots.js]] | `servidor/bots.js` | Los bots: salto, caída, loot, pelea, construcción, curación y tormenta (solo servidor) |
+| [[hosting.js]] | `servidor/hosting.js` | Archivos con ETag y gzip, `/salud`, latido de los WebSocket y tope de bots para el hosting (solo servidor) |
 | [[navegacion.js]] | `servidor/navegacion.js` | Grillas de lugares pisables y rutas para que los bots caminen por el mapa (solo servidor) |
 
 ## Pantallas
@@ -54,7 +55,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 
 ## Sistemas del juego
 
-- [[Mapa de la isla]] · [[Mapa y marcas]] · [[Estructuras rompibles]] · [[Daño visible y punto débil]] · [[Salas y partidas]] · [[Bus, caída y paracaídas]] · [[Deslizarse]] · [[Tormenta]] · [[Loot y rarezas]] · [[Armas y disparo]] · [[Construcción]] · [[Autos]] · [[Bots]] · [[Pico y recursos]] · [[Curación y escudo]] · [[Configuración y controles]]
+- [[Mapa de la isla]] · [[Mapa y marcas]] · [[Estructuras rompibles]] · [[Daño visible y punto débil]] · [[Salas y partidas]] · [[Bus, caída y paracaídas]] · [[Deslizarse]] · [[Tormenta]] · [[Loot y rarezas]] · [[Armas y disparo]] · [[Construcción]] · [[Autos]] · [[Bots]] · [[Pico y recursos]] · [[Curación y escudo]] · [[Configuración y controles]] · [[Jugar online]]
 
 ## Arte y herramientas
 
@@ -73,6 +74,7 @@ Battle royale 3D para navegador: isla fija con 10 pueblos ([[Mapa de la isla]]),
 - [[Texturas]]: máscaras de cara y tatuaje hechas con Python.
 - `tools/caida/pruebas.mjs`: pruebas de la caída libre, el paracaídas y deslizarse (ver [[caida.js]]).
 - `tools/controles/pruebas.mjs`: pruebas del registro de controles y opciones (ver [[controles.js]]).
+- [[render.yaml]]: el Blueprint de Render (plan gratis) y sus variables. Pruebas: `node tools/hosting/pruebas.mjs` (ver [[hosting.js]]).
 - [[Pruebas de construcción]]: piezas editadas, apoyo, derrumbes, vida y que lo que se ve coincida con lo que se pisa.
 - [[Pruebas del loot]]: el loot de cofres, jugadores y construcciones nunca atraviesa paredes y queda apoyado.
 - [[Pruebas del mapa]]: pruebas automáticas de colisiones, escaleras, puertas, alcance del loot, lo que se ve (caras al revés, caras que titilan, pisos falsos) y derrumbes.
