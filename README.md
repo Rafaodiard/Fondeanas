@@ -308,6 +308,14 @@ node tools/controles/pruebas.mjs
 
 ## Capturas
 
+![Tienda del día: destacadas, del día y el personaje probándose la skin elegida](docs/menu_tienda.jpg)
+![Caja abierta: la ruleta frena en el premio](docs/menu_caja.jpg)
+![Apuestas: cara o cruz y contrato](docs/menu_apuestas.jpg)
+![Panel admin: dar pavos y skins](docs/menu_admin.jpg)
+![Los 38 trajes: humanos, monstruos, animales y robots, todos del mismo tamaño](docs/skins_trajes.jpg)
+![Mochilas](docs/skins_mochilas.jpg)
+![Picos](docs/skins_picos.jpg)
+
 ![Golpe crítico en el punto débil: 100 de daño, chispas celestes y la barra de vida de la pared](docs/golpes_critico.jpg)
 ![Paredes con distinto daño: las grietas se abren a medida que pierden vida](docs/golpes_grietas.jpg)
 ![Bus volador desde el juego](docs/bus.png)
